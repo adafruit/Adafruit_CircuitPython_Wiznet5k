@@ -60,9 +60,21 @@ REG_SHAR           = const(0x0009) # Source Hardware Address Register
 REG_SIPR           = const(0x000F) # Source IP Address Register
 # Wiznet5k Socket Registers
 REG_SNSR           = const(0x0003) # Socket n Status Register
+REG_SNMR           = const(0x0000) # Socket Mode Register
 
 # Register commands
 MR_RST = const(0x80) # Mode Register RST
+
+# Socket registers
+SNMR_CLOSE  = const(0x00);
+SNMR_TCP    = const(0x21);
+SNMR_UDP    = const(0x02);
+# TODO: cleanup following if not req'd
+# SNMR_IPRAW  = const(0x03);
+# SNMR_MACRAW = const(0x04);
+# SNMR_PPPOE  = const(0x05);
+# SNMR_ND     = const(0x20);
+# SNMR_MULTI  = const(0x80);
 
 # Default hardware MAC address
 DEFAULT_MAC = [0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED]
@@ -251,8 +263,22 @@ class WIZNET:
                 bus_device.write(bytes([data[i]]))
         return len
 
+    # socket-specific methods
     def _read_snsr(self, socket, length=None):
+        """Returns status of socket 'socket'.
+        """
         ch_base = self._ch_base_msb << 8
         if length is None:
             return self.read(ch_base+0*0x00+REG_SNSR, 0x01)
         return self.read(ch_base+0*0x00+REG_SNSR, 0x01, length)
+    
+    # TODO: make ch_base global
+
+    #   static inline void write##name(SOCKET _s, uint8_t _data) { \
+    #   writeSn(_s, address, _data);                             \
+    def _write_socket(self, sock, addr, data):
+        """Performs a socket register write command.
+
+        """
+        ch_base = self._ch_base_msb << 8
+        return self.write(ch_base+ sock * 0x0100 + addr, data);

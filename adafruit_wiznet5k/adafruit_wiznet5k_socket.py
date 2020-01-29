@@ -31,6 +31,7 @@ A socket compatible interface with the Wiznet5k module.
 
 """
 from micropython import const
+import time
 
 # SNSR
 SOCK_CLOSED      = 0x00;
@@ -52,16 +53,28 @@ SOCK_PPPOE       = 0x5F;
 class SOCKET:
     """A simplified implementation of the Python 'socket' class
     for connecting to a Wiznet5k module.
+    TODO: Document interface param.
+    TODO: Document protocol param.
 
     """
-    def __init__(self, interface):
+    def __init__(self, interface, protocol=SOCK_TCP):
         # check hardware compatibility, throw err if hardware not detected
         assert interface.chip != None, "No Wiznet module detected."
-        status = bytearray(interface.max_sockets)
+        self._interface = interface
+        status = bytearray(self._interface.max_sockets)
 
         # check all the hardware sockets, allocate closed sockets
-        for sock in range(0, interface.max_sockets):
-            status[sock] = interface._read_snsr(sock)[0]
+        for sock in range(0, self._interface.max_sockets):
+            status[sock] = self._interface._read_snsr(sock)[0]
             if status[sock] == SOCK_CLOSED:
                 # TODO: makesocket
                 print("making new socket...!")
+    
+    def _make_socket(self, sock):
+        """Creates a new Wiznet5k socket.
+        :param int sock: Socket number
+        """
+        # TODO: (?) EthernetServer::server_port[s] = 0;
+        time.sleep(0.250)
+        self._interface._write_snmr(sock, protocol)
+        self._interface._write_snir(sock, 0xFF)
