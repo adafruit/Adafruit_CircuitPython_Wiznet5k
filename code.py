@@ -10,3 +10,7 @@ spi_bus = busio.SPI(board.SCK, MOSI=board.MOSI, MISO=board.MISO)
 
 # Initialize wiznet5k module interface
 eth = wiznet(spi_bus, cs)
+
+print("Hardware MAC Address: ", eth.mac_address)
+
+print("Hardware IP Address: ", eth.ip_address)

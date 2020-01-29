@@ -55,15 +55,17 @@ __version__ = "0.0.0-auto.0"
 __repo__ = "https://github.com/adafruit/Adafruit_CircuitPython_Wiznet5k.git"
 
 # Registers
-REG_MR = const(0x0000) # Mode Register
-REG_VERSIONR_W5500 = const(0x0039) # W5500 Silicon Version Register
-REG_SHAR = const(0x0009)
+REG_MR = const(0x0000)              # Mode Register
+REG_VERSIONR_W5500 = const(0x0039)  # W5500 Silicon Version Register
+REG_SHAR = const(0x0009)            # Source Hardware Address Register
+REG_SIPR = const(0x000F)            # Source IP Address Register
+
 # Register commands
 MR_RST = const(0x80) # Mode Register RST
 
+
 # Default hardware MAC address
 DEFAULT_MAC = [0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED]
-
 # Maximum number of sockets to support, differs between chip versions.
 W5200_W5500_MAX_SOCK_NUM = const(0x08)
 
@@ -78,8 +80,7 @@ class wiznet:
     """
 
     def __init__(self, spi_bus, cs, reset=None,
-                mac=DEFAULT_MAC, timeout=None, debug=False):
-        self._debug = debug
+                 mac=DEFAULT_MAC, timeout=None):
         self._device = spidev.SPIDevice(spi_bus, cs,
                                         baudrate=8000000,
                                         polarity=0, phase=0)
@@ -88,18 +89,32 @@ class wiznet:
         self._cs = cs
         # initialize the module
         assert self._w5100_init() == 1, "Unsuccessfully initialized Wiznet module."
-        # set MAC address
+        # Set MAC address
         self.mac_address = mac
+        # Set IP Address
+        self.ip_address = (0, 0, 0, 0)
 
-        # TODO: Set IP Address
-        # 	W5100.setIPAddress(IPAddress(0,0,0,0).raw_address());
+    @property
+    def ip_address(self):
+        """Returns the hardware's IP address.
+        """
+        return self.read(REG_SIPR, 0x00, 4)
+
+    @ip_address.setter
+    def ip_address(self, ip_address):
+        """Returns the hardware's IP address.
+        :param tuple ip_address: Desired IP address.
+        """
+        # inline void setIPAddress(const uint8_t * addr) { writeSIPR(addr); }
+        #   __GP_REGISTER_N(SIPR,   0x000F, 4); // Source IP address
+        self._write_16(REG_SIPR, 0x04, ip_address, 4)
 
     @property
     def mac_address(self):
-        """The hardware MAC address.
+        """Returns the hardware's MAC address.
 
         """
-        return self._mac
+        return self.read(REG_SHAR, 0x00, 6)
 
     @mac_address.setter
     def mac_address(self, address):
@@ -108,23 +123,7 @@ class wiznet:
 
         """
         self._write_16(REG_SHAR, 0x04, address, 6)
-        print(self.read(REG_SHAR, 0x00))
-        # TODO: implement n-byte read
-
-    def _write_16(self, addr, buf, data, len):
-        """Writes data to a register address.
-        :param int addr: Register address.
-        :param int cb: Common register block (?)
-        :param int data: Data to write to the register.
-
-        """
-        with self._device as bus_device:
-            bus_device.write(bytes([addr >> 8]))
-            bus_device.write(bytes([addr & 0xFF]))
-            bus_device.write(bytes([buf]))
-            for i in range(0, len):
-                bus_device.write(bytes([data[i]]))
-        return len
+        
 
     def _w5100_init(self):
         """Initializes and detects a wiznet5k module.
@@ -152,14 +151,14 @@ class wiznet:
         """
         assert self.sw_reset() == 0, "Chip not reset properly!"
         self._chip_type = "w5500"
-        self.write_mr(0x08)
-        assert self.read_mr()[0] == 0x08, "Expected 0x08."
+        self._write_mr(0x08)
+        assert self._read_mr()[0] == 0x08, "Expected 0x08."
 
-        self.write_mr(0x10)
-        assert self.read_mr()[0] == 0x10, "Expected 0x10."
+        self._write_mr(0x10)
+        assert self._read_mr()[0] == 0x10, "Expected 0x10."
 
-        self.write_mr(0x00)
-        assert self.read_mr()[0] == 0x00, "Expected 0x00."
+        self._write_mr(0x00)
+        assert self._read_mr()[0] == 0x00, "Expected 0x00."
 
         if self.read(REG_VERSIONR_W5500, 0x00)[0] != 0x04:
             return -1
@@ -170,22 +169,22 @@ class wiznet:
         by writing to its MR register reset bit.
 
         """
-        mr = self.read_mr()
-        self.write_mr(0x80)
-        mr = self.read_mr()
+        mr = self._read_mr()
+        self._write_mr(0x80)
+        mr = self._read_mr()
         if mr[0] != 0x00:
             return -1
         return 0
 
 
-    def read_mr(self):
+    def _read_mr(self):
         """Reads from the Mode Register (MR).
 
         """
         res = self.read(REG_MR, 0x00)
         return res
 
-    def write_mr(self, data):
+    def _write_mr(self, data):
         """Writes to the mode register (MR).
         :param int data: Data to write to the mode register.
 
@@ -205,7 +204,7 @@ class wiznet:
             bus_device.write(bytes([cb]))
             bus_device.write(bytes([data]))
 
-    def read(self, addr, cb):
+    def read(self, addr, cb, length=1):
         """Reads data from a register address.
         :param int addr: Register address.
         :param int cb: Common register block (?)
@@ -215,9 +214,23 @@ class wiznet:
             bus_device.write(bytes([addr >> 8]))
             bus_device.write(bytes([addr & 0xFF]))
             bus_device.write(bytes([cb]))
-            result = bytearray(1)
+            result = bytearray(length)
             bus_device.readinto(result)
         return result
 
+    def _write_16(self, addr, buf, data, len):
+        """Writes data to a register address.
+        :param int addr: Register address.
+        :param int buf: Buffer.
+        :param int data: Data to write to the register.
+        :param int len: Length of data to write.
 
+        """
+        with self._device as bus_device:
+            bus_device.write(bytes([addr >> 8]))
+            bus_device.write(bytes([addr & 0xFF]))
+            bus_device.write(bytes([buf]))
+            for i in range(0, len):
+                bus_device.write(bytes([data[i]]))
+        return len
 
