@@ -57,7 +57,7 @@ __repo__ = "https://github.com/adafruit/Adafruit_CircuitPython_Wiznet5k.git"
 # Registers
 REG_MR = const(0x0000) # Mode Register
 REG_VERSIONR_W5500 = const(0x0039) # W5500 Silicon Version Register
-
+REG_SHAR = const(0x0009)
 # Register commands
 MR_RST = const(0x80) # Mode Register RST
 
@@ -72,30 +72,65 @@ class wiznet:
     :param ~busio.SPI spi_bus: The SPI bus the Wiznet module is connected to.
     :param ~digitalio.DigitalInOut cs: Chip select pin.
     :param ~digitalio.DigitalInOut rst: Optional reset pin. 
-    :param str mac_address: The Wiznet's MAC Address.
+    :param str mac: The Wiznet's MAC Address.
     :param int timeout: Times out if no response from DHCP server.
 
     """
 
     def __init__(self, spi_bus, cs, reset=None,
-                mac_address=DEFAULT_MAC, timeout=None, debug=False):
+                mac=DEFAULT_MAC, timeout=None, debug=False):
         self._debug = debug
         self._device = spidev.SPIDevice(spi_bus, cs,
                                         baudrate=8000000,
                                         polarity=0, phase=0)
-        self.mac_address = mac_address
         self._chip_type = None
-        time.sleep(1)
         # init c.s.
         self._cs = cs
-        # initialize the chip
+        # initialize the module
         assert self._w5100_init() == 1, "Unsuccessfully initialized Wiznet module."
+        # set MAC address
+        self.mac_address = mac
 
+        # TODO: Set IP Address
+        # 	W5100.setIPAddress(IPAddress(0,0,0,0).raw_address());
 
-    def _w5100_init(self):
-        """Initializes a W5k module and performs chip detection.
+    @property
+    def mac_address(self):
+        """The hardware MAC address.
 
         """
+        return self._mac
+
+    @mac_address.setter
+    def mac_address(self, address):
+        """Sets the hardware MAC address.
+        :param tuple address: Hardware MAC address.
+
+        """
+        self._write_16(REG_SHAR, 0x04, address, 6)
+        print(self.read(REG_SHAR, 0x00))
+        # TODO: implement n-byte read
+
+    def _write_16(self, addr, buf, data, len):
+        """Writes data to a register address.
+        :param int addr: Register address.
+        :param int cb: Common register block (?)
+        :param int data: Data to write to the register.
+
+        """
+        with self._device as bus_device:
+            bus_device.write(bytes([addr >> 8]))
+            bus_device.write(bytes([addr & 0xFF]))
+            bus_device.write(bytes([buf]))
+            for i in range(0, len):
+                bus_device.write(bytes([data[i]]))
+        return len
+
+    def _w5100_init(self):
+        """Initializes and detects a wiznet5k module.
+
+        """
+        time.sleep(1)
         self._cs.switch_to_output()
         self._cs.value = 1
 
