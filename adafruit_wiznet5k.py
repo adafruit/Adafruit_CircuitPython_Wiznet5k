@@ -41,13 +41,116 @@ Implementation Notes
 * Adafruit CircuitPython firmware for the supported boards:
   https://github.com/adafruit/circuitpython/releases
 
-.. todo:: Uncomment or remove the Bus Device and/or the Register library dependencies based on the library's use of either.
 
 # * Adafruit's Bus Device library: https://github.com/adafruit/Adafruit_CircuitPython_BusDevice
-# * Adafruit's Register library: https://github.com/adafruit/Adafruit_CircuitPython_Register
 """
 
 # imports
+import time
+import adafruit_bus_device.spi_device as spidev
+from micropython import const
+from digitalio import DigitalInOut
 
 __version__ = "0.0.0-auto.0"
 __repo__ = "https://github.com/adafruit/Adafruit_CircuitPython_Wiznet5k.git"
+
+
+REG_MR = const(0x0000) # Mode Register
+REG_VERSIONR_W5500 = const(0x0039) # W5500 Silicon Version Register
+
+MR_RST = const(0x80) # Mode Register RST
+
+
+class wiznet:
+    """Interface for WIZNET5k module.
+
+    :param ~busio.SPI spi_bus: The SPI bus the Wiznet module is connected to.
+    :param ~digitalio.DigitalInOut cs: Chip select pin.
+    :param ~digitalio.DigitalInOut rst: Optional reset pin. 
+    :param str mac_address: The Wiznet's MAC Address.
+    :param int timeout: Times out if no response from DHCP server.
+
+    """
+
+    def __init__(self, spi_bus, cs, reset=None, mac_address=[0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED], timeout=None):
+        self._device = spidev.SPIDevice(spi_bus, cs,
+                                        baudrate=8000000,
+                                        polarity=0, phase=0)
+        self.mac_address = mac_address
+        self._chip_type = None
+        time.sleep(1)
+        # init c.s.
+        self._cs = cs
+        self._cs.switch_to_output()
+        self._cs.value = 1
+        self.detect_w5500()
+
+    def detect_w5500(self):
+        """Detects W5500 chip.
+
+        """
+        assert self.sw_reset() == 0, "Chip not reset properly!"
+        self._chip_type = "w5500"
+        self.write_mr(0x08)
+        mr = self.read_mr()
+        print("mr =", mr)
+
+        self.write_mr(0x10)
+        mr = self.read_mr()
+        print("mr =", mr)
+
+        self.write_mr(0x00)
+        mr = self.read_mr()
+        print("mr =", mr)
+
+        self.read_mr()
+        mr = self.read_mr()
+        print("mr =", mr)
+
+        data = self.read(REG_VERSIONR_W5500, 0x00)
+        print(data)
+
+
+    def sw_reset(self):
+        """Performs a soft-reset on a Wiznet chip
+        by writing to its MR register reset bit.
+
+        """
+        mr = self.read_mr()
+        print("mr =", mr)
+        self.write_mr(0x80)
+        mr = self.read_mr()
+        print("mr =", mr)
+        if mr[0] != 0x00:
+            return -1
+        return 0
+
+
+    def read_mr(self):
+        """Reads from the Mode Register (MR).
+
+        """
+        res = self.read(REG_MR, 0x00)
+        return res
+
+    def write_mr(self, data):
+        self.write(REG_MR, 0x04, data)
+
+    def write(self, addr, cb, data):
+        with self._device as bus_device:
+            bus_device.write(bytes([addr >> 8]))
+            bus_device.write(bytes([addr & 0xFF]))
+            bus_device.write(bytes([cb]))
+            bus_device.write(bytes([data]))
+
+    def read(self, addr, cb):
+        with self._device as bus_device:
+            bus_device.write(bytes([addr >> 8]))
+            bus_device.write(bytes([addr & 0xFF]))
+            bus_device.write(bytes([cb]))
+            result = bytearray(1)
+            bus_device.readinto(result)
+        return result
+
+
+
