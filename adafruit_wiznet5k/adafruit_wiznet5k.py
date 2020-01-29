@@ -33,8 +33,6 @@ Implementation Notes
 
 **Hardware:**
 
-.. todo:: Add links to any specific hardware product page(s), or category page(s). Use unordered list & hyperlink rST
-   inline format: "* `Link Text <url>`_"
 
 **Software and Dependencies:**
 
@@ -50,7 +48,7 @@ import time
 import adafruit_bus_device.spi_device as spidev
 from micropython import const
 from digitalio import DigitalInOut
-from adafruit_wiznet5k.adafruit_wiznet5k_dhcp import DHCP
+from adafruit_wiznet5k.adafruit_wiznet5k_dhcp import DHCP as DHCP
 
 __version__ = "0.0.0-auto.0"
 __repo__ = "https://github.com/adafruit/Adafruit_CircuitPython_Wiznet5k.git"
@@ -63,7 +61,6 @@ REG_SIPR = const(0x000F)            # Source IP Address Register
 
 # Register commands
 MR_RST = const(0x80) # Mode Register RST
-
 
 # Default hardware MAC address
 DEFAULT_MAC = [0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED]
@@ -95,6 +92,21 @@ class WIZNET:
         # Set IP address
         self.ip_address = (0, 0, 0, 0)
 
+
+    @property
+    def max_sockets(self):
+        """Returns max number of sockets supported by chip.
+        """
+        if chip_type == "w5500":
+            return W5200_W5500_MAX_SOCK_NUM
+        else:
+            return -1
+
+    @property
+    def chip(self):
+        """Returns the chip type.
+        """
+        return self._chip_type
 
     @property
     def ip_address(self):
@@ -152,7 +164,6 @@ class WIZNET:
 
         """
         assert self.sw_reset() == 0, "Chip not reset properly!"
-        self._chip_type = "w5500"
         self._write_mr(0x08)
         assert self._read_mr()[0] == 0x08, "Expected 0x08."
 
@@ -164,6 +175,7 @@ class WIZNET:
 
         if self.read(REG_VERSIONR_W5500, 0x00)[0] != 0x04:
             return -1
+        self._chip_type = "w5500"
         return 1
 
     def sw_reset(self):
