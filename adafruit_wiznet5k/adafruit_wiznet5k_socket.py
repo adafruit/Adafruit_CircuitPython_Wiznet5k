@@ -30,6 +30,24 @@ A socket compatible interface with the Wiznet5k module.
 * Author(s): Paul Stoffregen, ladyada, Brent Rubell
 
 """
+from micropython import const
+
+# SNSR
+SOCK_CLOSED      = 0x00;
+SOCK_INIT        = 0x13;
+SOCK_LISTEN      = 0x14;
+SOCK_SYNSENT     = 0x15;
+SOCK_SYNRECV     = 0x16;
+SOCK_ESTABLISHED = 0x17;
+SOCK_FIN_WAIT    = 0x18;
+SOCK_CLOSING     = 0x1A;
+SOCK_TIME_WAIT   = 0x1B;
+SOCK_CLOSE_WAIT  = 0x1C;
+SOCK_LAST_ACK    = 0x1D;
+SOCK_UDP         = 0x22;
+SOCK_IPRAW       = 0x32;
+SOCK_MACRAW      = 0x42;
+SOCK_PPPOE       = 0x5F;
 
 class SOCKET:
     """A simplified implementation of the Python 'socket' class
@@ -40,7 +58,10 @@ class SOCKET:
         # check hardware compatibility, throw err if hardware not detected
         assert interface.chip != None, "No Wiznet module detected."
         status = bytearray(interface.max_sockets)
-        # check all the hardware sockets, allocate unused sockets
+
+        # check all the hardware sockets, allocate closed sockets
         for sock in range(0, interface.max_sockets):
-            data = interface._read_snsr(sock)
-            print(data)
+            status[sock] = interface._read_snsr(sock)[0]
+            if status[sock] == SOCK_CLOSED:
+                # TODO: makesocket
+                print("making new socket...!")

@@ -54,12 +54,12 @@ __version__ = "0.0.0-auto.0"
 __repo__ = "https://github.com/adafruit/Adafruit_CircuitPython_Wiznet5k.git"
 
 # Wiznet5k Registers
-REG_MR = const(0x0000)              # Mode Register
-REG_VERSIONR_W5500 = const(0x0039)  # W5500 Silicon Version Register
-REG_SHAR = const(0x0009)            # Source Hardware Address Register
-REG_SIPR = const(0x000F)            # Source IP Address Register
+REG_MR             = const(0x0000) # Mode Register
+REG_VERSIONR_W5500 = const(0x0039) # W5500 Silicon Version Register
+REG_SHAR           = const(0x0009) # Source Hardware Address Register
+REG_SIPR           = const(0x000F) # Source IP Address Register
 # Wiznet5k Socket Registers
-REG_SNSR = const(0x0003)            # Socket n Status Register
+REG_SNSR           = const(0x0003) # Socket n Status Register
 
 # Register commands
 MR_RST = const(0x80) # Mode Register RST
@@ -251,14 +251,8 @@ class WIZNET:
                 bus_device.write(bytes([data[i]]))
         return len
 
-    def _read_snsr(self, socket, buf=None, length=None):
+    def _read_snsr(self, socket, length=None):
         ch_base = self._ch_base_msb << 8
-        print(ch_base+0*0x00+REG_SNSR)
-        print(ch_base)
-        # should be 0x1000
-        print(self.read(0x1000, 0x01))
-        # if length == None:
-            # CH_BASE, CH_SIZE
-            # return self.read(self._ch_base_msb << 8 + socket * 0x0100 + REG_SNSR, 0x01)
-        # CH_BASE, CH_SIZE
-        # return self.read(self._ch_base_msb << 8 + socket * 0x0100 + REG_SNSR, buf, length);
+        if length is None:
+            return self.read(ch_base+0*0x00+REG_SNSR, 0x01)
+        return self.read(ch_base+0*0x00+REG_SNSR, 0x01, length)
