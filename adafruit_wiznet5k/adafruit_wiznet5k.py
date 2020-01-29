@@ -50,6 +50,7 @@ import time
 import adafruit_bus_device.spi_device as spidev
 from micropython import const
 from digitalio import DigitalInOut
+from adafruit_wiznet5k.adafruit_wiznet5k_dhcp import DHCP
 
 __version__ = "0.0.0-auto.0"
 __repo__ = "https://github.com/adafruit/Adafruit_CircuitPython_Wiznet5k.git"
@@ -69,7 +70,7 @@ DEFAULT_MAC = [0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED]
 # Maximum number of sockets to support, differs between chip versions.
 W5200_W5500_MAX_SOCK_NUM = const(0x08)
 
-class wiznet:
+class WIZNET:
     """Interface for WIZNET5k module.
     :param ~busio.SPI spi_bus: The SPI bus the Wiznet module is connected to.
     :param ~digitalio.DigitalInOut cs: Chip select pin.
@@ -80,7 +81,7 @@ class wiznet:
     """
 
     def __init__(self, spi_bus, cs, reset=None,
-                 mac=DEFAULT_MAC, timeout=None):
+                 mac=DEFAULT_MAC, timeout=None, response_timeout=None):
         self._device = spidev.SPIDevice(spi_bus, cs,
                                         baudrate=8000000,
                                         polarity=0, phase=0)
@@ -91,8 +92,9 @@ class wiznet:
         assert self._w5100_init() == 1, "Unsuccessfully initialized Wiznet module."
         # Set MAC address
         self.mac_address = mac
-        # Set IP Address
+        # Set IP address
         self.ip_address = (0, 0, 0, 0)
+
 
     @property
     def ip_address(self):
