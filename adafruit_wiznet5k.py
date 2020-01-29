@@ -54,16 +54,21 @@ from digitalio import DigitalInOut
 __version__ = "0.0.0-auto.0"
 __repo__ = "https://github.com/adafruit/Adafruit_CircuitPython_Wiznet5k.git"
 
-
+# Registers
 REG_MR = const(0x0000) # Mode Register
 REG_VERSIONR_W5500 = const(0x0039) # W5500 Silicon Version Register
 
+# Register commands
 MR_RST = const(0x80) # Mode Register RST
 
+# Default hardware MAC address
+DEFAULT_MAC = [0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED]
+
+# Maximum number of sockets to support, differs between chip versions.
+W5200_W5500_MAX_SOCK_NUM = const(0x08)
 
 class wiznet:
     """Interface for WIZNET5k module.
-
     :param ~busio.SPI spi_bus: The SPI bus the Wiznet module is connected to.
     :param ~digitalio.DigitalInOut cs: Chip select pin.
     :param ~digitalio.DigitalInOut rst: Optional reset pin. 
@@ -72,7 +77,9 @@ class wiznet:
 
     """
 
-    def __init__(self, spi_bus, cs, reset=None, mac_address=[0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED], timeout=None):
+    def __init__(self, spi_bus, cs, reset=None,
+                mac_address=DEFAULT_MAC, timeout=None, debug=False):
+        self._debug = debug
         self._device = spidev.SPIDevice(spi_bus, cs,
                                         baudrate=8000000,
                                         polarity=0, phase=0)
@@ -83,7 +90,13 @@ class wiznet:
         self._cs = cs
         self._cs.switch_to_output()
         self._cs.value = 1
-        self.detect_w5500()
+
+        # Detect if chip is Wiznet W5500
+        if self.detect_w5500() == 1:
+            # TODO: perform w5500 initialization
+        else:
+            raise TypeError("Wiznet chip not detected or unsupported by this library.")
+
 
     def detect_w5500(self):
         """Detects W5500 chip.
@@ -92,24 +105,17 @@ class wiznet:
         assert self.sw_reset() == 0, "Chip not reset properly!"
         self._chip_type = "w5500"
         self.write_mr(0x08)
-        mr = self.read_mr()
-        print("mr =", mr)
+        assert self.read_mr()[0] == 0x08, "Expected 0x08."
 
         self.write_mr(0x10)
-        mr = self.read_mr()
-        print("mr =", mr)
+        assert self.read_mr()[0] == 0x10, "Expected 0x10."
 
         self.write_mr(0x00)
-        mr = self.read_mr()
-        print("mr =", mr)
+        assert self.read_mr()[0] == 0x00, "Expected 0x00."
 
-        self.read_mr()
-        mr = self.read_mr()
-        print("mr =", mr)
-
-        data = self.read(REG_VERSIONR_W5500, 0x00)
-        print(data)
-
+        if self.read(REG_VERSIONR_W5500, 0x00)[0] != 0x04:
+            return -1
+        return 1
 
     def sw_reset(self):
         """Performs a soft-reset on a Wiznet chip
@@ -117,10 +123,8 @@ class wiznet:
 
         """
         mr = self.read_mr()
-        print("mr =", mr)
         self.write_mr(0x80)
         mr = self.read_mr()
-        print("mr =", mr)
         if mr[0] != 0x00:
             return -1
         return 0
@@ -134,9 +138,19 @@ class wiznet:
         return res
 
     def write_mr(self, data):
+        """Writes to the mode register (MR).
+        :param int data: Data to write to the mode register.
+
+        """
         self.write(REG_MR, 0x04, data)
 
     def write(self, addr, cb, data):
+        """Writes data to a register address.
+        :param int addr: Register address.
+        :param int cb: Common register block (?)
+        :param int data: Data to write to the register.
+
+        """
         with self._device as bus_device:
             bus_device.write(bytes([addr >> 8]))
             bus_device.write(bytes([addr & 0xFF]))
@@ -144,6 +158,11 @@ class wiznet:
             bus_device.write(bytes([data]))
 
     def read(self, addr, cb):
+        """Reads data from a register address.
+        :param int addr: Register address.
+        :param int cb: Common register block (?)
+
+        """
         with self._device as bus_device:
             bus_device.write(bytes([addr >> 8]))
             bus_device.write(bytes([addr & 0xFF]))
