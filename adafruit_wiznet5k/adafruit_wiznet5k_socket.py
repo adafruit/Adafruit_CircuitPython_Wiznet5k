@@ -30,7 +30,6 @@ A socket compatible interface with the Wiznet5k module.
 * Author(s): Paul Stoffregen, ladyada, Brent Rubell
 
 """
-# imports
 
 class SOCKET:
     """A simplified implementation of the Python 'socket' class
@@ -38,7 +37,10 @@ class SOCKET:
 
     """
     def __init__(self, interface):
-        # check hardware compatibility
+        # check hardware compatibility, throw err if hardware not detected
         assert interface.chip != None, "No Wiznet module detected."
+        status = bytearray(interface.max_sockets)
         # check all the hardware sockets, allocate unused sockets
-        max_index = interface.max_sockets
+        for sock in range(0, interface.max_sockets):
+            data = interface._read_snsr(sock)
+            print(data)
