@@ -88,14 +88,27 @@ class wiznet:
         time.sleep(1)
         # init c.s.
         self._cs = cs
+        # initialize the chip
+        assert self._w5100_init() == 1, "Unsuccessfully initialized Wiznet module."
+
+
+    def _w5100_init(self):
+        """Initializes a W5k module and performs chip detection.
+
+        """
         self._cs.switch_to_output()
         self._cs.value = 1
 
         # Detect if chip is Wiznet W5500
         if self.detect_w5500() == 1:
-            # TODO: perform w5500 initialization
+            # perform w5500 initialization
+            for i in range(0, W5200_W5500_MAX_SOCK_NUM):
+                ctrl_byte = (0x0C + (i<<5))
+                self.write(0x1E, ctrl_byte, 2)
+                self.write(0x1F, ctrl_byte, 2)
         else:
-            raise TypeError("Wiznet chip not detected or unsupported by this library.")
+            return 0
+        return 1
 
 
     def detect_w5500(self):
