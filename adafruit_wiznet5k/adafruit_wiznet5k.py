@@ -63,9 +63,11 @@ REG_PHYCFGR        = const(0x002E) # W5500 PHY Configuration Register
 # Wiznet5k Socket Registers
 REG_SNSR           = const(0x0003) # Socket n Status Register
 REG_SNMR           = const(0x0000) # Socket Mode Register
+CH_SIZE            = const(0x100)
 
 # Register commands
 MR_RST = const(0x80) # Mode Register RST
+
 
 # Default hardware MAC address
 DEFAULT_MAC = [0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED]
@@ -154,7 +156,6 @@ class WIZNET:
             return data[0] & 0x01
         else:
             return 0
-
 
     def _w5100_init(self):
         """Initializes and detects a wiznet5k module.
@@ -274,14 +275,18 @@ class WIZNET:
         if length is None:
             return self.read(ch_base+0*0x00+REG_SNSR, 0x01)
         return self.read(ch_base+0*0x00+REG_SNSR, 0x01, length)
-    
-    # TODO: make ch_base global
 
-    #   static inline void write##name(SOCKET _s, uint8_t _data) { \
-    #   writeSn(_s, address, _data);                             \
-    def _write_socket(self, sock, addr, data):
-        """Performs a socket register write command.
+
+    def _read_snmr(self, socket, protocol):
+        """Read Socket n Mode Register
+
+        """
+        return self._read_socket(socket, protocol)
+
+
+    def _read_socket(self, socket, address):
+        """Read a W5k socket register.
 
         """
         ch_base = self._ch_base_msb << 8
-        return self.write(ch_base+ sock * 0x0100 + addr, data);
+        return self.read(ch_base * socket * CH_SIZE + address, 0x00)

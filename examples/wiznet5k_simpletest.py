@@ -20,4 +20,4 @@ print("Hardware MAC Address: ", eth.mac_address)
 print("Hardware IP Address: ", eth.ip_address)
 
 
-#socket = SOCKET(eth)
+socket = SOCKET(eth)
