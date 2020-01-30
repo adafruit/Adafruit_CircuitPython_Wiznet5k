@@ -58,23 +58,14 @@ REG_MR             = const(0x0000) # Mode Register
 REG_VERSIONR_W5500 = const(0x0039) # W5500 Silicon Version Register
 REG_SHAR           = const(0x0009) # Source Hardware Address Register
 REG_SIPR           = const(0x000F) # Source IP Address Register
+REG_PHYCFGR        = const(0x002E) # W5500 PHY Configuration Register
+
 # Wiznet5k Socket Registers
 REG_SNSR           = const(0x0003) # Socket n Status Register
 REG_SNMR           = const(0x0000) # Socket Mode Register
 
 # Register commands
 MR_RST = const(0x80) # Mode Register RST
-
-# Socket registers
-SNMR_CLOSE  = const(0x00);
-SNMR_TCP    = const(0x21);
-SNMR_UDP    = const(0x02);
-# TODO: cleanup following if not req'd
-# SNMR_IPRAW  = const(0x03);
-# SNMR_MACRAW = const(0x04);
-# SNMR_PPPOE  = const(0x05);
-# SNMR_ND     = const(0x20);
-# SNMR_MULTI  = const(0x80);
 
 # Default hardware MAC address
 DEFAULT_MAC = [0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED]
@@ -151,7 +142,19 @@ class WIZNET:
 
         """
         self._write_16(REG_SHAR, 0x04, address, 6)
-        
+
+    @property
+    def link_status(self):
+        """Returns the PHY's link status.
+        1: Link up.
+        0: Link down.
+        """
+        if self._chip_type == "w5500":
+            data =  self.read(REG_PHYCFGR, 0x00)
+            return data[0] & 0x01
+        else:
+            return 0
+
 
     def _w5100_init(self):
         """Initializes and detects a wiznet5k module.
