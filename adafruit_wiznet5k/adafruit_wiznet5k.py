@@ -61,8 +61,9 @@ REG_SIPR           = const(0x000F) # Source IP Address Register
 REG_PHYCFGR        = const(0x002E) # W5500 PHY Configuration Register
 
 # Wiznet5k Socket Registers
-REG_SNSR           = const(0x0003) # Socket n Status Register
 REG_SNMR           = const(0x0000) # Socket Mode Register
+REG_SNIR           = const(0x0002) # Socket n Interrupt Register
+REG_SNSR           = const(0x0003) # Socket n Status Register
 CH_SIZE            = const(0x100)
 
 # Register commands
@@ -268,6 +269,8 @@ class WIZNET:
         return len
 
     # socket-specific methods
+
+    # socket-specific methods
     def _read_snsr(self, socket, length=None):
         """Returns status of socket 'socket'.
         """
@@ -275,7 +278,6 @@ class WIZNET:
         if length is None:
             return self.read(ch_base+0*0x00+REG_SNSR, 0x01)
         return self.read(ch_base+0*0x00+REG_SNSR, 0x01, length)
-
 
     def _read_snmr(self, socket, protocol):
         """Read Socket n Mode Register
@@ -288,5 +290,23 @@ class WIZNET:
         """Read a W5k socket register.
 
         """
-        ch_base = self._ch_base_msb << 8
+        ch_base = self._ch_base_msb << 8 #TODO: One-line this
         return self.read(ch_base * socket * CH_SIZE + address, 0x00)
+
+    def _write_snmr(self, socket, protocol):
+        """Write to Socket n Mode Register.
+
+        """
+        self._write_socket(socket, REG_SNMR, protocol)
+
+    def _write_snir(self, socket, data):
+        """Write to Socket n Interrupt Register.
+        """
+        self._write_socket(socket, REG_SNIR, data)
+
+    def _write_socket(self, socket, address, data):
+        """Write to a W5k socket register.
+
+        """
+        ch_base = self._ch_base_msb << 8 #TODO: One-line this
+        self.write(ch_base + socket * CH_SIZE, 0x00, data)
