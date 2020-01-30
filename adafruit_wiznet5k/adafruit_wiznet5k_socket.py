@@ -33,48 +33,82 @@ A socket compatible interface with the Wiznet5k module.
 from micropython import const
 import time
 
-# SNSR
-SOCK_CLOSED      = 0x00;
-SOCK_INIT        = 0x13;
-SOCK_LISTEN      = 0x14;
-SOCK_SYNSENT     = 0x15;
-SOCK_SYNRECV     = 0x16;
-SOCK_ESTABLISHED = 0x17;
-SOCK_FIN_WAIT    = 0x18;
-SOCK_CLOSING     = 0x1A;
-SOCK_TIME_WAIT   = 0x1B;
-SOCK_CLOSE_WAIT  = 0x1C;
-SOCK_LAST_ACK    = 0x1D;
-SOCK_UDP         = 0x22;
-SOCK_IPRAW       = 0x32;
-SOCK_MACRAW      = 0x42;
-SOCK_PPPOE       = 0x5F;
+# SNSR Commands
+SNSR_SOCK_CLOSED      = const(0x00)
+SNSR_SOCK_INIT        = const(0x13)
+SNSR_SOCK_LISTEN      = const(0x14)
+SNSR_SOCK_SYNSENT     = const(0x15)
+SNSR_SOCK_SYNRECV     = const(0x16)
+SNSR_SOCK_ESTABLISHED = const(0x17)
+SNSR_SOCK_FIN_WAIT    = const(0x18)
+SNSR_SOCK_CLOSING     = const(0x1A)
+SNSR_SOCK_TIME_WAIT   = const(0x1B)
+SNSR_SOCK_CLOSE_WAIT  = const(0x1C)
+SNSR_SOCK_LAST_ACK    = const(0x1D)
+SNSR_SOCK_UDP         = const(0x22)
+SNSR_SOCK_IPRAW       = const(0x32)
+SNSR_SOCK_MACRAW      = const(0x42)
+SNSR_SOCK_PPPOE       = const(0x5F)
+
+# Sock Commands (CMD)
+CMD_SOCK_OPEN      = const(0x01)
+CMD_SOCK_LISTEN    = const(0x02)
+CMD_SOCK_CONNECT   = const(0x04)
+CMD_SOCK_DISCON    = const(0x08)
+CMD_SOCK_CLOSE     = const(0x10)
+CMD_SOCK_SEND      = const(0x20)
+CMD_SOCK_SEND_MAC  = const(0x21)
+CMD_SOCK_SEND_KEEP = const(0x22)
+CMD_SOCK_RECV      = const(0x40)
+
+# Socket registers
+SNMR_CLOSE  = const(0x00);
+SNMR_TCP    = const(0x21);
+SNMR_UDP    = const(0x02);
+# TODO: cleanup following if not req'd
+# SNMR_IPRAW  = const(0x03);
+# SNMR_MACRAW = const(0x04);
+# SNMR_PPPOE  = const(0x05);
+# SNMR_ND     = const(0x20);
+# SNMR_MULTI  = const(0x80);
+
+LOCAL_PORT = 49152 # 49152 - 65535
 
 class SOCKET:
     """A simplified implementation of the Python 'socket' class
     for connecting to a Wiznet5k module.
-    TODO: Document interface param.
-    TODO: Document protocol param.
 
     """
-    def __init__(self, interface, protocol=SOCK_TCP):
+    def __init__(self, interface, port=1, protocol=SNMR_TCP):
         # check hardware compatibility, throw err if hardware not detected
         assert interface.chip != None, "No Wiznet module detected."
-        self._interface = interface
-        status = bytearray(self._interface.max_sockets)
+        self._iface = interface
+        self._protocol = protocol
+        self._port = port
+        status = bytearray(self._iface.max_sockets)
 
         # check all the hardware sockets, allocate closed sockets
-        for sock in range(0, self._interface.max_sockets):
-            status[sock] = self._interface._read_snsr(sock)[0]
-            if status[sock] == SOCK_CLOSED:
-                # TODO: makesocket
-                print("making new socket...!")
-    
+        for sock in range(0, self._iface.max_sockets):
+            status[sock] = self._iface._read_snsr(sock)[0]
+            if status[sock] == SNSR_SOCK_CLOSED:
+                print("making new socket, sock#", sock)
+                self._make_socket(sock)
+
     def _make_socket(self, sock):
         """Creates a new Wiznet5k socket.
         :param int sock: Socket number
         """
+        print("W5k socket {}\n".format(sock))
         # TODO: (?) EthernetServer::server_port[s] = 0;
         time.sleep(0.250)
-        self._interface._write_snmr(sock, protocol)
-        self._interface._write_snir(sock, 0xFF)
+        self._iface._write_snmr(sock, self._protocol)
+        self._iface._write_snir(sock, 0xFF)
+        if self._port > 0:
+            # write to socket source port
+            self._iface._write_sock_port(sock, self._port)
+        else:
+            # if source port is not set, set the local port number
+            self._iface._write_sock_port(sock, LOCAL_PORT)
+        # open the socket
+        self._iface._exec_sock_cmd(sock, CMD_SOCK_OPEN)
+

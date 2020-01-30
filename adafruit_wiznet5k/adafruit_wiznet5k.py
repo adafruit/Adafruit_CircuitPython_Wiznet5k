@@ -61,9 +61,12 @@ REG_SIPR           = const(0x000F) # Source IP Address Register
 REG_PHYCFGR        = const(0x002E) # W5500 PHY Configuration Register
 
 # Wiznet5k Socket Registers
-REG_SNMR           = const(0x0000) # Socket Mode Register
+REG_SNMR           = const(0x0000) # Socket n Mode Register
+REG_SNCR           = const(0x0001) # Socket n Command Register
 REG_SNIR           = const(0x0002) # Socket n Interrupt Register
 REG_SNSR           = const(0x0003) # Socket n Status Register
+REG_SNPORT         = const(0x0004) # Socket n Source Port
+
 CH_SIZE            = const(0x100)
 
 # Register commands
@@ -285,14 +288,6 @@ class WIZNET:
         """
         return self._read_socket(socket, protocol)
 
-
-    def _read_socket(self, socket, address):
-        """Read a W5k socket register.
-
-        """
-        ch_base = self._ch_base_msb << 8 #TODO: One-line this
-        return self.read(ch_base * socket * CH_SIZE + address, 0x00)
-
     def _write_snmr(self, socket, protocol):
         """Write to Socket n Mode Register.
 
@@ -304,9 +299,43 @@ class WIZNET:
         """
         self._write_socket(socket, REG_SNIR, data)
 
+    def _write_sock_port(self, socket, port):
+        """Write to the socket port number.
+        """
+        self._write_socket(socket, REG_SNPORT, port)
+
+    def _write_sncr(self, socket, data):
+        self._write_socket(socket, REG_SNCR, data)
+
+    def _read_sncr(self, socket):
+        self._read_socket(socket, REG_SNCR)
+
+    def _exec_sock_cmd(self, socket, cmd):
+        """Send the command to a socket
+
+        """
+        # send command to socket
+        print("executing...")
+        self._write_sncr(socket, cmd)
+
+        # wait for command to complete...
+        while True:
+            print('reading..')
+            data = self._read_sncr(socket)
+            print('data: ', data)
+            time.sleep(1)
+
+
     def _write_socket(self, socket, address, data):
         """Write to a W5k socket register.
 
         """
         ch_base = self._ch_base_msb << 8 #TODO: One-line this
         self.write(ch_base + socket * CH_SIZE, 0x00, data)
+
+    def _read_socket(self, socket, address):
+        """Read a W5k socket register.
+
+        """
+        ch_base = self._ch_base_msb << 8 #TODO: One-line this
+        return self.read(ch_base * socket * CH_SIZE + address, 0x00)
