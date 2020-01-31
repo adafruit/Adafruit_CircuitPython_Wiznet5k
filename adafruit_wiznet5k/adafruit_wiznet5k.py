@@ -310,32 +310,17 @@ class WIZNET:
     def _read_sncr(self, socket):
         self._read_socket(socket, REG_SNCR)
 
-    def _exec_sock_cmd(self, socket, cmd):
-        """Send the command to a socket
-
-        """
-        # send command to socket
-        print("executing...")
-        self._write_sncr(socket, cmd)
-
-        # wait for command to complete...
-        while True:
-            print('reading..')
-            data = self._read_sncr(socket)
-            print('data: ', data)
-            time.sleep(1)
-
+    def _read_snmr(self, socket):
+        return self._read_socket(socket, REG_SNMR)
 
     def _write_socket(self, socket, address, data):
         """Write to a W5k socket register.
 
         """
-        ch_base = self._ch_base_msb << 8 #TODO: One-line this
-        self.write(ch_base + socket * CH_SIZE, 0x00, data)
+        self.write(4098, 0x04, data)
 
     def _read_socket(self, socket, address):
         """Read a W5k socket register.
 
         """
-        ch_base = self._ch_base_msb << 8 #TODO: One-line this
-        return self.read(ch_base * socket * CH_SIZE + address, 0x00)
+        return self.read(4098, socket)
