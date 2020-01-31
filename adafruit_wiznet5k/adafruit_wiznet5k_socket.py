@@ -63,14 +63,11 @@ CMD_SOCK_RECV      = const(0x40)
 
 # Socket registers
 SNMR_CLOSE  = const(0x00);
-SNMR_TCP    = const(0x21);
+SNMR_TCP    = const(0x01);
 SNMR_UDP    = const(0x02);
-# TODO: cleanup following if not req'd
-# SNMR_IPRAW  = const(0x03);
-# SNMR_MACRAW = const(0x04);
-# SNMR_PPPOE  = const(0x05);
-# SNMR_ND     = const(0x20);
-# SNMR_MULTI  = const(0x80);
+SNMR_IPRAW  = const(0x03);
+SNMR_MACRAW = const(0x04);
+SNMR_PPPOE  = const(0x05);
 
 LOCAL_PORT = 49152 # 49152 - 65535
 
@@ -79,7 +76,7 @@ class SOCKET:
     for connecting to a Wiznet5k module.
 
     """
-    def __init__(self, interface, port=1, protocol=SNMR_TCP):
+    def __init__(self, interface, port=68, protocol=SNMR_TCP):
         # check hardware compatibility, throw err if hardware not detected
         assert interface.chip != None, "No Wiznet module detected."
         self._iface = interface
@@ -89,20 +86,22 @@ class SOCKET:
 
         # check all the hardware sockets, allocate closed sockets
         for sock in range(0, self._iface.max_sockets):
+        # for sock in range(0, 1): # DEBUG ONLY TODO REMOVE!
             status[sock] = self._iface._read_snsr(sock)[0]
             if status[sock] == SNSR_SOCK_CLOSED:
-                print("making new socket, sock#", sock)
+                # print("w5k socket begin, protocol={}, port={}".format(self._protocol, self._port))
                 self._make_socket(sock)
 
     def _make_socket(self, sock):
         """Creates a new Wiznet5k socket.
         :param int sock: Socket number
         """
-        print("W5k socket {}\n".format(sock))
-        # TODO: (?) EthernetServer::server_port[s] = 0;
-        time.sleep(0.250)
+        # print("W5k socket {}\n".format(sock))
+        time.sleep(0.00025)
+
         self._iface._write_snmr(sock, self._protocol)
         self._iface._write_snir(sock, 0xFF)
+
         if self._port > 0:
             # write to socket source port
             self._iface._write_sock_port(sock, self._port)
@@ -110,5 +109,4 @@ class SOCKET:
             # if source port is not set, set the local port number
             self._iface._write_sock_port(sock, LOCAL_PORT)
         # open the socket
-        self._iface._exec_sock_cmd(sock, CMD_SOCK_OPEN)
-
+        self._iface._write_sncr(sock, CMD_SOCK_OPEN)
