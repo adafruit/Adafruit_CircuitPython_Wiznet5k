@@ -85,8 +85,8 @@ class SOCKET:
         status = bytearray(self._iface.max_sockets)
 
         # check all the hardware sockets, allocate closed sockets
-        for sock in range(0, self._iface.max_sockets):
-        # for sock in range(0, 1): # DEBUG ONLY TODO REMOVE!
+        #for sock in range(0, self._iface.max_sockets):
+        for sock in range(0, 1): # DEBUG ONLY TODO REMOVE!
             status[sock] = self._iface._read_snsr(sock)[0]
             if status[sock] == SNSR_SOCK_CLOSED:
                 # print("w5k socket begin, protocol={}, port={}".format(self._protocol, self._port))
@@ -108,5 +108,13 @@ class SOCKET:
         else:
             # if source port is not set, set the local port number
             self._iface._write_sock_port(sock, LOCAL_PORT)
+
+        # verify socket write?
+        # self._iface._read_socket(sock, 0x0004)
+        # self._iface._read_socket(sock, 0x0005)
+
         # open the socket
         self._iface._write_sncr(sock, CMD_SOCK_OPEN)
+        while(self._iface._read_sncr(sock)):
+            print('1')
+        print('2')

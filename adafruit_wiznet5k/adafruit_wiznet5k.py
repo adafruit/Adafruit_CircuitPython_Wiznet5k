@@ -302,7 +302,8 @@ class WIZNET:
     def _write_sock_port(self, socket, port):
         """Write to the socket port number.
         """
-        self._write_socket(socket, REG_SNPORT, port)
+        self._write_socket(socket, REG_SNPORT, port >> 8)
+        self._write_socket(socket, REG_SNPORT+1, port & 0xFF)
 
     def _write_sncr(self, socket, data):
         self._write_socket(socket, REG_SNCR, data)
