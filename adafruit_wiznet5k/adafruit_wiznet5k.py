@@ -313,14 +313,22 @@ class WIZNET:
     def _read_snmr(self, socket):
         return self._read_socket(socket, REG_SNMR)
 
+    def _exec_sock_cmd(self, socket, cmd):
+        # TODO
+        pass
+
     def _write_socket(self, socket, address, data):
         """Write to a W5k socket register.
 
         """
-        self.write(4098, 0x04, data)
+        base = self._ch_base_msb << 8
+        cntl_byte = (socket<<5)+0x0C;
+        self.write(base + socket * CH_SIZE + address, cntl_byte, data)
 
     def _read_socket(self, socket, address):
         """Read a W5k socket register.
 
         """
-        return self.read(4098, socket)
+        base = self._ch_base_msb << 8
+        cntl_byte = (socket<<5)+0x08;
+        return self.read(base + socket * CH_SIZE + address, cntl_byte)
