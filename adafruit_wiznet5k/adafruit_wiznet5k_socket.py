@@ -109,12 +109,9 @@ class SOCKET:
             # if source port is not set, set the local port number
             self._iface._write_sock_port(sock, LOCAL_PORT)
 
-        # verify socket write?
-        # self._iface._read_socket(sock, 0x0004)
-        # self._iface._read_socket(sock, 0x0005)
-
         # open the socket
         self._iface._write_sncr(sock, CMD_SOCK_OPEN)
-        while(self._iface._read_sncr(sock)):
-            print('1')
-        print('2')
+        # debug, verify SNSR 
+        # TODO: format this line
+        # print(self._iface._read_socket(sock, 0x0003))
+        self._iface._read_socket(sock, 0x0001)
