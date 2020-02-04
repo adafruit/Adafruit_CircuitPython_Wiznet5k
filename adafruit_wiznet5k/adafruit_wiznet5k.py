@@ -161,6 +161,21 @@ class WIZNET:
         else:
             return 0
 
+    def pretty_ip(self, ip): # pylint: disable=no-self-use, invalid-name
+        """Converts a bytearray IP address to a
+        dotted-quad string for printing
+
+        """
+        return "%d.%d.%d.%d" % (ip[0], ip[1], ip[2], ip[3])
+
+    def pretty_mac(self, mac): # pylint: disable=no-self-use, invalid-name
+        """Converts a bytearray MAC address to a
+        dotted-quad string for printing
+
+        """
+        return "%s:%s:%s:%s:%s:%s" % (hex(mac[0]), hex(mac[1]), hex(mac[2]),
+                                      hex(mac[3]), hex(mac[4]), hex(mac[5]))
+
     def _w5100_init(self):
         """Initializes and detects a wiznet5k module.
 
