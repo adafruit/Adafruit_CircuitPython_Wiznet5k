@@ -68,6 +68,44 @@ REG_SNCR           = const(0x0001) # Socket n Command Register
 REG_SNIR           = const(0x0002) # Socket n Interrupt Register
 REG_SNSR           = const(0x0003) # Socket n Status Register
 REG_SNPORT         = const(0x0004) # Socket n Source Port
+REG_SNDIPR         = const(0x000C) # Destination IP Address
+REG_SNDPORT        = const(0x0010) # Destination Port
+
+# SNSR Commands
+SNSR_SOCK_CLOSED      = const(0x00)
+SNSR_SOCK_INIT        = const(0x13)
+SNSR_SOCK_LISTEN      = const(0x14)
+SNSR_SOCK_SYNSENT     = const(0x15)
+SNSR_SOCK_SYNRECV     = const(0x16)
+SNSR_SOCK_ESTABLISHED = const(0x17)
+SNSR_SOCK_FIN_WAIT    = const(0x18)
+SNSR_SOCK_CLOSING     = const(0x1A)
+SNSR_SOCK_TIME_WAIT   = const(0x1B)
+SNSR_SOCK_CLOSE_WAIT  = const(0x1C)
+SNSR_SOCK_LAST_ACK    = const(0x1D)
+SNSR_SOCK_UDP         = const(0x22)
+SNSR_SOCK_IPRAW       = const(0x32)
+SNSR_SOCK_MACRAW      = const(0x42)
+SNSR_SOCK_PPPOE       = const(0x5F)
+
+# Sock Commands (CMD)
+CMD_SOCK_OPEN      = const(0x01)
+CMD_SOCK_LISTEN    = const(0x02)
+CMD_SOCK_CONNECT   = const(0x04)
+CMD_SOCK_DISCON    = const(0x08)
+CMD_SOCK_CLOSE     = const(0x10)
+CMD_SOCK_SEND      = const(0x20)
+CMD_SOCK_SEND_MAC  = const(0x21)
+CMD_SOCK_SEND_KEEP = const(0x22)
+CMD_SOCK_RECV      = const(0x40)
+
+# Socket registers
+SNMR_CLOSE  = const(0x00);
+SNMR_TCP    = const(0x01);
+SNMR_UDP    = const(0x02);
+SNMR_IPRAW  = const(0x03);
+SNMR_MACRAW = const(0x04);
+SNMR_PPPOE  = const(0x05);
 
 CH_SIZE            = const(0x100)
 
@@ -91,7 +129,7 @@ class WIZNET:
     """
 
     def __init__(self, spi_bus, cs, reset=None,
-                 mac=DEFAULT_MAC, timeout=None, response_timeout=None):
+                 mac=DEFAULT_MAC, timeout=5.0, response_timeout=5.0):
         self._device = spidev.SPIDevice(spi_bus, cs,
                                         baudrate=8000000,
                                         polarity=0, phase=0)
@@ -104,6 +142,7 @@ class WIZNET:
         self.mac_address = mac
         # Set IP address
         self.ip_address = (0, 0, 0, 0)
+        self._timeout = timeout
 
 
     @property
@@ -132,7 +171,7 @@ class WIZNET:
         """Returns the hardware's IP address.
         :param tuple ip_address: Desired IP address.
         """
-        self._write_16(REG_SIPR, 0x04, ip_address, 4)
+        self._write_n(REG_SIPR, 0x04, ip_address)
 
     @property
     def mac_address(self):
@@ -147,7 +186,7 @@ class WIZNET:
         :param tuple address: Hardware MAC address.
 
         """
-        self._write_16(REG_SHAR, 0x04, address, 6)
+        self._write_n(REG_SHAR, 0x04, address)
 
     @property
     def link_status(self):
@@ -177,8 +216,7 @@ class WIZNET:
                                       hex(mac[3]), hex(mac[4]), hex(mac[5]))
 
     def begin(self, dns):
-        """Begin ethernet
-
+        """Begin ethernet connection.
         """
         self._dns = dns
         SUBNET_ADDR = (255, 255, 255, 0)
@@ -186,8 +224,40 @@ class WIZNET:
         gateway_ip = self.ip_address
         # Set the last octet to 1
         gateway_ip[3] = 1
-        self._write_16(REG_GAR, 0x04, gateway_ip, 4)
-        self._write_16(REG_SUBR, 0x04, SUBNET_ADDR, 4)
+        self._write_n(REG_GAR, 0x04, gateway_ip)
+        self._write_n(REG_SUBR, 0x04, SUBNET_ADDR)
+
+    def connect(self, server_ip, port):
+        """Connect to server address.
+        """
+        # TODO: rewrite for socket_open compatibility
+
+    def socket_open(self, socket_num, dest, port, conn_mode=SNMR_TCP):
+        """Open a socket to a destination IP address or hostname. We
+        may use a variety of SNMR_MODEs.
+        Returns 0 if socket successfully created, 1 otherwise. 
+        """
+        status = self._read_snsr(socket_num)[0]
+        if status == SNSR_SOCK_CLOSED:
+            print("w5k socket begin, protocol={}, port={}".format(conn_mode, port))
+            time.sleep(0.00025)
+
+            self._write_snmr(socket_num, conn_mode)
+            self._write_snir(socket_num, 0xFF)
+
+            if port > 0:
+                # write to socket source port
+                self._write_sock_port(socket_num, port)
+            else:
+                # if source port is not set, set the local port number
+                self._write_sock_port(socket_num, LOCAL_PORT)
+
+            # open the socket
+            self._write_sncr(socket_num, CMD_SOCK_OPEN)
+            # print(self._read_socket(socket_num, 0x0003))
+            # print(self._read_sncr(socket_num))
+            return 0
+        return 1
 
     def _w5100_init(self):
         """Initializes and detects a wiznet5k module.
@@ -241,7 +311,6 @@ class WIZNET:
             return -1
         return 0
 
-
     def _read_mr(self):
         """Reads from the Mode Register (MR).
 
@@ -283,7 +352,7 @@ class WIZNET:
             bus_device.readinto(result)
         return result
 
-    def _write_16(self, addr, buf, data, len):
+    def _write_n(self, addr, buf, data):
         """Writes data to a register address.
         :param int addr: Register address.
         :param int buf: Buffer.
@@ -295,13 +364,23 @@ class WIZNET:
             bus_device.write(bytes([addr >> 8]))
             bus_device.write(bytes([addr & 0xFF]))
             bus_device.write(bytes([buf]))
-            for i in range(0, len):
+            for i in range(0, len(data)):
                 bus_device.write(bytes([data[i]]))
         return len
 
     # socket-specific methods
 
-    # socket-specific methods
+    def _write_sndipr(self, sock, ip_addr):
+        """Writes to socket destination IP Address.
+
+        """
+        self._write_socket(sock, REG_SNDIPR, ip_addr, 4)
+
+    def _write_sndport(self, sock, port):
+        """Writes to socket destination port.
+        """
+        self._write_socket(sock, REG_SNDPORT, port)
+
     def _read_snsr(self, socket, length=None):
         """Returns status of socket 'socket'.
         """
@@ -342,21 +421,17 @@ class WIZNET:
     def _read_snmr(self, socket):
         return self._read_socket(socket, REG_SNMR)
 
-    def _exec_sock_cmd(self, socket, cmd):
-        # TODO
-        pass
-
-    def _write_socket(self, socket, address, data):
+    def _write_socket(self, socket, address, data, len=None):
         """Write to a W5k socket register.
-
         """
         base = self._ch_base_msb << 8
         cntl_byte = (socket<<5)+0x0C;
-        self.write(base + socket * CH_SIZE + address, cntl_byte, data)
+        if len is None:
+            return self.write(base + socket * CH_SIZE + address, cntl_byte, data)
+        return self._write_n(base + socket * CH_SIZE + address, cntl_byte, data)
 
     def _read_socket(self, socket, address):
         """Read a W5k socket register.
-
         """
         base = self._ch_base_msb << 8
         cntl_byte = (socket<<5)+0x08;
