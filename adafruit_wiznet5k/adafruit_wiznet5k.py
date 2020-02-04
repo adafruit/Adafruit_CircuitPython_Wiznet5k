@@ -239,7 +239,7 @@ class WIZNET:
         """
         status = self._read_snsr(socket_num)[0]
         if status == SNSR_SOCK_CLOSED:
-            print("w5k socket begin, protocol={}, port={}".format(conn_mode, port))
+            # print("w5k socket begin, protocol={}, port={}".format(conn_mode, port))
             time.sleep(0.00025)
 
             self._write_snmr(socket_num, conn_mode)
@@ -254,8 +254,6 @@ class WIZNET:
 
             # open the socket
             self._write_sncr(socket_num, CMD_SOCK_OPEN)
-            # print(self._read_socket(socket_num, 0x0003))
-            # print(self._read_sncr(socket_num))
             return 0
         return 1
 
