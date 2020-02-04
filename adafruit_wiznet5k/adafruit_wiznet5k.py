@@ -55,6 +55,8 @@ __repo__ = "https://github.com/adafruit/Adafruit_CircuitPython_Wiznet5k.git"
 
 # Wiznet5k Registers
 REG_MR             = const(0x0000) # Mode Register
+REG_GAR            = const(0x0001) # Gateway IP Address
+REG_SUBR           = const(0x0005) # Subnet Mask Address
 REG_VERSIONR_W5500 = const(0x0039) # W5500 Silicon Version Register
 REG_SHAR           = const(0x0009) # Source Hardware Address Register
 REG_SIPR           = const(0x000F) # Source IP Address Register
@@ -130,8 +132,6 @@ class WIZNET:
         """Returns the hardware's IP address.
         :param tuple ip_address: Desired IP address.
         """
-        # inline void setIPAddress(const uint8_t * addr) { writeSIPR(addr); }
-        #   __GP_REGISTER_N(SIPR,   0x000F, 4); // Source IP address
         self._write_16(REG_SIPR, 0x04, ip_address, 4)
 
     @property
@@ -175,6 +175,19 @@ class WIZNET:
         """
         return "%s:%s:%s:%s:%s:%s" % (hex(mac[0]), hex(mac[1]), hex(mac[2]),
                                       hex(mac[3]), hex(mac[4]), hex(mac[5]))
+
+    def begin(self, dns):
+        """Begin ethernet
+
+        """
+        self._dns = dns
+        SUBNET_ADDR = (255, 255, 255, 0)
+        # Assume gateway IP is on the same network as the local IP
+        gateway_ip = self.ip_address
+        # Set the last octet to 1
+        gateway_ip[3] = 1
+        self._write_16(REG_GAR, 0x04, gateway_ip, 4)
+        self._write_16(REG_SUBR, 0x04, SUBNET_ADDR, 4)
 
     def _w5100_init(self):
         """Initializes and detects a wiznet5k module.
