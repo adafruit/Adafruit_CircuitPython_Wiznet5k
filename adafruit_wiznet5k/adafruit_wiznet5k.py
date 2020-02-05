@@ -101,7 +101,7 @@ CMD_SOCK_RECV      = const(0x40)
 
 # Socket registers
 SNMR_CLOSE  = const(0x00);
-SNMR_TCP    = const(0x01);
+SNMR_TCP    = const(0x21);
 SNMR_UDP    = const(0x02);
 SNMR_IPRAW  = const(0x03);
 SNMR_MACRAW = const(0x04);
@@ -362,7 +362,8 @@ class WIZNET:
 
         while self.sock_status(sock) != SNSR_SOCK_ESTABLISHED:
             print('sock_status: ', self.sock_status(sock))
-            time.sleep(0.1)
+            print('SN_IR: ', self._read_snir(sock))
+            time.sleep(0.5)
             if self.sock_status(sock) == SNSR_SOCK_CLOSED:
                 print('closed!')
                 return 0
@@ -390,13 +391,17 @@ class WIZNET:
                 self._write_sock_port(socket_num, LOCAL_PORT)
 
             # set socket destination IP addr. and port
+            print(addr, dst_port)
             self._write_sndipr(socket_num, addr)
             self._write_sndport(socket_num, dst_port)
+            print('Sock PORT:', self._read_socket(socket_num, 0x0010))
+            print('Sock PORT:', self._read_socket(socket_num, 0x0011))
 
             # open socket
             self._write_sncr(socket_num, CMD_SOCK_OPEN)
             assert self._read_sncr(socket_num)[0] == 0x00, "Error: Unable to open socket!"
             assert self._read_snsr((socket_num))[0] == 0x13, "Error: Unable to open socket!"
+
             return 0
         return 1
 
@@ -411,7 +416,8 @@ class WIZNET:
         """Writes to socket destination port.
 
         """
-        self._write_socket(sock, REG_SNDPORT, port)
+        self._write_socket(sock, REG_SNDPORT, port >> 8)
+        self._write_socket(sock, REG_SNDPORT+1, port & 0xFF)
 
     def _read_snsr(self, sock):
         """Reads Socket n Status Register.
@@ -451,12 +457,18 @@ class WIZNET:
     def _read_snmr(self, socket):
         return self._read_socket(socket, REG_SNMR)
 
-    def _write_socket(self, socket, address, data, len=None):
+    def _read_snir(self, socket):
+        return self._read_socket(socket, REG_SNIR)
+    
+    def _read_sndipr(self, socket):
+        return self._read_socket(socket, REG_SNDIPR)
+
+    def _write_socket(self, socket, address, data, length=None):
         """Write to a W5k socket register.
         """
         base = self._ch_base_msb << 8
         cntl_byte = (socket<<5)+0x0C;
-        if len is None:
+        if length is None:
             return self.write(base + socket * CH_SIZE + address, cntl_byte, data)
         return self._write_n(base + socket * CH_SIZE + address, cntl_byte, data)
 
