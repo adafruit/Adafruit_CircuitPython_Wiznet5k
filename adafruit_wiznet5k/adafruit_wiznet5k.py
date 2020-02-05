@@ -339,10 +339,12 @@ class WIZNET:
         gateway_ip = self.ip_address
         # Set the last octet to 1
         gateway_ip[3] = 1
+
         for octet in range(0, 4):
             self.write(REG_GAR+octet, 0x04, gateway_ip[octet])
 
-        self._write_n(REG_SUBR, 0x04, SUBNET_ADDR)
+        for octet in range(0, 4):
+            self.write(REG_SUBR+octet, 0x04, SUBNET_ADDR[octet])
 
     def connect(self, server_ip, server_port):
         """Connect to server address.
@@ -405,7 +407,8 @@ class WIZNET:
         """Writes to socket destination IP Address.
 
         """
-        self._write_socket(sock, REG_SNDIPR, ip_addr, 4)
+        for octet in range(0, 4):
+            self._write_socket(sock, REG_SNDIPR+octet, ip_addr[octet])
 
     def _write_sndport(self, sock, port):
         """Writes to socket destination port.
