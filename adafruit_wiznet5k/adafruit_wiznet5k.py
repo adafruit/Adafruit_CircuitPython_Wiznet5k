@@ -343,7 +343,7 @@ class WIZNET:
         self._write_n(REG_SUBR, 0x04, SUBNET_ADDR)
 
 
-    def connect(self, server_ip, port):
+    def connect(self, server_ip, server_port):
         """Connect to server address.
         """
         # TODO: handle dhcp, using server_ip for now
@@ -354,19 +354,18 @@ class WIZNET:
         if sock == self.max_sockets:
             return 0
         # initialize a socket and set the mode
-        port =+1
+        port = 0
         ret = self.socket_open(sock, port, SNMR_TCP)
         if ret == 1: # socket unsuccessfully opened
             return 0
         # connect socket
-        self.socket_connect(sock, server_ip, port)
-        print(self.sock_status(sock))
+        self.socket_connect(sock, server_ip, server_port)
 
         while self.sock_status(sock) != SNSR_SOCK_ESTABLISHED:
             # print('sock_status: ', self.sock_status(sock))
             time.sleep(0.1)
             if self.sock_status(sock) == SNSR_SOCK_CLOSED:
-                print('closed!')
+                # print('closed!')
                 return 0
         return 1
 
@@ -385,6 +384,7 @@ class WIZNET:
         may use a variety of SNMR_MODEs.
         Returns 0 if socket successfully created, 1 otherwise. 
         """
+        port += 1
         if self._read_snsr(socket_num)[0] == SNSR_SOCK_CLOSED:
             print("w5k socket begin, protocol={}, port={}".format(conn_mode, port))
             time.sleep(0.00025)
