@@ -215,69 +215,6 @@ class WIZNET:
         return "%s:%s:%s:%s:%s:%s" % (hex(mac[0]), hex(mac[1]), hex(mac[2]),
                                       hex(mac[3]), hex(mac[4]), hex(mac[5]))
 
-    def begin(self, dns):
-        """Begin ethernet connection.
-        """
-        self._dns = dns
-        SUBNET_ADDR = (255, 255, 255, 0)
-        # Assume gateway IP is on the same network as the local IP
-        gateway_ip = self.ip_address
-        # Set the last octet to 1
-        gateway_ip[3] = 1
-        self._write_n(REG_GAR, 0x04, gateway_ip)
-        self._write_n(REG_SUBR, 0x04, SUBNET_ADDR)
-
-    def connect(self, server_ip, port):
-        """Connect to server address.
-        """
-        # TODO: handle dhcp, using server_ip for now
-        sock = 0
-        # TODO: check all socket status (SNSRs) up to MAX_num
-
-        # if socket allocated is the maximum
-        if sock == self.max_sockets:
-            return 0
-        # initialize a socket and set the mode
-        port =+1
-        self.socket_open(sock, port, SNMR_TCP)
-
-        # connect socket
-        self.socket_connect(sock, server_ip, port)
-
-    def socket_connect(self, socket_num, addr, port):
-        """Establishes connection in client mode.
-        """
-        self._write_sndipr(socket_num, addr)
-        self._write_sndport(socket_num, port)
-        self._write_sncr(socket_num, CMD_SOCK_CONNECT)
-        return 0
-
-
-    def socket_open(self, socket_num, port, conn_mode=SNMR_TCP):
-        """Open a socket to a destination IP address or hostname. We
-        may use a variety of SNMR_MODEs.
-        Returns 0 if socket successfully created, 1 otherwise. 
-        """
-        status = self._read_snsr(socket_num)[0]
-        if status == SNSR_SOCK_CLOSED:
-            # print("w5k socket begin, protocol={}, port={}".format(conn_mode, port))
-            time.sleep(0.00025)
-
-            self._write_snmr(socket_num, conn_mode)
-            self._write_snir(socket_num, 0xFF)
-
-            if port > 0:
-                # write to socket source port
-                self._write_sock_port(socket_num, port)
-            else:
-                # if source port is not set, set the local port number
-                self._write_sock_port(socket_num, LOCAL_PORT)
-
-            # open the socket
-            self._write_sncr(socket_num, CMD_SOCK_OPEN)
-            return 0
-        return 1
-
     def _w5100_init(self):
         """Initializes and detects a wiznet5k module.
 
@@ -389,6 +326,86 @@ class WIZNET:
 
     # socket-specific methods
 
+    def sock_status(self, sock):
+        #return self._read_snsr(sock)[0]
+        return self._read_snsr(sock)
+
+    def begin(self, dns):
+        """Begin ethernet connection.
+        """
+        self._dns = dns
+        SUBNET_ADDR = (255, 255, 255, 0)
+        # Assume gateway IP is on the same network as the local IP
+        gateway_ip = self.ip_address
+        # Set the last octet to 1
+        gateway_ip[3] = 1
+        self._write_n(REG_GAR, 0x04, gateway_ip)
+        self._write_n(REG_SUBR, 0x04, SUBNET_ADDR)
+
+
+    def connect(self, server_ip, port):
+        """Connect to server address.
+        """
+        # TODO: handle dhcp, using server_ip for now
+        sock = 0
+        # TODO: check all socket status (SNSRs) up to MAX_num
+
+        # if socket allocated is the maximum
+        if sock == self.max_sockets:
+            return 0
+        # initialize a socket and set the mode
+        port =+1
+        ret = self.socket_open(sock, port, SNMR_TCP)
+        if ret == 1: # socket unsuccessfully opened
+            return 0
+        # connect socket
+        self.socket_connect(sock, server_ip, port)
+        print(self.sock_status(sock))
+
+        while self.sock_status(sock) != SNSR_SOCK_ESTABLISHED:
+            # print('sock_status: ', self.sock_status(sock))
+            time.sleep(0.1)
+            if self.sock_status(sock) == SNSR_SOCK_CLOSED:
+                print('closed!')
+                return 0
+        return 1
+
+
+    def socket_connect(self, socket_num, addr, port):
+        """Establishes connection in client mode.
+        """
+        self._write_sndipr(socket_num, addr)
+        self._write_sndport(socket_num, port)
+        self._write_sncr(socket_num, CMD_SOCK_CONNECT)
+        self._read_sncr(socket_num)
+        return 0
+
+    def socket_open(self, socket_num, port, conn_mode=SNMR_TCP):
+        """Open a socket to a destination IP address or hostname. We
+        may use a variety of SNMR_MODEs.
+        Returns 0 if socket successfully created, 1 otherwise. 
+        """
+        if self._read_snsr(socket_num)[0] == SNSR_SOCK_CLOSED:
+            print("w5k socket begin, protocol={}, port={}".format(conn_mode, port))
+            time.sleep(0.00025)
+
+            self._write_snmr(socket_num, conn_mode)
+            self._write_snir(socket_num, 0xFF)
+
+            if port > 0:
+                # write to socket source port
+                self._write_sock_port(socket_num, port)
+            else:
+                # if source port is not set, set the local port number
+                self._write_sock_port(socket_num, LOCAL_PORT)
+
+            # open the socket
+            self._write_sncr(socket_num, CMD_SOCK_OPEN)
+            self._read_sncr(socket_num)
+            return 0
+        return 1
+
+
     def _write_sndipr(self, sock, ip_addr):
         """Writes to socket destination IP Address.
 
@@ -397,16 +414,15 @@ class WIZNET:
 
     def _write_sndport(self, sock, port):
         """Writes to socket destination port.
+
         """
         self._write_socket(sock, REG_SNDPORT, port)
 
-    def _read_snsr(self, socket, length=None):
-        """Returns status of socket 'socket'.
+    def _read_snsr(self, sock):
+        """Reads Socket n Status Register.
+
         """
-        ch_base = self._ch_base_msb << 8
-        if length is None:
-            return self.read(ch_base+0*0x00+REG_SNSR, 0x01)
-        return self.read(ch_base+0*0x00+REG_SNSR, 0x01, length)
+        return self._read_socket(sock, REG_SNSR)
 
     def _read_snmr(self, socket, protocol):
         """Read Socket n Mode Register
@@ -435,7 +451,7 @@ class WIZNET:
         self._write_socket(socket, REG_SNCR, data)
 
     def _read_sncr(self, socket):
-        self._read_socket(socket, REG_SNCR)
+        return self._read_socket(socket, REG_SNCR)
 
     def _read_snmr(self, socket):
         return self._read_socket(socket, REG_SNMR)
@@ -452,6 +468,5 @@ class WIZNET:
     def _read_socket(self, socket, address):
         """Read a W5k socket register.
         """
-        base = self._ch_base_msb << 8
         cntl_byte = (socket<<5)+0x08;
-        return self.read(base + socket * CH_SIZE + address, cntl_byte)
+        return self.read(address, cntl_byte)
