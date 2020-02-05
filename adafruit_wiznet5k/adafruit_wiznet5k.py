@@ -49,7 +49,6 @@ import adafruit_bus_device.spi_device as spidev
 from micropython import const
 from digitalio import DigitalInOut
 from adafruit_wiznet5k.adafruit_wiznet5k_dhcp import DHCP as DHCP
-from collections import namedtuple
 
 __version__ = "0.0.0-auto.0"
 __repo__ = "https://github.com/adafruit/Adafruit_CircuitPython_Wiznet5k.git"
@@ -71,7 +70,7 @@ REG_SNSR           = const(0x0003) # Socket n Status Register
 REG_SNPORT         = const(0x0004) # Socket n Source Port
 REG_SNDIPR         = const(0x000C) # Destination IP Address
 REG_SNDPORT        = const(0x0010) # Destination Port
-REG_SNRX_RD        = const(0x0028) # RX Read Pointer
+REG_SNRX_RSR       = const(0x0026) # RX Free Size
 
 # SNSR Commands
 SNSR_SOCK_CLOSED      = const(0x00)
@@ -120,8 +119,6 @@ DEFAULT_MAC = [0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED]
 # Maximum number of sockets to support, differs between chip versions.
 W5200_W5500_MAX_SOCK_NUM = const(0x08)
 
-
-SOCKET_STATE = namedtuple("SOCKET_STATE", "RX_RSR RX_RD, TX_FSR, RX_inc")
 
 class WIZNET:
     """Interface for WIZNET5k module.
@@ -354,11 +351,6 @@ class WIZNET:
 
     # socket-specific methods
 
-    def _sock_rcv_available(self, sock):
-        pass
-        # TODO!, requires state[] and readsnxrx_rd implementation
-        # uint16_t ret = state[s].RX_RSR;
-
     def sock_status(self, sock):
         return self._read_snsr(sock)
 
@@ -399,7 +391,7 @@ class WIZNET:
             self._src_port = 1024
 
         # initialize a socket and set the mode
-        ret = self.socket_open(self._sock, server_ip, self._src_port, server_port, SNMR_TCP)
+        ret = self.sock_open(self._sock, server_ip, self._src_port, server_port, SNMR_TCP)
         if ret == 1: # socket unsuccessfully opened
             return 0
 
@@ -412,7 +404,7 @@ class WIZNET:
                 return 0
         return 1
 
-    def socket_open(self, socket_num, addr, src_port, dst_port, conn_mode=SNMR_TCP):
+    def sock_open(self, socket_num, addr, src_port, dst_port, conn_mode=SNMR_TCP):
         """Open a socket to a destination IP address or hostname. We
         may use a variety of SNMR_MODEs.
         Returns 0 if socket successfully created, 1 otherwise. 
@@ -441,17 +433,29 @@ class WIZNET:
             assert self._read_sncr(socket_num)[0] == 0x00, "Error: Unable to open socket!"
             assert self._read_snsr((socket_num))[0] == 0x13, "Error: Unable to open socket!"
 
-            # SOCKET_STATE(0, 0, 0, 0)
-            SOCKET_STATE(0, self._read_snrx_rd(socket_num), 0, 0)
-
             return 0
         return 1
 
-    def _read_snrx_rd(self, sock):
-        """Reads the Socket n Read Data Pointer Register
-        """
-        data = self._read_socket(sock, REG_SNRX_RD)
-        data += self._read_socket(sock, REG_SNRX_RD+1)
+
+    def sock_available(self):
+        if self._sock != self.max_sockets:
+            return self._get_rx_rcv_size(self._sock)
+        return 0
+
+    def _get_rx_rcv_size(self, sock):
+        val = 0
+        val_1=0
+        while True:
+            val_1 = self._read_snrx_rsr(sock)
+            if val_1 != 0:
+                val = self._read_snrx_rsr(sock)
+            if not (val != val_1):
+                break
+        return val
+
+    def _read_snrx_rsr(self, sock):
+        data = self._read_socket(sock, REG_SNRX_RSR)
+        data += self._read_socket(sock, REG_SNRX_RSR+1)
         return data
 
     def _write_sndipr(self, sock, ip_addr):
