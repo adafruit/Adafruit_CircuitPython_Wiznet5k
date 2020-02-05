@@ -205,13 +205,14 @@ class WIZNET:
     def remote_ip(self):
         """Returns the remote IP Address.
         """
-        remote_ip = [0, 0, 0, 0]
+        remote_ip = bytearray(4)
+
         if self._sock >= self.max_sockets:
             return remote_ip
         for octet in range(0, 4):
              remote_ip[octet] = self._read_socket(self._sock, REG_SNDIPR+octet)[0]
-        
-        return remote_ip
+
+        return self.pretty_ip(remote_ip)
 
     def pretty_ip(self, ip): # pylint: disable=no-self-use, invalid-name
         """Converts a bytearray IP address to a
