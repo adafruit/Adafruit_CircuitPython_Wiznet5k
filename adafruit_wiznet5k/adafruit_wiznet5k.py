@@ -230,9 +230,30 @@ class WIZNET:
     def connect(self, server_ip, port):
         """Connect to server address.
         """
-        # TODO: rewrite for socket_open compatibility
+        # TODO: handle dhcp, using server_ip for now
+        sock = 0
+        # TODO: check all socket status (SNSRs) up to MAX_num
 
-    def socket_open(self, socket_num, dest, port, conn_mode=SNMR_TCP):
+        # if socket allocated is the maximum
+        if sock == self.max_sockets:
+            return 0
+        # initialize a socket and set the mode
+        port =+1
+        self.socket_open(sock, port, SNMR_TCP)
+
+        # connect socket
+        self.socket_connect(sock, server_ip, port)
+
+    def socket_connect(self, socket_num, addr, port):
+        """Establishes connection in client mode.
+        """
+        self._write_sndipr(socket_num, addr)
+        self._write_sndport(socket_num, port)
+        self._write_sncr(socket_num, CMD_SOCK_CONNECT)
+        return 0
+
+
+    def socket_open(self, socket_num, port, conn_mode=SNMR_TCP):
         """Open a socket to a destination IP address or hostname. We
         may use a variety of SNMR_MODEs.
         Returns 0 if socket successfully created, 1 otherwise. 
