@@ -49,6 +49,7 @@ import adafruit_bus_device.spi_device as spidev
 from micropython import const
 from digitalio import DigitalInOut
 from adafruit_wiznet5k.adafruit_wiznet5k_dhcp import DHCP as DHCP
+from collections import namedtuple
 
 __version__ = "0.0.0-auto.0"
 __repo__ = "https://github.com/adafruit/Adafruit_CircuitPython_Wiznet5k.git"
@@ -70,6 +71,7 @@ REG_SNSR           = const(0x0003) # Socket n Status Register
 REG_SNPORT         = const(0x0004) # Socket n Source Port
 REG_SNDIPR         = const(0x000C) # Destination IP Address
 REG_SNDPORT        = const(0x0010) # Destination Port
+REG_SNRX_RD        = const(0x0028) # RX Read Pointer
 
 # SNSR Commands
 SNSR_SOCK_CLOSED      = const(0x00)
@@ -117,6 +119,9 @@ MR_RST = const(0x80) # Mode Register RST
 DEFAULT_MAC = [0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED]
 # Maximum number of sockets to support, differs between chip versions.
 W5200_W5500_MAX_SOCK_NUM = const(0x08)
+
+
+SOCKET_STATE = namedtuple("SOCKET_STATE", "RX_RSR RX_RD, TX_FSR, RX_inc")
 
 class WIZNET:
     """Interface for WIZNET5k module.
@@ -213,6 +218,15 @@ class WIZNET:
              remote_ip[octet] = self._read_socket(self._sock, REG_SNDIPR+octet)[0]
 
         return self.pretty_ip(remote_ip)
+
+    @property
+    def socket_available(self):
+        """Determines how many bytes are waiting to be ready on the socket.
+        """
+        if self._sock >= self.max_sockets:
+            return 0
+        # return Ethernet.socketRecvAvailable(sockindex);
+
 
     def pretty_ip(self, ip): # pylint: disable=no-self-use, invalid-name
         """Converts a bytearray IP address to a
@@ -340,8 +354,12 @@ class WIZNET:
 
     # socket-specific methods
 
+    def _sock_rcv_available(self, sock):
+        pass
+        # TODO!, requires state[] and readsnxrx_rd implementation
+        # uint16_t ret = state[s].RX_RSR;
+
     def sock_status(self, sock):
-        #return self._read_snsr(sock)[0]
         return self._read_snsr(sock)
 
     def begin(self, dns):
@@ -423,9 +441,18 @@ class WIZNET:
             assert self._read_sncr(socket_num)[0] == 0x00, "Error: Unable to open socket!"
             assert self._read_snsr((socket_num))[0] == 0x13, "Error: Unable to open socket!"
 
+            # SOCKET_STATE(0, 0, 0, 0)
+            SOCKET_STATE(0, self._read_snrx_rd(socket_num), 0, 0)
+
             return 0
         return 1
 
+    def _read_snrx_rd(self, sock):
+        """Reads the Socket n Read Data Pointer Register
+        """
+        data = self._read_socket(sock, REG_SNRX_RD)
+        data += self._read_socket(sock, REG_SNRX_RD+1)
+        return data
 
     def _write_sndipr(self, sock, ip_addr):
         """Writes to socket destination IP Address.
@@ -447,55 +474,55 @@ class WIZNET:
         """
         return self._read_socket(sock, REG_SNSR)
 
-    def _read_snmr(self, socket, protocol):
+    def _read_snmr(self, sock, protocol):
         """Read Socket n Mode Register
 
         """
-        return self._read_socket(socket, protocol)
+        return self._read_socket(sock, protocol)
 
-    def _write_snmr(self, socket, protocol):
+    def _write_snmr(self, sock, protocol):
         """Write to Socket n Mode Register.
 
         """
-        self._write_socket(socket, REG_SNMR, protocol)
+        self._write_socket(sock, REG_SNMR, protocol)
 
-    def _write_snir(self, socket, data):
+    def _write_snir(self, sock, data):
         """Write to Socket n Interrupt Register.
         """
-        self._write_socket(socket, REG_SNIR, data)
+        self._write_socket(sock, REG_SNIR, data)
 
-    def _write_sock_port(self, socket, port):
+    def _write_sock_port(self, sock, port):
         """Write to the socket port number.
         """
-        self._write_socket(socket, REG_SNPORT, port >> 8)
-        self._write_socket(socket, REG_SNPORT+1, port & 0xFF)
+        self._write_socket(sock, REG_SNPORT, port >> 8)
+        self._write_socket(sock, REG_SNPORT+1, port & 0xFF)
 
-    def _write_sncr(self, socket, data):
-        self._write_socket(socket, REG_SNCR, data)
+    def _write_sncr(self, sock, data):
+        self._write_socket(sock, REG_SNCR, data)
 
-    def _read_sncr(self, socket):
-        return self._read_socket(socket, REG_SNCR)
+    def _read_sncr(self, sock):
+        return self._read_socket(sock, REG_SNCR)
 
-    def _read_snmr(self, socket):
-        return self._read_socket(socket, REG_SNMR)
+    def _read_snmr(self, sock):
+        return self._read_socket(sock, REG_SNMR)
 
-    def _read_snir(self, socket):
-        return self._read_socket(socket, REG_SNIR)
+    def _read_snir(self, sock):
+        return self._read_socket(sock, REG_SNIR)
     
-    def _read_sndipr(self, socket):
-        return self._read_socket(socket, REG_SNDIPR)
+    def _read_sndipr(self, sock):
+        return self._read_socket(sock, REG_SNDIPR)
 
-    def _write_socket(self, socket, address, data, length=None):
+    def _write_socket(self, sock, address, data, length=None):
         """Write to a W5k socket register.
         """
         base = self._ch_base_msb << 8
-        cntl_byte = (socket<<5)+0x0C;
+        cntl_byte = (sock<<5)+0x0C;
         if length is None:
-            return self.write(base + socket * CH_SIZE + address, cntl_byte, data)
-        return self._write_n(base + socket * CH_SIZE + address, cntl_byte, data)
+            return self.write(base + sock * CH_SIZE + address, cntl_byte, data)
+        return self._write_n(base + sock * CH_SIZE + address, cntl_byte, data)
 
-    def _read_socket(self, socket, address):
+    def _read_socket(self, sock, address):
         """Read a W5k socket register.
         """
-        cntl_byte = (socket<<5)+0x08;
+        cntl_byte = (sock<<5)+0x08;
         return self.read(address, cntl_byte)
