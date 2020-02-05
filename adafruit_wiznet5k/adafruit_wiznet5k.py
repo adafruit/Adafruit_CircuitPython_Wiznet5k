@@ -143,7 +143,8 @@ class WIZNET:
         # Set IP address
         self.ip_address = (0, 0, 0, 0)
         self._timeout = timeout
-
+        self._sock = 0
+        self._src_port = 0
 
     @property
     def max_sockets(self):
@@ -349,43 +350,53 @@ class WIZNET:
     def connect(self, server_ip, server_port):
         """Connect to server address.
         """
-        # TODO: handle dhcp, using server_ip for now
-        sock = 0
-        # TODO: check all socket status (SNSRs) up to MAX_num
+        # TODO: implement dhcp, using a static server_ip for now
 
-        # if socket allocated is the maximum
-        if sock == self.max_sockets:
+        # allocate a socket based on socket status
+        # NOTE: only allocate up to max. socket number for the chip
+        for _sock in range(0, self.max_sockets):
+            status = self.sock_status(_sock)
+            if status[0] == SNSR_SOCK_CLOSED or status[0] == SNSR_SOCK_FIN_WAIT or status[0] == SNSR_SOCK_CLOSE_WAIT:
+                self._sock = _sock
+                break
+
+        if self._sock == self.max_sockets:
             return 0
+
+        self._src_port+=1
+        if (self._src_port == 0):
+            self._src_port = 1024
+
         # initialize a socket and set the mode
-        ret = self.socket_open(sock, server_ip, server_port, SNMR_TCP)
+        ret = self.socket_open(self._sock, server_ip, self._src_port, server_port, SNMR_TCP)
         if ret == 1: # socket unsuccessfully opened
             return 0
-        # connect socket
-        self._write_sncr(sock, CMD_SOCK_CONNECT)
-        self._read_sncr(sock)
 
-        while self.sock_status(sock)[0] != SNSR_SOCK_ESTABLISHED:
-            if self.sock_status(sock)[0] == SNSR_SOCK_CLOSED:
+        # connect socket
+        self._write_sncr(self._sock, CMD_SOCK_CONNECT)
+        self._read_sncr(self._sock)
+
+        while self.sock_status(self._sock)[0] != SNSR_SOCK_ESTABLISHED:
+            if self.sock_status(self._sock)[0] == SNSR_SOCK_CLOSED:
                 return 0
         return 1
 
-    def socket_open(self, socket_num, addr, dst_port, conn_mode=SNMR_TCP):
+    def socket_open(self, socket_num, addr, src_port, dst_port, conn_mode=SNMR_TCP):
         """Open a socket to a destination IP address or hostname. We
         may use a variety of SNMR_MODEs.
         Returns 0 if socket successfully created, 1 otherwise. 
         """
         port = 0
         if self._read_snsr(socket_num)[0] == SNSR_SOCK_CLOSED:
-            print("w5k socket begin, protocol={}, port={}".format(conn_mode, port))
+            print("w5k socket begin, protocol={}, port={}".format(conn_mode, src_port))
             time.sleep(0.00025)
 
             self._write_snmr(socket_num, conn_mode)
             self._write_snir(socket_num, 0xFF)
 
-            port += 1
-            if port > 0:
+            if src_port > 0:
                 # write to socket source port
-                self._write_sock_port(socket_num, port)
+                self._write_sock_port(socket_num, src_port)
             else:
                 # if source port is not set, set the local port number
                 self._write_sock_port(socket_num, LOCAL_PORT)
