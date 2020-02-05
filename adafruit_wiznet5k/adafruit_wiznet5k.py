@@ -360,12 +360,8 @@ class WIZNET:
         self._write_sncr(sock, CMD_SOCK_CONNECT)
         self._read_sncr(sock)
 
-        while self.sock_status(sock) != SNSR_SOCK_ESTABLISHED:
-            print('sock_status: ', self.sock_status(sock))
-            print('SN_IR: ', self._read_snir(sock))
-            time.sleep(0.5)
-            if self.sock_status(sock) == SNSR_SOCK_CLOSED:
-                print('closed!')
+        while self.sock_status(sock)[0] != SNSR_SOCK_ESTABLISHED:
+            if self.sock_status(sock)[0] == SNSR_SOCK_CLOSED:
                 return 0
         return 1
 
@@ -391,11 +387,8 @@ class WIZNET:
                 self._write_sock_port(socket_num, LOCAL_PORT)
 
             # set socket destination IP addr. and port
-            print(addr, dst_port)
             self._write_sndipr(socket_num, addr)
             self._write_sndport(socket_num, dst_port)
-            print('Sock PORT:', self._read_socket(socket_num, 0x0010))
-            print('Sock PORT:', self._read_socket(socket_num, 0x0011))
 
             # open socket
             self._write_sncr(socket_num, CMD_SOCK_OPEN)
