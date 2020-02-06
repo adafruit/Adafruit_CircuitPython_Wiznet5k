@@ -8,6 +8,7 @@ import adafruit_wiznet5k.adafruit_wiznet5k_socket as socket
 
 # Static IP Configuration
 MY_IP = (192, 168, 0, 105)
+MY_SUBNET_ADDR = (255, 255, 255, 0)
 MY_DNS = (192, 168, 0, 1)
 
 # MAC Address
@@ -19,21 +20,16 @@ cs = digitalio.DigitalInOut(board.D10)
 spi_bus = busio.SPI(board.SCK, MOSI=board.MOSI, MISO=board.MISO)
 
 # Initialize wiznet5k module interface
-eth = WIZNET(spi_bus, cs)
+eth = WIZNET(spi_bus, cs, dhcp=False)
 
 # Check if ethernet cable is connected
 assert eth.link_status == 1, "Link down. Please connect an ethernet cable."
 
-# Assign static IP
-eth.ip_address = MY_IP
-
-# Print connection information
-eth.pretty_mac(eth.mac_address)
+# (ip_address, subnet_mask, gateway_address, dns_server)
+eth.ifconfig = ((MY_IP, MY_SUBNET_ADDR, MY_IP, MY_DNS))
 
 print("Hardware IP Address: ", eth.pretty_ip(eth.ip_address))
 print("Hardware MAC Address: ", eth.pretty_mac(eth.mac_address))
-
-eth.begin(MY_DNS)
 
 socket.set_interface(eth)
 sock = socket.socket()

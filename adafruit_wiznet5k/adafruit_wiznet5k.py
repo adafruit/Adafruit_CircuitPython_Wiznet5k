@@ -125,13 +125,12 @@ class WIZNET:
     :param ~busio.SPI spi_bus: The SPI bus the Wiznet module is connected to.
     :param ~digitalio.DigitalInOut cs: Chip select pin.
     :param ~digitalio.DigitalInOut rst: Optional reset pin. 
+    :param bool dhcp: Whether to start DHCP automatically or not
     :param str mac: The Wiznet's MAC Address.
-    :param int timeout: Times out if no response from DHCP server.
 
     """
-
-    def __init__(self, spi_bus, cs, reset=None,
-                 mac=DEFAULT_MAC, timeout=5.0, response_timeout=5.0):
+    def __init__(self, spi_bus, cs, reset=None, 
+                 dhcp=True, mac=DEFAULT_MAC):
         self._device = spidev.SPIDevice(spi_bus, cs,
                                         baudrate=8000000,
                                         polarity=0, phase=0)
@@ -142,11 +141,20 @@ class WIZNET:
         assert self._w5100_init() == 1, "Unsuccessfully initialized Wiznet module."
         # Set MAC address
         self.mac_address = mac
-        # Set IP address
-        self.ip_address = (0, 0, 0, 0)
-        self._timeout = timeout
+        # Set DHCP
+        self.is_dhcp = dhcp
         self._sock = 0
         self._src_port = 0
+
+    @property
+    def dhcp(self):
+        """Returns if DHCP is active.
+        """
+        return self.is_dhcp
+    
+    @dhcp.setter
+    def dhcp(self, dhcp):
+        self.is_dhcp = dhcp
 
     @property
     def max_sockets(self):
@@ -193,9 +201,7 @@ class WIZNET:
 
     @property
     def link_status(self):
-        """Returns the PHY's link status.
-        1: Link up.
-        0: Link down.
+        """"Returns if the PHY is connected.
         """
         if self._chip_type == "w5500":
             data =  self.read(REG_PHYCFGR, 0x00)
@@ -208,21 +214,11 @@ class WIZNET:
         """Returns the remote IP Address.
         """
         remote_ip = bytearray(4)
-
         if self._sock >= self.max_sockets:
             return remote_ip
         for octet in range(0, 4):
              remote_ip[octet] = self._read_socket(self._sock, REG_SNDIPR+octet)[0]
-
         return self.pretty_ip(remote_ip)
-
-    @property
-    def socket_available(self):
-        """Determines how many bytes are waiting to be ready on the socket.
-        """
-        if self._sock >= self.max_sockets:
-            return 0
-        # return Ethernet.socketRecvAvailable(sockindex);
 
 
     def pretty_ip(self, ip): # pylint: disable=no-self-use, invalid-name
@@ -239,6 +235,36 @@ class WIZNET:
         """
         return "%s:%s:%s:%s:%s:%s" % (hex(mac[0]), hex(mac[1]), hex(mac[2]),
                                       hex(mac[3]), hex(mac[4]), hex(mac[5]))
+
+    @property
+    def ifconfig(self):
+        """Returns a tuple of (ip_address, subnet_mask, gateway_address, dns_server).
+        """
+        for octet in range(0, 4):
+            subnet_mask = self.read(REG_SUBR+octet, 0x00)
+        print(subnet_mask)
+        params = (self.ip_address, subnet_mask, 0, self._dns)
+
+    @ip_address.setter
+    def ifconfig(self, params):
+        """Sets ifconfig parameters provided tuple of
+        (ip_address, subnet_mask, gateway_address, dns_server).
+        Setting if_config turns DHCP off, if on.
+        """
+        ip_address, subnet_mask, gateway_address, dns_server = params
+        # set ip_address
+        self.ip_address = ip_address
+        # set subnet_address
+        for octet in range(0, 4):
+            self.write(REG_SUBR+octet, 0x04, subnet_mask[octet])
+        # set gateway_address
+        gateway_address = list(gateway_address)
+        gateway_address[3] = 1
+        for octet in range(0, 4):
+            self.write(REG_GAR+octet, 0x04, gateway_address[octet])
+        # set dns
+        self._dns = dns_server
+        self.dhcp = False
 
     def _w5100_init(self):
         """Initializes and detects a wiznet5k module.
@@ -355,27 +381,6 @@ class WIZNET:
         """Returns the socket connection status. Can be: 
         """
         return self._read_snsr(socket_num)
-
-    # TODO: this needs to be included in some form of initialization
-    # Possibly make DNS, gateway ip address and subnet address 
-    # initialization properties
-    def begin(self, dns):
-        """Begin ethernet connection.
-        """
-        self._dns = dns
-        SUBNET_ADDR = (255, 255, 255, 0)
-        # Assume gateway IP is on the same network as the local IP
-        gateway_ip = self.ip_address
-        # Set the last octet to 1
-        gateway_ip[3] = 1
-
-        for octet in range(0, 4):
-            self.write(REG_GAR+octet, 0x04, gateway_ip[octet])
-
-        for octet in range(0, 4):
-            self.write(REG_SUBR+octet, 0x04, SUBNET_ADDR[octet])
-
-    # TODO: Implement DHCP, currently relies on a static IP
 
     def socket_connect(self, socket_num, dest, port, conn_mode=SNMR_TCP):
         """Open and verify we've connected a socket to a dest IP address
