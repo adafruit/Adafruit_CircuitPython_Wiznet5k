@@ -349,11 +349,16 @@ class WIZNET:
                 bus_device.write(bytes([data[i]]))
         return len
 
-    # socket-specific methods
+    # Socket-Register API
 
-    def sock_status(self, sock):
-        return self._read_snsr(sock)
+    def socket_status(self, socket_num):
+        """Returns the socket connection status. Can be: 
+        """
+        return self._read_snsr(socket_num)
 
+    # TODO: this needs to be included in some form of initialization
+    # Possibly make DNS, gateway ip address and subnet address 
+    # initialization properties
     def begin(self, dns):
         """Begin ethernet connection.
         """
@@ -370,23 +375,20 @@ class WIZNET:
         for octet in range(0, 4):
             self.write(REG_SUBR+octet, 0x04, SUBNET_ADDR[octet])
 
-    def connect(self, server_ip, server_port):
-        """Connect to server address.
+    # TODO: Implement DHCP, currently relies on a static IP
+
+    def socket_connect(self, socket_num, dest, port, conn_mode=SNMR_TCP):
+        """Open and verify we've connected a socket to a dest IP address
+        or hostname. By default, we use 'conn_mode'= SNMR_TCP but we
+        may also use SNMR_UDP.
         """
-        # TODO: implement dhcp, using a static server_ip for now
-
         # initialize a socket and set the mode
-        ret = self.sock_open(self._sock, server_ip, self._src_port, server_port, SNMR_TCP)
+        res = self.get_socket(socket_num, dest, port, conn_mode = conn_mode)
         if ret == 1: # socket unsuccessfully opened
-            return 0
-
-        # connect socket
-        self._write_sncr(self._sock, CMD_SOCK_CONNECT)
-        self._read_sncr(self._sock)
-
-        while self.sock_status(self._sock)[0] != SNSR_SOCK_ESTABLISHED:
-            if self.sock_status(self._sock)[0] == SNSR_SOCK_CLOSED:
-                return 0
+            raise RuntimeError('Failed to initalize a connection with the socket.')
+        while self.socket_status(self._sock)[0] != SNSR_SOCK_ESTABLISHED:
+            if self.socket_status(self._sock)[0] == SNSR_SOCK_CLOSED:
+                raise RuntimeError('Failed to establish connection.')
         return 1
 
     def get_socket(self):
@@ -395,7 +397,7 @@ class WIZNET:
         """
         sock = 0
         for _sock in range(0, self.max_sockets):
-            status = self.sock_status(_sock)
+            status = self.socket_status(_sock)
             if status[0] == SNSR_SOCK_CLOSED or status[0] == SNSR_SOCK_FIN_WAIT or status[0] == SNSR_SOCK_CLOSE_WAIT:
                 sock = _sock
                 break
@@ -433,28 +435,20 @@ class WIZNET:
 
             # open socket
             self._write_sncr(socket_num, CMD_SOCK_OPEN)
-            assert self._read_sncr(socket_num)[0] == 0x00, "Error: Unable to open socket!"
-            assert self._read_snsr((socket_num))[0] == 0x13, "Error: Unable to open socket!"
+            assert self._read_sncr(socket_num)[0] == 0x00, "Could not connect to remote server"
+            assert self._read_snsr((socket_num))[0] == 0x13, "Could not connect to remote server"
 
             return 0
         return 1
 
-    def sock_available(self):
-        print('data avail.:', self._read_snrx_rsr(self._sock))
-        #if self._sock != self.max_sockets:
-        #    return self._get_rx_rcv_size(self._sock)
-        #return 0
+    def socket_avaliable(self, socket_num):
+        """Returns how many bytes are waiting to be read on the socket.
 
-    def _get_rx_rcv_size(self, sock):
-        val = 0
-        val_1=0
-        while True:
-            val_1 = self._read_snrx_rsr(sock)
-            if val_1 != 0:
-                val = self._read_snrx_rsr(sock)
-            if not (val != val_1):
-                break
-        return val
+        """
+        return self._read_snrx_rsr(socket_num)
+
+
+    # Socket-Register Methods
 
     def _read_snrx_rsr(self, sock):
         data = self._read_socket(sock, REG_SNRX_RSR)

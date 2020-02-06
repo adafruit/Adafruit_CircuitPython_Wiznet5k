@@ -30,11 +30,43 @@ A socket compatible interface with the Wiznet5k module.
 * Author(s): Paul Stoffregen, ladyada, Brent Rubell
 
 """
+from micropython import const
+from adafruit_wiznet5k import adafruit_wiznet5k
+
+_the_interface = None   # pylint: disable=invalid-name
+def set_interface(iface):
+    """Helper to set the global internet interface"""
+    global _the_interface   # pylint: disable=global-statement, invalid-name
+    _the_interface = iface
+
+SOCK_STREAM = const(1)
+AF_INET = const(2)
+NO_SOCKET_AVAIL = const(255)
+
+MAX_PACKET = const(4000)
 
 class socket:
     """A simplified implementation of the Python 'socket' class
     for connecting to a Wiznet5k module.
 
     """
-    def __init__(self):
-        pass
+    def __init__(self, family=AF_INET, type=SOCK_STREAM, proto=0, fileno=0, socknum=None):
+        if family != AF_INET:
+            raise RuntimeError("Only AF_INET family supported by W5K modules.")
+        if type != SOCK_STREAM:
+            raise RuntimeError("Only SOCK_STREAM type supported.")
+        self._buffer = b''
+        self._socknum = socknum if socknum else _the_interface.get_socket()
+        # TODO: implement set_timeout
+        # self.set_timeout(0)
+    
+    def connect(self, address, conn_type=None):
+        """Connect to a remote socket at address. (The format of address depends on the address family — see above.)
+        """
+        host, port = address
+        if conn_type is None:
+            conn_type == _the_interface.SNMR_TCP
+        if not _the_interface.socket_connect(self._socknum, host, port, conn_mode=conntype):
+            raise RuntimeError("Failed to connect to host", host)
+        self._buffer = b''
+
