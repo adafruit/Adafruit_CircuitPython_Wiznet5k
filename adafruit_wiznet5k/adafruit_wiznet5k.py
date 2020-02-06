@@ -375,21 +375,6 @@ class WIZNET:
         """
         # TODO: implement dhcp, using a static server_ip for now
 
-        # allocate a socket based on socket status
-        # NOTE: only allocate up to max. socket number for the chip
-        for _sock in range(0, self.max_sockets):
-            status = self.sock_status(_sock)
-            if status[0] == SNSR_SOCK_CLOSED or status[0] == SNSR_SOCK_FIN_WAIT or status[0] == SNSR_SOCK_CLOSE_WAIT:
-                self._sock = _sock
-                break
-
-        if self._sock == self.max_sockets:
-            return 0
-
-        self._src_port+=1
-        if (self._src_port == 0):
-            self._src_port = 1024
-
         # initialize a socket and set the mode
         ret = self.sock_open(self._sock, server_ip, self._src_port, server_port, SNMR_TCP)
         if ret == 1: # socket unsuccessfully opened
@@ -404,12 +389,30 @@ class WIZNET:
                 return 0
         return 1
 
-    def sock_open(self, socket_num, addr, src_port, dst_port, conn_mode=SNMR_TCP):
-        """Open a socket to a destination IP address or hostname. We
-        may use a variety of SNMR_MODEs.
-        Returns 0 if socket successfully created, 1 otherwise. 
+    def get_socket(self):
+        """Request, allocates and returns a socket from the W5k
+        chip. Returned socket number may not exceed max_sockets. 
         """
-        port = 0
+        sock = 0
+        for _sock in range(0, self.max_sockets):
+            status = self.sock_status(_sock)
+            if status[0] == SNSR_SOCK_CLOSED or status[0] == SNSR_SOCK_FIN_WAIT or status[0] == SNSR_SOCK_CLOSE_WAIT:
+                sock = _sock
+                break
+
+        if sock == self.max_sockets:
+            return 0
+
+        self._src_port+=1
+        if (self._src_port == 0):
+            self._src_port = 1024
+
+        return sock
+
+    def socket_open(self, socket_num, dest, port, conn_mode=SNMR_TCP):
+        """Opens a socket to a destination IP address or hostname. By default, we use
+        'conn_mode'=SNMR_TCP but we may also use SNMR_UDP.
+        """
         if self._read_snsr(socket_num)[0] == SNSR_SOCK_CLOSED:
             print("w5k socket begin, protocol={}, port={}".format(conn_mode, src_port))
             time.sleep(0.00025)
@@ -417,16 +420,16 @@ class WIZNET:
             self._write_snmr(socket_num, conn_mode)
             self._write_snir(socket_num, 0xFF)
 
-            if src_port > 0:
+            if self._src_port > 0:
                 # write to socket source port
-                self._write_sock_port(socket_num, src_port)
+                self._write_sock_port(socket_num, self._src_port)
             else:
                 # if source port is not set, set the local port number
                 self._write_sock_port(socket_num, LOCAL_PORT)
 
             # set socket destination IP addr. and port
             self._write_sndipr(socket_num, addr)
-            self._write_sndport(socket_num, dst_port)
+            self._write_sndport(socket_num, port)
 
             # open socket
             self._write_sncr(socket_num, CMD_SOCK_OPEN)
@@ -436,11 +439,11 @@ class WIZNET:
             return 0
         return 1
 
-
     def sock_available(self):
-        if self._sock != self.max_sockets:
-            return self._get_rx_rcv_size(self._sock)
-        return 0
+        print('data avail.:', self._read_snrx_rsr(self._sock))
+        #if self._sock != self.max_sockets:
+        #    return self._get_rx_rcv_size(self._sock)
+        #return 0
 
     def _get_rx_rcv_size(self, sock):
         val = 0
