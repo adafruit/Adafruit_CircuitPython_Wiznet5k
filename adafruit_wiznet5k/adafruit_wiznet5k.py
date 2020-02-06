@@ -125,12 +125,14 @@ class WIZNET:
     :param ~busio.SPI spi_bus: The SPI bus the Wiznet module is connected to.
     :param ~digitalio.DigitalInOut cs: Chip select pin.
     :param ~digitalio.DigitalInOut rst: Optional reset pin. 
-    :param bool dhcp: Whether to start DHCP automatically or not
+    :param bool dhcp: Whether to start DHCP automatically or not.
     :param str mac: The Wiznet's MAC Address.
+    :param bool debug: Enable debugging output.
 
     """
     def __init__(self, spi_bus, cs, reset=None, 
-                 dhcp=True, mac=DEFAULT_MAC):
+                 dhcp=True, mac=DEFAULT_MAC, debug=True):
+        self._debug = debug
         self._device = spidev.SPIDevice(spi_bus, cs,
                                         baudrate=8000000,
                                         polarity=0, phase=0)
@@ -169,6 +171,8 @@ class WIZNET:
     def chip(self):
         """Returns the chip type.
         """
+        if self._debug:
+            print("Chip version")
         return self._chip_type
 
     @property
@@ -258,8 +262,6 @@ class WIZNET:
         for octet in range(0, 4):
             self.write(REG_SUBR+octet, 0x04, subnet_mask[octet])
         # set gateway_address
-        gateway_address = list(gateway_address)
-        gateway_address[3] = 1
         for octet in range(0, 4):
             self.write(REG_GAR+octet, 0x04, gateway_address[octet])
         # set dns
@@ -378,8 +380,14 @@ class WIZNET:
     # Socket-Register API
 
     def socket_status(self, socket_num):
-        """Returns the socket connection status. Can be: 
+        """Returns the socket connection status. Can be: SNSR_SOCK_CLOSED,
+        SNSR_SOCK_INIT, SNSR_SOCK_LISTEN, SNSR_SOCK_SYNSENT, SNSR_SOCK_SYNRECV,
+        SNSR_SYN_SOCK_ESTABLISHED, SNSR_SOCK_FIN_WAIT, SNSR_SOCK_CLOSING,
+        SNSR_SOCK_TIME_WAIT, SNSR_SOCK_CLOSE_WAIT, SNSR_LAST_ACK,
+        SNSR_SOCK_UDP, SNSR_SOCK_IPRAW, SNSR_SOCK_MACRAW, SNSR_SOCK_PPOE.
         """
+        if self._debug:
+            print("*** Socket status")
         return self._read_snsr(socket_num)
 
     def socket_connect(self, socket_num, dest, port, conn_mode=SNMR_TCP):
@@ -387,6 +395,8 @@ class WIZNET:
         or hostname. By default, we use 'conn_mode'= SNMR_TCP but we
         may also use SNMR_UDP.
         """
+        if self._debug:
+            print("*** Socket connect mode", conn_mode)
         # initialize a socket and set the mode
         res = self.get_socket(socket_num, dest, port, conn_mode = conn_mode)
         if ret == 1: # socket unsuccessfully opened
@@ -400,6 +410,8 @@ class WIZNET:
         """Request, allocates and returns a socket from the W5k
         chip. Returned socket number may not exceed max_sockets. 
         """
+        if self._debug:
+            print("*** Get socket")
         sock = 0
         for _sock in range(0, self.max_sockets):
             status = self.socket_status(_sock)
@@ -409,17 +421,20 @@ class WIZNET:
 
         if sock == self.max_sockets:
             return 0
-
         self._src_port+=1
+
         if (self._src_port == 0):
             self._src_port = 1024
-
+        if self._debug:
+            print("Allocated socket #%d" % sock)
         return sock
 
     def socket_open(self, socket_num, dest, port, conn_mode=SNMR_TCP):
         """Opens a socket to a destination IP address or hostname. By default, we use
         'conn_mode'=SNMR_TCP but we may also use SNMR_UDP.
         """
+        if self._debug:
+            print("*** Open socket")
         if self._read_snsr(socket_num)[0] == SNSR_SOCK_CLOSED:
             print("w5k socket begin, protocol={}, port={}".format(conn_mode, src_port))
             time.sleep(0.00025)
@@ -450,8 +465,20 @@ class WIZNET:
         """Returns how many bytes are waiting to be read on the socket.
 
         """
-        return self._read_snrx_rsr(socket_num)
+        sock_bytes = self._read_snrx_rsr(socket_num)
+        if self._debug:
+            print("*** Socket: %d bytes available" % sock_bytes)
+        return sock_bytes
 
+    def socket_close(self, socket_num):
+        """Closes a socket.
+
+        """
+        if self._debug:
+            print("*** Closing socket #%d" % socket_num)
+        self._write_sncr(socket_num, CMD_SOCK_CLOSE)
+        self._read_sncr(socket_num)
+        self._write_snir(socket_num, 0xFF)
 
     # Socket-Register Methods
 
