@@ -71,8 +71,10 @@ REG_SNPORT         = const(0x0004) # Socket n Source Port
 REG_SNDIPR         = const(0x000C) # Destination IP Address
 REG_SNDPORT        = const(0x0010) # Destination Port
 REG_SNRX_RSR       = const(0x0026) # RX Free Size
+REG_SNRX_RD        = const(0x0028) # Read Size Pointer
 REG_SNTX_FSR       = const(0x0020) # Socket n TX Free Size
 REG_SNTX_WR        = const(0x0024) # TX Write Pointer
+
 
 # SNSR Commands
 SNSR_SOCK_CLOSED      = const(0x00)
@@ -343,7 +345,7 @@ class WIZNET:
         """
         self.write(REG_MR, 0x04, data)
 
-    def read(self, addr, cb, length=1):
+    def read(self, addr, cb, length=1, buffer=None):
         """Reads data from a register address.
         :param int addr: Register address.
         :param int cb: Common register block (?)
@@ -353,8 +355,11 @@ class WIZNET:
             bus_device.write(bytes([addr >> 8]))
             bus_device.write(bytes([addr & 0xFF]))
             bus_device.write(bytes([cb]))
-            result = bytearray(length)
-            bus_device.readinto(result)
+            if buffer is not None:
+                bus_device.readinto(buffer)
+            else:
+                result = bytearray(length)
+                bus_device.readinto(result)
         return result
 
     def write(self, addr, cb, data):
@@ -473,15 +478,6 @@ class WIZNET:
             return 0
         return 1
 
-    def socket_avaliable(self, socket_num):
-        """Returns how many bytes are waiting to be read on the socket.
-
-        """
-        sock_bytes = self._read_snrx_rsr(socket_num)
-        if self._debug:
-            print("*** Socket: %d bytes available" % sock_bytes)
-        return sock_bytes
-
     def socket_close(self, socket_num):
         """Closes a socket.
 
@@ -491,6 +487,39 @@ class WIZNET:
         self._write_sncr(socket_num, CMD_SOCK_CLOSE)
         self._read_sncr(socket_num)
         self._write_snir(socket_num, 0xFF)
+
+    def socket_read(self, socket_num, buffer):
+        """Reads data from a socket into a buffer.
+        Returns buffer.
+
+        """
+        assert socket_num <= self.max_sockets, "Provided socket exceeds max_sockets."
+        # check how much data is available
+        ret = self._get_rx_rcv_size(socket_num)
+        if ret == 0:
+            # no data available on socket
+            status = self.socket_status(socket_num)
+            if status == SNSR_SOCK_CLOSED or status == SNSR_SOCK_LISTEN or status == SNSR_SOCK_CLOSE_WAIT:
+                # remote end closed its side of connection, this is EOF state
+                ret = 0
+            else:
+                ret = -1
+        else:
+            if ret > len(buffer):
+                ret = len(buffer)
+        
+        if ret > 0:
+            ptr = 0
+            ptr = self._read_snrx_rsr(socket_num)
+            cntl_byte = (0x18+(socket_num<<5))
+            self.read(ptr, cb, buffer = buffer)
+            if not ret:
+                ptr += len(buffer)
+                self._write_snrx_rd(socket_num, ptr)
+
+            self._write_sncr(socket_num, CMD_SOCK_RECV)
+            self._read_sncr(socket_num)
+        return buffer
 
     def socket_write(self, socket_num, buffer):
         """Writes a bytearray to a provided socket.
@@ -541,6 +570,18 @@ class WIZNET:
 
     # Socket-Register Methods
 
+    def _get_rx_rcv_size(self, sock):
+        """Get size of recieved and saved in socket buffer.
+
+        """
+        val = 0
+        val_1 = 0
+        while (val != val_1):
+            val_1 = self._read_snrx_rsr(sock)
+            if val_1 != 0:
+                val = self._read_snrx_rsr(sock)
+        return val
+
     def _get_tx_free_size(self, sock):
         """Get free size of sock's tx buffer block.
 
@@ -552,6 +593,15 @@ class WIZNET:
             if val_1 != 0:
                 val = self._read_sntx_fsr(sock)
         return val
+
+    def _read_snrx_rd(self, sock):
+        data = self._read_socket(sock, REG_SNRX_RD)
+        data += self._read_socket(sock, REG_SNRX_RD+1)
+        return data
+
+    def _write_snrx_rd(self, sock, data):
+        self._write_socket(sock, REG_SNRX_RD, data >> 8)
+        self._write_socket(sock, REG_SNRX_RD+1, data & 0xff)
 
     def _write_sntx_wr(self, sock, data):
         self._write_socket(sock, REG_SNTX_WR, data >> 8)

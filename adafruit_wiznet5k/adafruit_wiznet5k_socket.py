@@ -1,6 +1,5 @@
 # The MIT License (MIT)
 #
-# Copyright 2018 Paul Stoffregen
 # Copyright (c) 2019 ladyada for Adafruit Industries
 # Modified by Brent Rubell for Adafruit Industries, 2020
 #
@@ -27,7 +26,7 @@
 
 A socket compatible interface with the Wiznet5k module.
 
-* Author(s): Paul Stoffregen, ladyada, Brent Rubell
+* Author(s): ladyada, Brent Rubell
 
 """
 import gc
@@ -61,6 +60,21 @@ class socket:
         # TODO: implement set_timeout
         # self.set_timeout(0)
     
+    def connected(self):
+        """Returns whether or not we are connected to the socket.
+        """
+        if (self._socknum >= _the_interface.max_sockets):
+            return 0
+        else:
+            status = _the_interface.socket_status(self._socknum)
+            result = status not in (adafruit_wiznet5k.SNSR_SOCK_CLOSED,
+                                    adafruit_wiznet5k.SNSR_SOCK_LISTEN,
+                                    adafruit_wiznet5k.SNSR_SOCK_CLOSE_WAIT,
+                                    adafruit_wiznet5k.SNSR_SOCK_FIN_WAIT)
+            if not result:
+                self.close()
+            return result
+
     def connect(self, address, conn_type=None):
         """Connect to a remote socket at address. (The format of address depends on the address family — see above.)
         """
@@ -80,3 +94,8 @@ class socket:
         """
         _the_interface.socket_write(self._socknum, data)
         gc.collect()
+    
+    def close(self):
+        """Closes the socket.
+        """
+        _the_interface.socket_close(self._socknum)
