@@ -85,7 +85,7 @@ class socket:
         if not _the_interface.socket_connect(self._socknum, host, port, conn_mode=conn_type):
             raise RuntimeError("Failed to connect to host", host)
         self._buffer = b''
-    
+
     def send(self, data):
         """Send data to the socket. The socket must be connected to
         a remote socket.
@@ -99,3 +99,8 @@ class socket:
         """Closes the socket.
         """
         _the_interface.socket_close(self._socknum)
+
+    def available(self):
+        """Returns how many bytes of data are available to be read.
+        """
+        return _the_interface.socket_available(self._socknum)

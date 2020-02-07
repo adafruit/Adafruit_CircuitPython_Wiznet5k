@@ -392,6 +392,12 @@ class WIZNET:
 
     # Socket-Register API
 
+    def socket_available(self, socket_num):
+        """Returns is socket is available.
+        """
+        assert socket_num <= self.max_sockets, "Provided socket exceeds max_sockets."
+        return self._get_rx_rcv_size(socket_num)
+
     def socket_status(self, socket_num):
         """Returns the socket connection status. Can be: SNSR_SOCK_CLOSED,
         SNSR_SOCK_INIT, SNSR_SOCK_LISTEN, SNSR_SOCK_SYNSENT, SNSR_SOCK_SYNRECV,
