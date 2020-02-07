@@ -274,7 +274,6 @@ class WIZNET:
         # set gateway_address
         for octet in range(0, 4):
             self.write(REG_GAR+octet, 0x04, gateway_address[octet])
-        print('GAR: ', self.read(REG_GAR, 0x00, 4))
         # set dns
         self._dns = dns_server
         self.dhcp = False
@@ -297,7 +296,6 @@ class WIZNET:
         else:
             return 0
         return 1
-
 
     def detect_w5500(self):
         """Detects W5500 chip.
@@ -384,7 +382,6 @@ class WIZNET:
             bus_device.write(bytes([addr & 0xFF]))
             bus_device.write(bytes([cb]))
             for i in range(0, len(data)):
-                print(bytes([data[i]]))
                 bus_device.write(bytes([data[i]]))
         return len
 
@@ -415,14 +412,10 @@ class WIZNET:
         self._write_sncr(self._sock, CMD_SOCK_CONNECT)
         self._read_sncr(self._sock)
         
-        # TODO: this fails out, need to fix!
         while self.socket_status(socket_num)[0] != SNSR_SOCK_ESTABLISHED:
-            print('status: ', self.socket_status(socket_num))
-            print('snir: ', self._read_snir(socket_num))
             if self.socket_status(socket_num)[0] == SNSR_SOCK_CLOSED:
                 raise RuntimeError('Failed to establish connection.')
             time.sleep(1)
-        print('status: ', self.socket_status(socket_num))
         return 1
 
     def get_socket(self):
@@ -521,7 +514,6 @@ class WIZNET:
                 ret = 0
                 break
 
-
         # Read the starting address for saving the transmitting data.
         ptr = self._read_sntx_wr(socket_num)
         offset = ptr & 0x07FF
@@ -529,6 +521,7 @@ class WIZNET:
 
         # update sn_tx_wr to the value + data size
         ptr += len(buffer)
+        # TODO: clean this up.
         self._write_socket(socket_num, REG_SNTX_WR, ptr >> 8)
         self._write_socket(socket_num, REG_SNTX_WR+1, ptr & 0xff)
 
@@ -563,10 +556,8 @@ class WIZNET:
         return val
 
     def _write_sntx_wr(self, sock, data):
-        self._write_socket(sock, REG_SNTX_WR, 0x00)
-        self._write_socket(sock, REG_SNTX_WR+1, 0x00)
-
-        #elf._write_socket(sock, REG_SNTX_WR, buf, 2)
+        self._write_socket(sock, REG_SNTX_WR, data >> 8)
+        self._write_socket(sock, REG_SNTX_WR+1, data & 0xff)
 
     def _read_sntx_wr(self, sock):
         buf = bytearray(2)

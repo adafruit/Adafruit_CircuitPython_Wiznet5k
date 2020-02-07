@@ -30,6 +30,7 @@ A socket compatible interface with the Wiznet5k module.
 * Author(s): Paul Stoffregen, ladyada, Brent Rubell
 
 """
+import gc
 from micropython import const
 from adafruit_wiznet5k import adafruit_wiznet5k
 
@@ -64,9 +65,18 @@ class socket:
         """Connect to a remote socket at address. (The format of address depends on the address family — see above.)
         """
         host, port = address
+
         if conn_type is None:
-            conn_type == _the_interface.SNMR_TCP
-        if not _the_interface.socket_connect(self._socknum, host, port, conn_mode=conntype):
+            conn_type = _the_interface.SNMR_TCP
+        if not _the_interface.socket_connect(self._socknum, host, port, conn_mode=conn_type):
             raise RuntimeError("Failed to connect to host", host)
         self._buffer = b''
+    
+    def send(self, data):
+        """Send data to the socket. The socket must be connected to
+        a remote socket.
+        Returns the number of bytes sent
 
+        """
+        _the_interface.socket_write(self._socknum, data)
+        gc.collect()
