@@ -54,23 +54,25 @@ __version__ = "0.0.0-auto.0"
 __repo__ = "https://github.com/adafruit/Adafruit_CircuitPython_Wiznet5k.git"
 
 # Wiznet5k Registers
-REG_MR             = const(0x0000) # Mode Register
+REG_MR             = const(0x0000) # Mode
 REG_GAR            = const(0x0001) # Gateway IP Address
 REG_SUBR           = const(0x0005) # Subnet Mask Address
-REG_VERSIONR_W5500 = const(0x0039) # W5500 Silicon Version Register
-REG_SHAR           = const(0x0009) # Source Hardware Address Register
-REG_SIPR           = const(0x000F) # Source IP Address Register
-REG_PHYCFGR        = const(0x002E) # W5500 PHY Configuration Register
+REG_VERSIONR_W5500 = const(0x0039) # W5500 Silicon Version
+REG_SHAR           = const(0x0009) # Source Hardware Address
+REG_SIPR           = const(0x000F) # Source IP Address
+REG_PHYCFGR        = const(0x002E) # W5500 PHY Configuration
 
 # Wiznet5k Socket Registers
-REG_SNMR           = const(0x0000) # Socket n Mode Register
-REG_SNCR           = const(0x0001) # Socket n Command Register
-REG_SNIR           = const(0x0002) # Socket n Interrupt Register
-REG_SNSR           = const(0x0003) # Socket n Status Register
+REG_SNMR           = const(0x0000) # Socket n Mode
+REG_SNCR           = const(0x0001) # Socket n Command
+REG_SNIR           = const(0x0002) # Socket n Interrupt
+REG_SNSR           = const(0x0003) # Socket n Status
 REG_SNPORT         = const(0x0004) # Socket n Source Port
 REG_SNDIPR         = const(0x000C) # Destination IP Address
 REG_SNDPORT        = const(0x0010) # Destination Port
 REG_SNRX_RSR       = const(0x0026) # RX Free Size
+REG_SNTX_FSR       = const(0x0020) # Socket n TX Free Size
+REG_SNTX_WR        = const(0x0024) # TX Write Pointer
 
 # SNSR Commands
 SNSR_SOCK_CLOSED      = const(0x00)
@@ -100,16 +102,16 @@ CMD_SOCK_SEND_MAC  = const(0x21)
 CMD_SOCK_SEND_KEEP = const(0x22)
 CMD_SOCK_RECV      = const(0x40)
 
-# Socket registers
-SNMR_CLOSE  = const(0x00);
-SNMR_TCP    = const(0x21);
-SNMR_UDP    = const(0x02);
-SNMR_IPRAW  = const(0x03);
-SNMR_MACRAW = const(0x04);
-SNMR_PPPOE  = const(0x05);
 
-CH_SIZE            = const(0x100)
+# Socket n Interrupt Register
+SNIR_SEND_OK = const(0x10)
+SNIR_TIMEOUT = const(0x08)
+SNIR_RECV    = const(0x04)
+SNIR_DISCON  = const(0x02)
+SNIR_CON     = const(0x01)
 
+CH_SIZE     = const(0x100)
+SOCK_SIZE   = const(0x800) # MAX W5k socket size
 # Register commands
 MR_RST = const(0x80) # Mode Register RST
 
@@ -130,6 +132,15 @@ class WIZNET:
     :param bool debug: Enable debugging output.
 
     """
+
+    # Socket registers
+    SNMR_CLOSE  = const(0x00)
+    SNMR_TCP    = const(0x21)
+    SNMR_UDP    = const(0x02)
+    SNMR_IPRAW  = const(0x03)
+    SNMR_MACRAW = const(0x04)
+    SNMR_PPPOE  = const(0x05)
+
     def __init__(self, spi_bus, cs, reset=None, 
                  dhcp=True, mac=DEFAULT_MAC, debug=True):
         self._debug = debug
@@ -246,7 +257,6 @@ class WIZNET:
         """
         for octet in range(0, 4):
             subnet_mask = self.read(REG_SUBR+octet, 0x00)
-        print(subnet_mask)
         params = (self.ip_address, subnet_mask, 0, self._dns)
 
     @ip_address.setter
@@ -264,6 +274,7 @@ class WIZNET:
         # set gateway_address
         for octet in range(0, 4):
             self.write(REG_GAR+octet, 0x04, gateway_address[octet])
+        print('GAR: ', self.read(REG_GAR, 0x00, 4))
         # set dns
         self._dns = dns_server
         self.dhcp = False
@@ -334,19 +345,6 @@ class WIZNET:
         """
         self.write(REG_MR, 0x04, data)
 
-    def write(self, addr, cb, data):
-        """Writes data to a register address.
-        :param int addr: Register address.
-        :param int cb: Common register block (?)
-        :param int data: Data to write to the register.
-
-        """
-        with self._device as bus_device:
-            bus_device.write(bytes([addr >> 8]))
-            bus_device.write(bytes([addr & 0xFF]))
-            bus_device.write(bytes([cb]))
-            bus_device.write(bytes([data]))
-
     def read(self, addr, cb, length=1):
         """Reads data from a register address.
         :param int addr: Register address.
@@ -361,10 +359,22 @@ class WIZNET:
             bus_device.readinto(result)
         return result
 
-    def _write_n(self, addr, buf, data):
+    def write(self, addr, cb, data):
         """Writes data to a register address.
         :param int addr: Register address.
-        :param int buf: Buffer.
+        :param int cb: Common register block (?)
+        :param int data: Data to write to the register.
+
+        """
+        with self._device as bus_device:
+            bus_device.write(bytes([addr >> 8]))
+            bus_device.write(bytes([addr & 0xFF]))
+            bus_device.write(bytes([cb]))
+            bus_device.write(bytes([data]))
+
+    def _write_n(self, addr, cb, data):
+        """Writes data to a register address.
+        :param int addr: Register address.
         :param int data: Data to write to the register.
         :param int len: Length of data to write.
 
@@ -372,8 +382,9 @@ class WIZNET:
         with self._device as bus_device:
             bus_device.write(bytes([addr >> 8]))
             bus_device.write(bytes([addr & 0xFF]))
-            bus_device.write(bytes([buf]))
+            bus_device.write(bytes([cb]))
             for i in range(0, len(data)):
+                print(bytes([data[i]]))
                 bus_device.write(bytes([data[i]]))
         return len
 
@@ -386,8 +397,6 @@ class WIZNET:
         SNSR_SOCK_TIME_WAIT, SNSR_SOCK_CLOSE_WAIT, SNSR_LAST_ACK,
         SNSR_SOCK_UDP, SNSR_SOCK_IPRAW, SNSR_SOCK_MACRAW, SNSR_SOCK_PPOE.
         """
-        if self._debug:
-            print("*** Socket status")
         return self._read_snsr(socket_num)
 
     def socket_connect(self, socket_num, dest, port, conn_mode=SNMR_TCP):
@@ -396,14 +405,24 @@ class WIZNET:
         may also use SNMR_UDP.
         """
         if self._debug:
-            print("*** Socket connect mode", conn_mode)
+            print("*** Connecting: Socket# {}, conn_mode: {}".format(socket_num,conn_mode))
         # initialize a socket and set the mode
-        res = self.get_socket(socket_num, dest, port, conn_mode = conn_mode)
-        if ret == 1: # socket unsuccessfully opened
+        res = self.socket_open(socket_num, dest, port, conn_mode = conn_mode)
+        if res == 1: # socket unsuccessfully opened
             raise RuntimeError('Failed to initalize a connection with the socket.')
-        while self.socket_status(self._sock)[0] != SNSR_SOCK_ESTABLISHED:
-            if self.socket_status(self._sock)[0] == SNSR_SOCK_CLOSED:
+        
+        # connect socket
+        self._write_sncr(self._sock, CMD_SOCK_CONNECT)
+        self._read_sncr(self._sock)
+        
+        # TODO: this fails out, need to fix!
+        while self.socket_status(socket_num)[0] != SNSR_SOCK_ESTABLISHED:
+            print('status: ', self.socket_status(socket_num))
+            print('snir: ', self._read_snir(socket_num))
+            if self.socket_status(socket_num)[0] == SNSR_SOCK_CLOSED:
                 raise RuntimeError('Failed to establish connection.')
+            time.sleep(1)
+        print('status: ', self.socket_status(socket_num))
         return 1
 
     def get_socket(self):
@@ -436,7 +455,7 @@ class WIZNET:
         if self._debug:
             print("*** Open socket")
         if self._read_snsr(socket_num)[0] == SNSR_SOCK_CLOSED:
-            print("w5k socket begin, protocol={}, port={}".format(conn_mode, src_port))
+            print("w5k socket begin, protocol={}, port={}".format(conn_mode, port))
             time.sleep(0.00025)
 
             self._write_snmr(socket_num, conn_mode)
@@ -449,8 +468,8 @@ class WIZNET:
                 # if source port is not set, set the local port number
                 self._write_sock_port(socket_num, LOCAL_PORT)
 
-            # set socket destination IP addr. and port
-            self._write_sndipr(socket_num, addr)
+            # set socket destination IP and port
+            self._write_sndipr(socket_num, dest)
             self._write_sndport(socket_num, port)
 
             # open socket
@@ -480,7 +499,86 @@ class WIZNET:
         self._read_sncr(socket_num)
         self._write_snir(socket_num, 0xFF)
 
+    def socket_write(self, socket_num, buffer):
+        """Writes a bytearray to a provided socket.
+
+        """
+        assert socket_num <= self.max_sockets, "Provided socket exceeds max_sockets."
+        status = 0
+        ret = 0
+        free_size = 0
+        if len(buffer) > SOCK_SIZE:
+            ret = SOCK_SIZE
+        else:
+            ret = len(buffer)
+
+        # if buffer is avaliable, start the transfer
+        free_size = self._get_tx_free_size(socket_num)
+        while (free_size < ret):
+            free_size = self._get_tx_free_size(socket_num)
+            status = self.socket_status(socket_num)
+            if (status != SNSR_SOCK_ESTABLISHED) and (status != SNSR_SOCK_CLOSE_WAIT):
+                ret = 0
+                break
+
+
+        # Read the starting address for saving the transmitting data.
+        ptr = self._read_sntx_wr(socket_num)
+        offset = ptr & 0x07FF
+        dst_addr = offset +  (socket_num * 2048 + 0x8000)
+
+        # update sn_tx_wr to the value + data size
+        ptr += len(buffer)
+        self._write_socket(socket_num, REG_SNTX_WR, ptr >> 8)
+        self._write_socket(socket_num, REG_SNTX_WR+1, ptr & 0xff)
+
+        cntl_byte = (0x14+(socket_num<<5))
+        self._write_n(dst_addr, cntl_byte, buffer)
+
+        self._write_sncr(socket_num, CMD_SOCK_SEND)
+        self._read_sncr(socket_num)
+
+        # check data was  transferred correctly
+        while(self._read_snir(socket_num)[0] & SNIR_SEND_OK) != SNIR_SEND_OK:
+            if self.socket_status(socket_num) == SNSR_SOCK_CLOSED:
+                self.socket_close(socket_num)
+                return 0
+            time.sleep(0.01)
+
+        self._write_snir(socket_num, SNIR_SEND_OK)
+        return ret
+
     # Socket-Register Methods
+
+    def _get_tx_free_size(self, sock):
+        """Get free size of sock's tx buffer block.
+
+        """
+        val = 0
+        val_1 = 0
+        while (val != val_1):
+            val_1 = self._read_sntx_fsr(sock)
+            if val_1 != 0:
+                val = self._read_sntx_fsr(sock)
+        return val
+
+    def _write_sntx_wr(self, sock, data):
+        self._write_socket(sock, REG_SNTX_WR, 0x00)
+        self._write_socket(sock, REG_SNTX_WR+1, 0x00)
+
+        #elf._write_socket(sock, REG_SNTX_WR, buf, 2)
+
+    def _read_sntx_wr(self, sock):
+        buf = bytearray(2)
+        buf[0] = self._read_socket(sock, 0x0024)[0]
+        buf[1] = self._read_socket(sock, 0x0024+1)[0]
+        return (buf[0] << 8 | buf[1])
+
+
+    def _read_sntx_fsr(self, sock):
+        data = self._read_socket(sock, REG_SNTX_FSR)
+        data += self._read_socket(sock, REG_SNTX_FSR+1)
+        return data
 
     def _read_snrx_rsr(self, sock):
         data = self._read_socket(sock, REG_SNRX_RSR)
