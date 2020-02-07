@@ -521,9 +521,7 @@ class WIZNET:
 
         # update sn_tx_wr to the value + data size
         ptr += len(buffer)
-        # TODO: clean this up.
-        self._write_socket(socket_num, REG_SNTX_WR, ptr >> 8)
-        self._write_socket(socket_num, REG_SNTX_WR+1, ptr & 0xff)
+        self._write_sntx_wr(socket_num, ptr)
 
         cntl_byte = (0x14+(socket_num<<5))
         self._write_n(dst_addr, cntl_byte, buffer)
