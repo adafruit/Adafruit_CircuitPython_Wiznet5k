@@ -57,8 +57,7 @@ class socket:
             raise RuntimeError("Only SOCK_STREAM type supported.")
         self._buffer = b''
         self._socknum = socknum if socknum else _the_interface.get_socket()
-        # TODO: implement set_timeout
-        # self.set_timeout(0)
+        self.settimeout(0)
     
     def connected(self):
         """Returns whether or not we are connected to the socket.
@@ -104,3 +103,6 @@ class socket:
         """Returns how many bytes of data are available to be read.
         """
         return _the_interface.socket_available(self._socknum)
+
+    def settimeout(self, value):
+        self._timeout = value
