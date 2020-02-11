@@ -357,9 +357,9 @@ class WIZNET:
             bus_device.write(bytes([cb]))
             if buffer is not None:
                 bus_device.readinto(buffer)
-            else:
-                result = bytearray(length)
-                bus_device.readinto(result)
+                return buffer
+            result = bytearray(length)
+            bus_device.readinto(result)
         return result
 
     def write(self, addr, cb, data):
@@ -502,21 +502,40 @@ class WIZNET:
         assert socket_num <= self.max_sockets, "Provided socket exceeds max_sockets."
         # Check if there is data available on the socket
         ret = self._get_rx_rcv_size(socket_num)
+        ret = int.from_bytes(ret, 'b')
+        if self._debug:
+            print("Bytes avail. on sock: ", ret)
         if ret == 0:
             # no data on socket?
             status = self.socket_status(socket_num)
             if(status == SNSR_SOCK_LISTEN or status == SNSR_SOCK_CLOSED or status == SNSR_SOCK_CLOSE_WAIT):
                 # remote end closed its side of the connection, EOF state
-                print('closed 0..')
                 ret = 0
             else:
                 # connection is alive, no data waiting to be read
-                print('closed -1..')
                 ret = -1
         elif ret > len(buffer):
+            # populate ret with the length of buffer
             ret = len(buffer)
-        print('ok')
 
+        if ret > 0:
+            print('\t * Processing {} bytes of data'.format(ret))
+            # Read the starting save address of the received data
+            ptr = self._read_snrx_rd(socket_num)
+
+            # Read data from the starting address of snrx_rd
+            ctrl_byte = (0x18+(socket_num<<5))
+            self.read(ptr, ctrl_byte, len(buffer), buffer)
+
+            #  After reading the received data, update Sn_RX_RD to the increased
+            # value as many as the reading size.
+            ptr += len(buffer)
+            self._write_snrx_rd(socket_num, ptr)
+
+            # Notify the W5k of the updated Sn_Rx_RD
+            self._write_sncr(socket_num, CMD_SOCK_RECV)
+            self._read_sncr(socket_num)
+        return buffer
 
     def socket_write(self, socket_num, buffer):
         """Writes a bytearray to a provided socket.
@@ -590,9 +609,11 @@ class WIZNET:
         return val
 
     def _read_snrx_rd(self, sock):
-        data = self._read_socket(sock, REG_SNRX_RD)
-        data += self._read_socket(sock, REG_SNRX_RD+1)
-        return data
+        buf = bytearray(2)
+        buf[0] = self._read_socket(sock, REG_SNRX_RD)[0]
+        buf[1] = self._read_socket(sock, REG_SNRX_RD+1)[0]
+        return (buf[0] << 8 | buf[1])
+
 
     def _write_snrx_rd(self, sock, data):
         self._write_socket(sock, REG_SNRX_RD, data >> 8)
