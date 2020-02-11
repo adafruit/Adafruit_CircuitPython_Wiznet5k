@@ -30,6 +30,7 @@ A socket compatible interface with the Wiznet5k module.
 
 """
 import gc
+import time
 from micropython import const
 from adafruit_wiznet5k import adafruit_wiznet5k
 
@@ -93,7 +94,19 @@ class socket:
         """
         _the_interface.socket_write(self._socknum, data)
         gc.collect()
-    
+
+    def recv_into(self, buffer, nbytes=0):
+        """Receive up to nbytes bytes from the socket, storing the
+        data into a buffer rather than creating a new bytestring.
+        If nbytes is not specified (or 0), receive up to the size
+        available in the given buffer.
+        Returns the number of bytes received.
+        """
+        avail = self.available()
+        if avail:
+            res = _the_interface.socket_read(self._socknum, buffer)
+        return res
+
     def close(self):
         """Closes the socket.
         """
