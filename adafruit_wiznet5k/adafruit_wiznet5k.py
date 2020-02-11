@@ -393,7 +393,7 @@ class WIZNET:
     # Socket-Register API
 
     def socket_available(self, socket_num):
-        """Returns is socket is available.
+        """Returns bytes to be read from socket.
         """
         assert socket_num <= self.max_sockets, "Provided socket exceeds max_sockets."
         return self._get_rx_rcv_size(socket_num)
@@ -500,32 +500,23 @@ class WIZNET:
 
         """
         assert socket_num <= self.max_sockets, "Provided socket exceeds max_sockets."
-        # check how much data is available
+        # Check if there is data available on the socket
         ret = self._get_rx_rcv_size(socket_num)
         if ret == 0:
-            # no data available on socket
+            # no data on socket?
             status = self.socket_status(socket_num)
-            if status == SNSR_SOCK_CLOSED or status == SNSR_SOCK_LISTEN or status == SNSR_SOCK_CLOSE_WAIT:
-                # remote end closed its side of connection, this is EOF state
+            if(status == SNSR_SOCK_LISTEN or status == SNSR_SOCK_CLOSED or status == SNSR_SOCK_CLOSE_WAIT):
+                # remote end closed its side of the connection, EOF state
+                print('closed 0..')
                 ret = 0
             else:
+                # connection is alive, no data waiting to be read
+                print('closed -1..')
                 ret = -1
-        else:
-            if ret > len(buffer):
-                ret = len(buffer)
-        
-        if ret > 0:
-            ptr = 0
-            ptr = self._read_snrx_rsr(socket_num)
-            cntl_byte = (0x18+(socket_num<<5))
-            self.read(ptr, cb, buffer = buffer)
-            if not ret:
-                ptr += len(buffer)
-                self._write_snrx_rd(socket_num, ptr)
+        elif ret > len(buffer):
+            ret = len(buffer)
+        print('ok')
 
-            self._write_sncr(socket_num, CMD_SOCK_RECV)
-            self._read_sncr(socket_num)
-        return buffer
 
     def socket_write(self, socket_num, buffer):
         """Writes a bytearray to a provided socket.
@@ -540,7 +531,7 @@ class WIZNET:
         else:
             ret = len(buffer)
 
-        # if buffer is avaliable, start the transfer
+        # if buffer is available, start the transfer
         free_size = self._get_tx_free_size(socket_num)
         while (free_size < ret):
             free_size = self._get_tx_free_size(socket_num)
@@ -581,11 +572,9 @@ class WIZNET:
 
         """
         val = 0
-        val_1 = 0
+        val_1 = self._read_snrx_rsr(sock)
         while (val != val_1):
-            val_1 = self._read_snrx_rsr(sock)
-            if val_1 != 0:
-                val = self._read_snrx_rsr(sock)
+            val = self._read_snrx_rsr(sock)
         return val
 
     def _get_tx_free_size(self, sock):
