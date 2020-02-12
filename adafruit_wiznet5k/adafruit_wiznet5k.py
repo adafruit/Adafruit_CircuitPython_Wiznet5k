@@ -515,7 +515,7 @@ class WIZNET:
                 # connection is alive, no data waiting to be read
                 ret = -1
         elif ret > length:
-            # populate ret with the length of buffer
+            # set ret to the length of buffer
             ret = length
 
         if ret > 0:
@@ -525,12 +525,16 @@ class WIZNET:
 
             # Read data from the starting address of snrx_rd
             ctrl_byte = (0x18+(socket_num<<5))
-            self.read(ptr, ctrl_byte, length, buffer)
+
+            print("Read data, len={}, at: {}".format(ret, ptr))
+            self.read(ptr, ctrl_byte, ret, buffer)
 
             #  After reading the received data, update Sn_RX_RD to the increased
             # value as many as the reading size.
-            ptr += length
+            ptr += ret
             self._write_snrx_rd(socket_num, ptr)
+
+            print("Sock_RECV cmd, RX_RD = ", ptr)
 
             # Notify the W5k of the updated Sn_Rx_RD
             self._write_sncr(socket_num, CMD_SOCK_RECV)
