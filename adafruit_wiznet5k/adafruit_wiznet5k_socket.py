@@ -59,7 +59,14 @@ class socket:
         self._buffer = b''
         self._socknum = socknum if socknum else _the_interface.get_socket()
         self.settimeout(0)
-    
+
+    @property
+    def socknum(self):
+        """Returns the socket number of the socket object.
+
+        """
+        return self._socknum
+
     def connected(self):
         """Returns whether or not we are connected to the socket.
         """
