@@ -51,14 +51,15 @@ class socket:
     for connecting to a Wiznet5k module.
 
     """
-    def __init__(self, family=AF_INET, type=SOCK_STREAM, proto=0, fileno=0, socknum=None):
+    def __init__(self, family=AF_INET, type=SOCK_STREAM, proto=0, fileno=0,
+                 timeout=0.0, socknum=None):
         if family != AF_INET:
             raise RuntimeError("Only AF_INET family supported by W5K modules.")
         if type != SOCK_STREAM:
             raise RuntimeError("Only SOCK_STREAM type supported.")
         self._buffer = b''
         self._socknum = socknum if socknum else _the_interface.get_socket()
-        self.settimeout(0)
+        self.settimeout(timeout)
 
     @property
     def socknum(self):
@@ -168,14 +169,15 @@ class socket:
         self._buffer = b''
         return firstline[0]
 
-
     def close(self):
         """Closes the socket.
+
         """
         _the_interface.socket_close(self._socknum)
 
     def available(self):
         """Returns how many bytes of data are available to be read.
+
         """
         return _the_interface.socket_available(self._socknum)
 
@@ -185,3 +187,10 @@ class socket:
 
         """
         self._timeout = value
+    
+    def gettimeout(self):
+        """Return the timeout in seconds (float) associated
+        with socket operations, or None if no timeout is set.
+
+        """
+        return self._timeout
