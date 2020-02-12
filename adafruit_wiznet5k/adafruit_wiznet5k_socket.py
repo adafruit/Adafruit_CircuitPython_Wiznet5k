@@ -84,6 +84,9 @@ class socket:
 
     def connect(self, address, conn_type=None):
         """Connect to a remote socket at address. (The format of address depends on the address family — see above.)
+        :param tuple address: Remote socket as a (host, port) tuple.
+        :param int conn_type: Connection type (SNMR_TCP, SNMR_UDP)
+
         """
         host, port = address
 
@@ -96,7 +99,7 @@ class socket:
     def send(self, data):
         """Send data to the socket. The socket must be connected to
         a remote socket.
-        Returns the number of bytes sent
+        :param bytearray data: Desired data to send to the socket.
 
         """
         _the_interface.socket_write(self._socknum, data)
@@ -104,7 +107,8 @@ class socket:
 
     def recv(self, bufsize=0):
         """Reads some bytes from the connected remote address.
-        :param int bufsize: maximum number of bytes to receive
+        :param int bufsize: Maximum number of bytes to receive.
+
         """
         assert _the_interface.link_status, "Ethernet cable disconnected!"
         if bufsize == 0:
@@ -176,4 +180,8 @@ class socket:
         return _the_interface.socket_available(self._socknum)
 
     def settimeout(self, value):
+        """Sets socket read timeout.
+        :param int value: Socket read timeout, in seconds.
+
+        """
         self._timeout = value
