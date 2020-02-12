@@ -412,6 +412,7 @@ class WIZNET:
         or hostname. By default, we use 'conn_mode'= SNMR_TCP but we
         may also use SNMR_UDP.
         """
+        assert self.link_status, "Ethernet cable disconnected!"
         if self._debug:
             print("*** Connecting: Socket# {}, conn_mode: {}".format(socket_num,conn_mode))
         # initialize a socket and set the mode
@@ -456,6 +457,7 @@ class WIZNET:
         """Opens a socket to a destination IP address or hostname. By default, we use
         'conn_mode'=SNMR_TCP but we may also use SNMR_UDP.
         """
+        assert self.link_status, "Ethernet cable disconnected!"
         if self._debug:
             print("*** Open socket")
         if self._read_snsr(socket_num)[0] == SNSR_SOCK_CLOSED:
@@ -488,6 +490,7 @@ class WIZNET:
         """Closes a socket.
 
         """
+        assert self.link_status, "Ethernet cable disconnected!"
         if self._debug:
             print("*** Closing socket #%d" % socket_num)
         self._write_sncr(socket_num, CMD_SOCK_CLOSE)
@@ -499,6 +502,7 @@ class WIZNET:
         Returns buffer.
 
         """
+        assert self.link_status, "Ethernet cable disconnected!"
         assert socket_num <= self.max_sockets, "Provided socket exceeds max_sockets."
         # Check if there is data available on the socket
         ret = self._get_rx_rcv_size(socket_num)
@@ -544,6 +548,7 @@ class WIZNET:
         """Writes a bytearray to a provided socket.
 
         """
+        assert self.link_status, "Ethernet cable disconnected!"
         assert socket_num <= self.max_sockets, "Provided socket exceeds max_sockets."
         status = 0
         ret = 0
