@@ -102,12 +102,55 @@ class socket:
         _the_interface.socket_write(self._socknum, data)
         gc.collect()
 
+    def recv(self, bufsize=0):
+        """Reads some bytes from the connected remote address.
+        :param int bufsize: maximum number of bytes to receive
+        """
+        if bufsize == 0:
+            # read everything on the socket
+            while True:
+                avail = self.available()
+                if avail:
+                    self._buffer += _the_interface.socket_read(self._socknum, avail)
+                else:
+                    break
+            gc.collect()
+            ret = self._buffer
+            self._buffer = b''
+            gc.collect()
+            return ret
+        stamp = time.monotonic()
+
+        to_read = bufsize - len(self._buffer)
+        received = []
+        while to_read > 0:
+            print("Bytes to read:", to_read)
+            avail = self.available()
+            if avail:
+                stamp = time.monotonic()
+                recv = _the_interface.socket_read(self._socknum, min(to_read, avail))[1]
+                received.append(recv)
+                to_read -= len(recv)
+                gc.collect()
+            if self._timeout > 0 and time.monotonic() - stamp > self._timeout:
+                break
+        self._buffer = received
+
+        ret = None
+        if len(self._buffer) == bufsize:
+            ret = self._buffer
+            self._buffer = b''
+        else:
+            ret = self._buffer[:bufsize]
+            self._buffer = self._buffer[bufsize:]
+        gc.collect()
+        return ret
+
     def readline(self):
         """Attempt to return as many bytes as we can up to
         but not including '\n'"""
         stamp = time.monotonic()
         while b'\n' not in self._buffer:
-            print("reading..")
             avail = self.available()
             if avail:
                 self._buffer += _the_interface.socket_read(self._socknum, avail)[1]
