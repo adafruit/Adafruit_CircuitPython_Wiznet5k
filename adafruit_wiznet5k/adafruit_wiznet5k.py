@@ -494,7 +494,7 @@ class WIZNET:
         self._read_sncr(socket_num)
         self._write_snir(socket_num, 0xFF)
 
-    def socket_read(self, socket_num, buffer, length):
+    def socket_read(self, socket_num, length):
         """Reads data from a socket into a buffer.
         Returns buffer.
 
@@ -519,7 +519,8 @@ class WIZNET:
             ret = length
 
         if ret > 0:
-            print('\t * Processing {} bytes of data'.format(ret))
+            if self._debug:
+                print('\t * Processing {} bytes of data'.format(ret))
             # Read the starting save address of the received data
             ptr = self._read_snrx_rd(socket_num)
 
@@ -527,19 +528,17 @@ class WIZNET:
             ctrl_byte = (0x18+(socket_num<<5))
 
             print("Read data, len={}, at: {}".format(ret, ptr))
-            self.read(ptr, ctrl_byte, ret, buffer)
+            resp = self.read(ptr, ctrl_byte, ret)
 
             #  After reading the received data, update Sn_RX_RD to the increased
             # value as many as the reading size.
             ptr += ret
             self._write_snrx_rd(socket_num, ptr)
 
-            print("Sock_RECV cmd, RX_RD = ", ptr)
-
             # Notify the W5k of the updated Sn_Rx_RD
             self._write_sncr(socket_num, CMD_SOCK_RECV)
             self._read_sncr(socket_num)
-        return ret
+        return ret, resp
 
     def socket_write(self, socket_num, buffer):
         """Writes a bytearray to a provided socket.

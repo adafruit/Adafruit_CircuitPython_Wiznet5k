@@ -95,17 +95,24 @@ class socket:
         _the_interface.socket_write(self._socknum, data)
         gc.collect()
 
-    def recv_into(self, buffer, nbytes=0):
-        """Receive up to nbytes bytes from the socket, storing the
-        data into a buffer rather than creating a new bytestring.
-        If nbytes is not specified (or 0), receive up to the size
-        available in the given buffer.
-        Returns the number of bytes received.
-        """
-        avail = self.available()
-        if avail:
-            res = _the_interface.socket_read(self._socknum, buffer)
-        return res
+    def readline(self):
+        """Attempt to return as many bytes as we can up to
+        but not including '\n'"""
+        stamp = time.monotonic()
+        while b'\n' not in self._buffer:
+            print("reading..")
+            avail = self.available()
+            if avail:
+                self._buffer += _the_interface.socket_read(self._socknum, avail)[1]
+            elif self._timeout > 0 and time.monotonic() - stamp > self._timeout:
+                self.close()
+                raise RuntimeError("Didn't receive response, failing out...")
+        firstline = self._buffer.split(b'\n', 1)
+        gc.collect()
+        # clear tmp data buffer
+        self._buffer = b''
+        return firstline[0]
+
 
     def close(self):
         """Closes the socket.
