@@ -85,6 +85,7 @@ class socket:
     def connect(self, address, conn_type=None):
         """Connect to a remote socket at address. (The format of address depends on the address family — see above.)
         """
+        assert _the_interface.link_status, "Ethernet cable disconnected!"
         host, port = address
 
         if conn_type is None:
@@ -99,6 +100,7 @@ class socket:
         Returns the number of bytes sent
 
         """
+        assert _the_interface.link_status, "Ethernet cable disconnected!"
         _the_interface.socket_write(self._socknum, data)
         gc.collect()
 
@@ -106,6 +108,7 @@ class socket:
         """Reads some bytes from the connected remote address.
         :param int bufsize: maximum number of bytes to receive
         """
+        assert _the_interface.link_status, "Ethernet cable disconnected!"
         if bufsize == 0:
             # read everything on the socket
             while True:
@@ -149,6 +152,7 @@ class socket:
     def readline(self):
         """Attempt to return as many bytes as we can up to
         but not including '\n'"""
+        assert _the_interface.link_status, "Ethernet cable disconnected!"
         stamp = time.monotonic()
         while b'\n' not in self._buffer:
             avail = self.available()
@@ -172,6 +176,7 @@ class socket:
     def available(self):
         """Returns how many bytes of data are available to be read.
         """
+        assert _the_interface.link_status, "Ethernet cable disconnected!"
         return _the_interface.socket_available(self._socknum)
 
     def settimeout(self, value):
