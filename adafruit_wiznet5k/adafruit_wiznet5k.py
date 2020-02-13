@@ -1,5 +1,7 @@
 # The MIT License (MIT)
 #
+# Copyright (c) 2008 Bjoern Hartmann
+# Copyright 2018 Paul Stoffregen
 # Copyright (c) 2020 Brent Rubell for Adafruit Industries
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -48,6 +50,7 @@ import time
 import adafruit_bus_device.spi_device as spidev
 from micropython import const
 from digitalio import DigitalInOut
+from collections import namedtuple
 from adafruit_wiznet5k.adafruit_wiznet5k_dhcp import DHCP as DHCP
 
 __version__ = "0.0.0-auto.0"
@@ -74,7 +77,6 @@ REG_SNRX_RSR       = const(0x0026) # RX Free Size
 REG_SNRX_RD        = const(0x0028) # Read Size Pointer
 REG_SNTX_FSR       = const(0x0020) # Socket n TX Free Size
 REG_SNTX_WR        = const(0x0024) # TX Write Pointer
-
 
 # SNSR Commands
 SNSR_SOCK_CLOSED      = const(0x00)
@@ -104,7 +106,6 @@ CMD_SOCK_SEND_MAC  = const(0x21)
 CMD_SOCK_SEND_KEEP = const(0x22)
 CMD_SOCK_RECV      = const(0x40)
 
-
 # Socket n Interrupt Register
 SNIR_SEND_OK = const(0x10)
 SNIR_TIMEOUT = const(0x08)
@@ -117,12 +118,15 @@ SOCK_SIZE   = const(0x800) # MAX W5k socket size
 # Register commands
 MR_RST = const(0x80) # Mode Register RST
 
-
 # Default hardware MAC address
 DEFAULT_MAC = [0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED]
 # Maximum number of sockets to support, differs between chip versions.
 W5200_W5500_MAX_SOCK_NUM = const(0x08)
 
+# UDP
+UDP_SOCK = {'bytes_remaining': 0,
+            'remote_ip': 0,
+            'remote_port': 0}
 
 class WIZNET:
     """Interface for WIZNET5k module.
@@ -164,6 +168,7 @@ class WIZNET:
     @property
     def dhcp(self):
         """Returns if DHCP is active.
+
         """
         return self.is_dhcp
     
@@ -174,6 +179,7 @@ class WIZNET:
     @property
     def max_sockets(self):
         """Returns max number of sockets supported by chip.
+
         """
         if self._chip_type == "w5500":
             return W5200_W5500_MAX_SOCK_NUM
@@ -183,6 +189,7 @@ class WIZNET:
     @property
     def chip(self):
         """Returns the chip type.
+
         """
         if self._debug:
             print("Chip version")
@@ -191,6 +198,7 @@ class WIZNET:
     @property
     def ip_address(self):
         """Returns the hardware's IP address.
+
         """
         return self.read(REG_SIPR, 0x00, 4)
 
@@ -228,7 +236,8 @@ class WIZNET:
 
     @property
     def remote_ip(self):
-        """Returns the remote IP Address.
+        """Returns the IP address of the host who sent the current incoming packet.
+
         """
         remote_ip = bytearray(4)
         if self._sock >= self.max_sockets:
@@ -237,6 +246,12 @@ class WIZNET:
              remote_ip[octet] = self._read_socket(self._sock, REG_SNDIPR+octet)[0]
         return self.pretty_ip(remote_ip)
 
+    @property
+    def remote_port(self):
+        """Returns the port of the host who sent the current incoming packet.
+
+        """
+        return self._remote_port
 
     def pretty_ip(self, ip): # pylint: disable=no-self-use, invalid-name
         """Converts a bytearray IP address to a
@@ -391,12 +406,36 @@ class WIZNET:
 
     # Socket-Register API
 
-    def socket_available(self, socket_num):
-        """Returns bytes to be read from socket.
+    def socket_available(self, socket_num, sock_type=SNMR_TCP):
+        """Returns the amount of bytes to be read from the socket.
+
+        :param int socket_num: Desired socket to return bytes from.
+        :param int sock_type: Socket type, defaults to TCP.
         """
         assert socket_num <= self.max_sockets, "Provided socket exceeds max_sockets."
         res = self._get_rx_rcv_size(socket_num)
-        return int.from_bytes(res, 'b')
+        res = int.from_bytes(res, 'b')
+        print("res: ", res)
+        if sock_type == SNMR_TCP:
+            return res
+        # TODO: discard any remaining bytes in the last packet
+
+        if res > 0:
+            # parse the udp rx packet
+            tmp_buf = bytearray(8)
+            ret = 0
+            # read the first 8 header bytes
+            ret, tmp_buf = self.socket_read(socket_num, 8)
+            print(ret, tmp_buf)
+            if ret > 0:
+                UDP_SOCK['remote_ip'] = tmp_buf
+                UDP_SOCK['remote_port'] = tmp_buf[4]
+                UDP_SOCK['remote_port'] = (UDP_SOCK['remote_port'] << 8) + tmp_buf[5]
+                UDP_SOCK['bytes_remaining'] = tmp_buf[6]
+                UDP_SOCK['bytes_remaining'] = (UDP_SOCK['bytes_remaining'] << 8) + tmp_buf[7]
+                ret = UDP_SOCK['bytes_remaining']
+                return ret
+        return 0
 
     def socket_status(self, socket_num):
         """Returns the socket connection status. Can be: SNSR_SOCK_CLOSED,
@@ -429,6 +468,8 @@ class WIZNET:
                 if self.socket_status(socket_num)[0] == SNSR_SOCK_CLOSED:
                     raise RuntimeError('Failed to establish connection.')
                 time.sleep(1)
+        elif conn_mode == SNMR_UDP:
+            UDP_SOCK['bytes_remaining'] = 0
         return 1
 
     def get_socket(self):
@@ -498,6 +539,24 @@ class WIZNET:
         self._read_sncr(socket_num)
         self._write_snir(socket_num, 0xFF)
 
+    def socket_read_udp(self, socket_num, length):
+        print('remaining: ', UDP_SOCK['bytes_remaining'])
+        if UDP_SOCK['bytes_remaining'] > 0:
+            if UDP_SOCK['bytes_remaining'] <= length:
+                # read remaining data directly into the buffer
+                # got = Ethernet.socketRecv(sockindex, buffer, _remaining);
+                ret, resp = self.socket_read(socket_num, UDP_SOCK['bytes_remaining'])
+            else:
+                ret, resp = self.socket_read(socket_num, length)
+            if ret > 0:
+                UDP_SOCK['bytes_remaining'] -= ret
+                if self._debug:
+                    print("UDP read {0} bytes: ".format(ret))
+                    print(resp)
+                return ret, resp
+            # failed to read or no data
+        return -1
+
     def socket_read(self, socket_num, length):
         """Reads data from a socket into a buffer.
         Returns buffer.
@@ -505,6 +564,7 @@ class WIZNET:
         """
         assert self.link_status, "Ethernet cable disconnected!"
         assert socket_num <= self.max_sockets, "Provided socket exceeds max_sockets."
+
         # Check if there is data available on the socket
         ret = self._get_rx_rcv_size(socket_num)
         ret = int.from_bytes(ret, 'b')
@@ -512,7 +572,7 @@ class WIZNET:
             print("Bytes avail. on sock: ", ret)
         if ret == 0:
             # no data on socket?
-            status = self.socket_status(socket_num)
+            status = self._read_snmr(socket_num)
             if(status == SNSR_SOCK_LISTEN or status == SNSR_SOCK_CLOSED or status == SNSR_SOCK_CLOSE_WAIT):
                 # remote end closed its side of the connection, EOF state
                 ret = 0
