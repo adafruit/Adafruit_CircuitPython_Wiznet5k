@@ -419,15 +419,16 @@ class WIZNET:
         res = self.socket_open(socket_num, dest, port, conn_mode = conn_mode)
         if res == 1: # socket unsuccessfully opened
             raise RuntimeError('Failed to initalize a connection with the socket.')
-        
-        # connect socket
-        self._write_sncr(self._sock, CMD_SOCK_CONNECT)
-        self._read_sncr(self._sock)
-        
-        while self.socket_status(socket_num)[0] != SNSR_SOCK_ESTABLISHED:
-            if self.socket_status(socket_num)[0] == SNSR_SOCK_CLOSED:
-                raise RuntimeError('Failed to establish connection.')
-            time.sleep(1)
+
+        if conn_mode == SNMR_TCP:
+            # TCP client - connect socket
+            self._write_sncr(self._sock, CMD_SOCK_CONNECT)
+            self._read_sncr(self._sock)
+            # wait for tcp connection establishment
+            while self.socket_status(socket_num)[0] != SNSR_SOCK_ESTABLISHED:
+                if self.socket_status(socket_num)[0] == SNSR_SOCK_CLOSED:
+                    raise RuntimeError('Failed to establish connection.')
+                time.sleep(1)
         return 1
 
     def get_socket(self):
@@ -480,9 +481,9 @@ class WIZNET:
 
             # open socket
             self._write_sncr(socket_num, CMD_SOCK_OPEN)
-            assert self._read_sncr(socket_num)[0] == 0x00, "Could not connect to remote server"
-            assert self._read_snsr((socket_num))[0] == 0x13, "Could not connect to remote server"
-
+            self._read_sncr(socket_num)
+            assert self._read_snsr((socket_num))[0] == 0x13 or self._read_snsr((socket_num))[0] == 0x22, \
+                "Could not open socket in TCP or UDP mode."
             return 0
         return 1
 
