@@ -40,8 +40,9 @@ def set_interface(iface):
     global _the_interface   # pylint: disable=global-statement, invalid-name
     _the_interface = iface
 
-SOCK_STREAM = const(1)
-AF_INET = const(2)
+SOCK_STREAM     = const(0x21) # TCP
+SOCK_DGRAM      = const(0x02) # UDP
+AF_INET         = const(3)
 NO_SOCKET_AVAIL = const(255)
 
 MAX_PACKET = const(4000)
@@ -52,11 +53,10 @@ class socket:
 
     """
     def __init__(self, family=AF_INET, type=SOCK_STREAM, proto=0, fileno=0,
-                 timeout=0.0, socknum=None):
+                 timeout=None, socknum=None):
         if family != AF_INET:
             raise RuntimeError("Only AF_INET family supported by W5K modules.")
-        if type != SOCK_STREAM:
-            raise RuntimeError("Only SOCK_STREAM type supported.")
+        self._sock_type = type
         self._buffer = b''
         self._socknum = socknum if socknum else _the_interface.get_socket()
         self.settimeout(timeout)
@@ -83,17 +83,13 @@ class socket:
                 self.close()
             return result
 
-    def connect(self, address, conn_type=None):
+    def connect(self, address):
         """Connect to a remote socket at address. (The format of address depends on the address family — see above.)
         :param tuple address: Remote socket as a (host, port) tuple.
-        :param int conn_type: Connection type (SNMR_TCP, SNMR_UDP)
 
         """
         host, port = address
-
-        if conn_type is None:
-            conn_type = _the_interface.SNMR_TCP
-        if not _the_interface.socket_connect(self._socknum, host, port, conn_mode=conn_type):
+        if not _the_interface.socket_connect(self._socknum, host, port, conn_mode=self._sock_type):
             raise RuntimeError("Failed to connect to host", host)
         self._buffer = b''
 
@@ -186,11 +182,15 @@ class socket:
         :param int value: Socket read timeout, in seconds.
 
         """
+        if value is None:
+            value = 0.0
         self._timeout = value
-    
+
     def gettimeout(self):
         """Return the timeout in seconds (float) associated
         with socket operations, or None if no timeout is set.
 
         """
+        if value == 0.0:
+            return None
         return self._timeout
