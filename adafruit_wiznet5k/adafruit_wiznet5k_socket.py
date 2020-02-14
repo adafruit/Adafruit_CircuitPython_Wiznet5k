@@ -111,12 +111,15 @@ class socket:
         if bufsize == 0:
             # read everything on the socket
             while True:
-                avail = self.available()
+                if self._sock_type == SOCK_STREAM:
+                    avail = self.available()
+                elif self._sock_type == SOCK_DGRAM:
+                    avail = _the_interface._udp_remaining()
                 if avail:
                     if self._sock_type == SOCK_STREAM:
                         self._buffer += _the_interface.socket_read(self._socknum, avail)
                     elif self._sock_type == SOCK_DGRAM:
-                        self._buffer += _the_interface.socket_read_udp(self._socknum, avail)
+                        self._buffer += _the_interface.read_udp(self._socknum, avail)
                 else:
                     break
             gc.collect()
@@ -129,14 +132,16 @@ class socket:
         to_read = bufsize - len(self._buffer)
         received = []
         while to_read > 0:
-            print("Bytes to read:", to_read)
-            avail = self.available()
+            if self._sock_type == SOCK_STREAM:
+                avail = self.available()
+            elif self._sock_type == SOCK_DGRAM:
+                avail = _the_interface._udp_remaining()
             if avail:
                 stamp = time.monotonic()
                 if self._sock_type == SOCK_STREAM:
                     recv = _the_interface.socket_read(self._socknum, min(to_read, avail))[1]
                 elif self._sock_type == SOCK_DGRAM:
-                    recv = _the_interface._socket_read_udp(self._socknum, min(to_read, avail))[1]
+                    recv = _the_interface.read_udp(self._socknum, min(to_read, avail))[1]
                 received.append(recv)
                 to_read -= len(recv)
                 gc.collect()
@@ -161,10 +166,10 @@ class socket:
         while b'\n' not in self._buffer:
             if self._sock_type == SOCK_STREAM:
                 avail = self.available()
+                self._buffer += _the_interface.read(self._socknum, avail)[1]
             elif self._sock_type == SOCK_DGRAM:
                 avail = _the_interface._udp_remaining()
-            if avail:
-                self._buffer += _the_interface.socket_read(self._socknum, avail)[1]
+                self._buffer += _the_interface.read_udp(self._socknum, avail)[1]
             elif self._timeout > 0 and time.monotonic() - stamp > self._timeout:
                 self.close()
                 raise RuntimeError("Didn't receive response, failing out...")
@@ -185,7 +190,6 @@ class socket:
 
         """
         return _the_interface.socket_available(self._socknum, self._sock_type)
-
 
 
     def settimeout(self, value):
