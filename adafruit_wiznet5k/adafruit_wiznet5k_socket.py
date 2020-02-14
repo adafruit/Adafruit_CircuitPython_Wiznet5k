@@ -161,19 +161,13 @@ class socket:
         while b'\n' not in self._buffer:
             if self._sock_type == SOCK_STREAM:
                 avail = self.available()
-                if avail:
-                    self._buffer += _the_interface.socket_read(self._socknum, avail)[1]
-                elif self._timeout > 0 and time.monotonic() - stamp > self._timeout:
-                    self.close()
-                    raise RuntimeError("Didn't receive response, failing out...")
             elif self._sock_type == SOCK_DGRAM:
-                remaining = _the_interface._udp_remaining()
-                print("bytes remaining: ", remaining)
-                if remaining:
-                    self._buffer += _the_interface.socket_read(self._socknum, remaining)[1]
-                elif self._timeout > 0 and time.monotonic() - stamp > self._timeout:
-                    self.close()
-                    raise RuntimeError("Didn't receive response, failing out...")
+                avail = _the_interface._udp_remaining()
+            if avail:
+                self._buffer += _the_interface.socket_read(self._socknum, avail)[1]
+            elif self._timeout > 0 and time.monotonic() - stamp > self._timeout:
+                self.close()
+                raise RuntimeError("Didn't receive response, failing out...")
         firstline = self._buffer.split(b'\n', 1)
         gc.collect()
         # clear tmp data buffer
@@ -191,6 +185,8 @@ class socket:
 
         """
         return _the_interface.socket_available(self._socknum, self._sock_type)
+
+
 
     def settimeout(self, value):
         """Sets socket read timeout.
