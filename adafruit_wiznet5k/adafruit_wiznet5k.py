@@ -421,7 +421,8 @@ class WIZNET:
 
         if sock_type == 0x02:
             # flush by reading remaining data from previous packet
-            while UDP_SOCK['bytes_remaining'] > 0:
+            print("Avail, remaining", UDP_SOCK['bytes_remaining'])
+            while UDP_SOCK['bytes_remaining'] > 0 and self.socket_read(socket_num, 1):
                 print("Flushing {} bytes".format(UDP_SOCK['bytes_remaining']))
                 if (UDP_SOCK['bytes_remaining'] > 0):
                     UDP_SOCK['bytes_remaining'] = UDP_SOCK['bytes_remaining'] - 1
@@ -622,6 +623,20 @@ class WIZNET:
             self._write_sncr(socket_num, CMD_SOCK_RECV)
             self._read_sncr(socket_num)
         return ret, resp
+
+    def read_udp(self, socket_num, length):
+        print("UDP_SOCK['bytes_remaining']: ", UDP_SOCK['bytes_remaining'])
+        print("Length: ", length)
+        if UDP_SOCK['bytes_remaining'] > 0:
+            if UDP_SOCK['bytes_remaining'] <= length:
+                ret, resp = self.socket_read(socket_num, UDP_SOCK['bytes_remaining'])
+            else:
+                ret, resp = self.socket_read(socket_num, length)
+            if ret > 0:
+                UDP_SOCK['bytes_remaining'] -= ret
+            return ret, resp
+        return -1
+
 
     def socket_write(self, socket_num, buffer):
         """Writes a bytearray to a provided socket.
