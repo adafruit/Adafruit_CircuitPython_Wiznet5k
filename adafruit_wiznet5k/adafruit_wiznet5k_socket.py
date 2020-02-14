@@ -40,11 +40,15 @@ def set_interface(iface):
     global _the_interface   # pylint: disable=global-statement, invalid-name
     _the_interface = iface
 
+def htonl(x):
+    """Convert 32-bit positive integers from host to network byte order."""
+    return (((x)<<24 & 0xFF000000) | ((x)<< 8 & 0x00FF0000) | \
+            ((x)>> 8 & 0x0000FF00) | ((x)>>24 & 0x000000FF))
+
 SOCK_STREAM     = const(0x21) # TCP
 SOCK_DGRAM      = const(0x02) # UDP
 AF_INET         = const(3)
 NO_SOCKET_AVAIL = const(255)
-
 MAX_PACKET = const(4000)
 
 class socket:
@@ -82,6 +86,10 @@ class socket:
             if not result:
                 self.close()
             return result
+
+    def gethostbyname(self, address):
+        # TODO: Implement later!
+        pass
 
     def connect(self, address):
         """Connect to a remote socket at address. (The format of address depends on the address family — see above.)
