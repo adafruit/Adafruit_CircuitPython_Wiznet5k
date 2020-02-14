@@ -406,29 +406,41 @@ class WIZNET:
 
     # Socket-Register API
 
+    def _udp_remaining(self):
+        return UDP_SOCK['bytes_remaining']
+
     def socket_available(self, socket_num, sock_type=SNMR_TCP):
         """Returns the amount of bytes to be read from the socket.
 
         :param int socket_num: Desired socket to return bytes from.
         :param int sock_type: Socket type, defaults to TCP.
         """
+        if self._debug:
+            print("* socket_available called with protocol", sock_type)
         assert socket_num <= self.max_sockets, "Provided socket exceeds max_sockets."
         res = self._get_rx_rcv_size(socket_num)
+        print(res)
         res = int.from_bytes(res, 'b')
-        print("res: ", res)
         if sock_type == SNMR_TCP:
             return res
-        # TODO: discard any remaining bytes in the last packet
 
+        print("res: ", res)
         if res > 0:
+            # flush by reading remaining data from previous packet
+            while UDP_SOCK['bytes_remaining']:
+                print("flyshing")
+                if (UDP_SOCK['bytes_remaining'] > 0) and (self.socket_read(socket_num, 1) > 0):
+                    UDP_SOCK['bytes_remaining'] -= 1
+            #return -1
+
             # parse the udp rx packet
             tmp_buf = bytearray(8)
             ret = 0
             # read the first 8 header bytes
             ret, tmp_buf = self.socket_read(socket_num, 8)
-            print(ret, tmp_buf)
             if ret > 0:
                 UDP_SOCK['remote_ip'] = tmp_buf
+                print(ret, tmp_buf)
                 UDP_SOCK['remote_port'] = tmp_buf[4]
                 UDP_SOCK['remote_port'] = (UDP_SOCK['remote_port'] << 8) + tmp_buf[5]
                 UDP_SOCK['bytes_remaining'] = tmp_buf[6]
@@ -540,21 +552,23 @@ class WIZNET:
         self._write_snir(socket_num, 0xFF)
 
     def socket_read_udp(self, socket_num, length):
-        print('remaining: ', UDP_SOCK['bytes_remaining'])
+        """Performs a UDP read 
+        """
         if UDP_SOCK['bytes_remaining'] > 0:
             if UDP_SOCK['bytes_remaining'] <= length:
                 # read remaining data directly into the buffer
-                # got = Ethernet.socketRecv(sockindex, buffer, _remaining);
                 ret, resp = self.socket_read(socket_num, UDP_SOCK['bytes_remaining'])
             else:
+                # read provided length into buffer instead
                 ret, resp = self.socket_read(socket_num, length)
             if ret > 0:
                 UDP_SOCK['bytes_remaining'] -= ret
                 if self._debug:
                     print("UDP read {0} bytes: ".format(ret))
+                    print(UDP_SOCK['bytes_remaining'])
                     print(resp)
                 return ret, resp
-            # failed to read or no data
+        # failed to read or no data
         return -1
 
     def socket_read(self, socket_num, length):
