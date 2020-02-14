@@ -418,21 +418,23 @@ class WIZNET:
         if self._debug:
             print("* socket_available called with protocol", sock_type)
         assert socket_num <= self.max_sockets, "Provided socket exceeds max_sockets."
+
+        if sock_type == 0x02:
+            # flush by reading remaining data from previous packet
+            while UDP_SOCK['bytes_remaining'] > 0:
+                print("Flushing {} bytes".format(UDP_SOCK['bytes_remaining']))
+                if (UDP_SOCK['bytes_remaining'] > 0):
+                    UDP_SOCK['bytes_remaining'] = UDP_SOCK['bytes_remaining'] - 1
+                    print('flushed!')
+            print("Bytes remaining: ", UDP_SOCK['bytes_remaining'])
+
         res = self._get_rx_rcv_size(socket_num)
-        print(res)
         res = int.from_bytes(res, 'b')
         if sock_type == SNMR_TCP:
             return res
-
         print("res: ", res)
-        if res > 0:
-            # flush by reading remaining data from previous packet
-            while UDP_SOCK['bytes_remaining']:
-                print("flyshing")
-                if (UDP_SOCK['bytes_remaining'] > 0) and (self.socket_read(socket_num, 1) > 0):
-                    UDP_SOCK['bytes_remaining'] -= 1
-            #return -1
 
+        if res > 0:
             # parse the udp rx packet
             tmp_buf = bytearray(8)
             ret = 0
@@ -590,9 +592,11 @@ class WIZNET:
             if(status == SNSR_SOCK_LISTEN or status == SNSR_SOCK_CLOSED or status == SNSR_SOCK_CLOSE_WAIT):
                 # remote end closed its side of the connection, EOF state
                 ret = 0
+                resp = 0
             else:
                 # connection is alive, no data waiting to be read
                 ret = -1
+                resp = -1
         elif ret > length:
             # set ret to the length of buffer
             ret = length
