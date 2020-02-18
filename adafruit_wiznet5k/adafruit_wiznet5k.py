@@ -172,7 +172,8 @@ class WIZNET:
             if self._debug:
                 print("* Initializing DHCP")
             # Return IP assigned by DHCP
-            return dhcp.DHCP(self, self.mac_address)
+            d_client = dhcp.DHCP(self, self.mac_address)
+            return d_client.request_dhcp_lease()
         return False
 
     @property

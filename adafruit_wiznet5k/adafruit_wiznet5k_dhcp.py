@@ -29,10 +29,11 @@ Pure-Python implementation of Jordan Terrell's DHCP library v0.3
 * Author(s): Jordan Terrell, Brent Rubell
 
 """
-from time import monotonic
+import time
 from micropython import const
 from random import randrange
-from adafruit_wiznet5k_socket import htonl
+import adafruit_wiznet5k.adafruit_wiznet5k_socket as socket
+from adafruit_wiznet5k.adafruit_wiznet5k_socket import htonl, htons
 
 
 # DHCP State Machine
@@ -64,23 +65,26 @@ class DHCP:
     :param int timeout_response: DHCP Response timeout
 
     """
-    def __init__(self, sock, mac_address, timeout, timeout_response):
+    def __init__(self, eth, mac_address, timeout=1, timeout_response=1):
         self._lease_time = 0
         self._t1 = 0
         self._t2 =0
         self._timeout = timeout
         self._response_timeout = timeout_response
         self._mac_address = mac_address
-        self._sock = sock(type=SOCK_DGRAM)
+
+        # Initalize a new UDP socket for DHCP
+        socket.set_interface(eth)
+        self._sock = socket.socket(type=socket.SOCK_DGRAM)
 
         self._dhcp_state = STATE_DHCP_START
-        res = request_dhcp_lease()
-        return res
+
 
     def send_dhcp_message(self, state, time_elapsed):
         buff = bytearray(32)
         # Connect UDP socket to broadcast address / dhcp port 67
-        self._sock.connect((255, 255, 255, 255), 67)
+        SERVER_ADDR = 255, 255, 255, 255
+        self._sock.connect((SERVER_ADDR, 67))
 
         # OP
         buff[0] = DHCP_BOOT_REQUEST
@@ -93,19 +97,22 @@ class DHCP:
 
         # Transaction ID (xid)
         xid = htonl(self._transaction_id)
-        buff[4:7] = xid[0:3]
+        xid = xid.to_bytes(4, 'l')
+        buff[4:7] = xid
 
         # seconds elapsed
-        buff[8] = ((time_elapsed & 0xff00) >> 8)
-        buff[9] = (time_elapsed & 0x00ff)
+        buff[8] = ((int(time_elapsed) & 0xff00) >> 8)
+        buff[9] = (int(time_elapsed) & 0x00ff)
 
         # flags
         flags = htons(0x8000)
+        flags = flags.to_bytes(2, 'l')
         buff[10:11] = flags[0:1]
-        
+
+
         # TODO: Possibly perform a socket send here, Arduino impl. writes to TX buffer.
         #L163-L170
-        sock.send(buff)
+        self._sock.send(buff)
 
         buff_2 = bytearray(32)
         
@@ -133,12 +140,13 @@ class DHCP:
         buff_2[16] = len(b"WIZnet") + 6
         buff_2[17:23] = b"WIZnet"
         # last 3 bytes of MAC address
-        buff_2[24:25] = mac_address[3]
-        buff_2[26:27] = mac_address[4]
-        buff_2[28:29] = mac_address[5]
+        print(self._mac_address[3])
+        buff_2[24:25] = self._mac_address[3].to_bytes(2, 'l')
+        buff_2[26:27] = self._mac_address[4].to_bytes(2, 'l')
+        buff_2[28:29] = self._mac_address[5].to_bytes(2, 'l')
 
         # L198-L199: Transmit buffer? TODO?
-        sock.send(buff_2)
+        self._sock.send(buff_2)
 
         buff_3 = bytearray(32)
 
@@ -160,7 +168,7 @@ class DHCP:
             buff_3[11] = 0
 
             # Write buff_3 to tx buffer? TODO
-            sock.send(buff_4)
+            self._sock.send(buff_4)
         
         buff_4 = bytearray(32)
         buff_4[0] = 55
@@ -180,10 +188,36 @@ class DHCP:
         buff_4[8] = 255
 
         # TODO: Write to tx buffer
-        sock.send(buff_4)
+        self._sock.send(buff_4)
 
 
     def request_dhcp_lease(self):
         # select an initial transaction id
         self._transaction_id = randrange(1, 2000)
 
+        result = 0
+        msg_type = 0
+        start_time = time.monotonic()
+
+        while self._dhcp_state != STATE_DHCP_LEASED:
+            if self._dhcp_state == STATE_DHCP_START:
+                self._transaction_id += 1
+                self.send_dhcp_message(STATE_DHCP_DISCOVER, ((time.monotonic() - start_time) / 1000))
+                self._dhcp_state = STATE_DHCP_DISCOVER
+            elif self._dhcp_state == STATE_DHCP_REQUEST:
+                self._transaction_id += 1
+                self.send_dhcp_message(STATE_DHCP_REQUEST, ((time.monotonic() - start_time) / 1000))
+                self._dhcp_state = STATE_DHCP_REQUEST
+
+            # TODO: Add Discover State!
+        
+            if msg_type == 255:
+                msg_type = 0
+                self._dhcp_state = STATE_DHCP_START
+            
+            if (result != 1 and ((time.monotonic() - start_time > self._timeout))):
+                break
+        
+        self._transaction_id+=1
+        self._last_check_lease_ms = time.monotonic()
+        return result
