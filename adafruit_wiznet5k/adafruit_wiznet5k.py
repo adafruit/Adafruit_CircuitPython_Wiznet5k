@@ -51,7 +51,9 @@ import adafruit_bus_device.spi_device as spidev
 from micropython import const
 from digitalio import DigitalInOut
 from collections import namedtuple
-from adafruit_wiznet5k.adafruit_wiznet5k_dhcp import DHCP as DHCP
+
+import adafruit_wiznet5k.adafruit_wiznet5k_dhcp as dhcp
+
 
 __version__ = "0.0.0-auto.0"
 __repo__ = "https://github.com/adafruit/Adafruit_CircuitPython_Wiznet5k.git"
@@ -160,21 +162,18 @@ class WIZNET:
         assert self._w5100_init() == 1, "Unsuccessfully initialized Wiznet module."
         # Set MAC address
         self.mac_address = mac
-        # Set DHCP
-        self.is_dhcp = dhcp
         self._sock = 0
         self._src_port = 0
+        # Set DHCP
+        self.is_dhcp = self.dhcp(dhcp)
 
-    @property
-    def dhcp(self):
-        """Returns if DHCP is active.
-
-        """
-        return self.is_dhcp
-    
-    @dhcp.setter
-    def dhcp(self, dhcp):
-        self.is_dhcp = dhcp
+    def dhcp(self, is_dhcp):
+        if is_dhcp:
+            if self._debug:
+                print("* Initializing DHCP")
+            # Return IP assigned by DHCP
+            return dhcp.DHCP(self, self.mac_address)
+        return False
 
     @property
     def max_sockets(self):
@@ -421,20 +420,17 @@ class WIZNET:
 
         if sock_type == 0x02:
             # flush by reading remaining data from previous packet
-            print("Avail, remaining", UDP_SOCK['bytes_remaining'])
             while UDP_SOCK['bytes_remaining'] > 0 and self.socket_read(socket_num, 1):
-                print("Flushing {} bytes".format(UDP_SOCK['bytes_remaining']))
+                if self._debug:
+                    print("Flushing {} bytes".format(UDP_SOCK['bytes_remaining']))
                 if (UDP_SOCK['bytes_remaining'] > 0):
                     UDP_SOCK['bytes_remaining'] = UDP_SOCK['bytes_remaining'] - 1
-                    print('flushed!')
             print("Bytes remaining: ", UDP_SOCK['bytes_remaining'])
 
         res = self._get_rx_rcv_size(socket_num)
         res = int.from_bytes(res, 'b')
         if sock_type == SNMR_TCP:
             return res
-        print("res: ", res)
-
         if res > 0:
             # parse the udp rx packet
             tmp_buf = bytearray(8)
@@ -443,7 +439,6 @@ class WIZNET:
             ret, tmp_buf = self.socket_read(socket_num, 8)
             if ret > 0:
                 UDP_SOCK['remote_ip'] = tmp_buf
-                print(ret, tmp_buf)
                 UDP_SOCK['remote_port'] = tmp_buf[4]
                 UDP_SOCK['remote_port'] = (UDP_SOCK['remote_port'] << 8) + tmp_buf[5]
                 UDP_SOCK['bytes_remaining'] = tmp_buf[6]
@@ -461,6 +456,11 @@ class WIZNET:
         """
         return self._read_snsr(socket_num)
 
+    def get_host_by_name(self, hostname):
+        """Convert a hostname to a packed 4-byte IP address. Returns
+        a 4 bytearray"""
+        pass
+
     def socket_connect(self, socket_num, dest, port, conn_mode=SNMR_TCP):
         """Open and verify we've connected a socket to a dest IP address
         or hostname. By default, we use 'conn_mode'= SNMR_TCP but we
@@ -469,6 +469,10 @@ class WIZNET:
         assert self.link_status, "Ethernet cable disconnected!"
         if self._debug:
             print("*** Connecting: Socket# {}, conn_mode: {}".format(socket_num,conn_mode))
+        # Convert hostname to a 4-byte IP address
+        if isinstance(dest, str):
+            dest = self.get_host_by_name(hostname)
+
         # initialize a socket and set the mode
         res = self.socket_open(socket_num, dest, port, conn_mode = conn_mode)
         if res == 1: # socket unsuccessfully opened
@@ -499,6 +503,8 @@ class WIZNET:
             if status[0] == SNSR_SOCK_CLOSED or status[0] == SNSR_SOCK_FIN_WAIT or status[0] == SNSR_SOCK_CLOSE_WAIT:
                 sock = _sock
                 break
+        
+        print(dir(self))
 
         if sock == self.max_sockets:
             return 0
