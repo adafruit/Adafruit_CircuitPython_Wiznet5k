@@ -33,7 +33,7 @@ import time
 from micropython import const
 from random import randrange
 import adafruit_wiznet5k.adafruit_wiznet5k_socket as socket
-from adafruit_wiznet5k.adafruit_wiznet5k_socket import htonl, htons
+from adafruit_wiznet5k.adafruit_wiznet5k_socket import htonl, htons, ntohl
 
 
 # DHCP State Machine
@@ -65,7 +65,7 @@ class DHCP:
     :param int timeout_response: DHCP Response timeout
 
     """
-    def __init__(self, eth, mac_address, timeout=1, timeout_response=1):
+    def __init__(self, eth, mac_address, timeout=3, timeout_response=1):
         self._lease_time = 0
         self._t1 = 0
         self._t2 =0
@@ -84,6 +84,7 @@ class DHCP:
         buff = bytearray(317)
         # Connect UDP socket to broadcast address / dhcp port 67
         SERVER_ADDR = 255, 255, 255, 255
+        #SERVER_ADDR = 192,168,0,170
         self._sock.connect((SERVER_ADDR, 67))
 
         # OP
@@ -182,7 +183,57 @@ class DHCP:
         buff[273] = 59
         buff[274] = 255
 
+        # Send DHCP packet
         self._sock.send(buff)
+
+    def parse_dhcp_response(self, response_timeout, transaction_id):
+        start_time = time.monotonic()
+        print("Parsing...")
+        packet_sz = self._sock.available()
+        while (packet_sz <= 0):
+            print("Waiting for packet...")
+            if (time.monotonic() - start_time) > response_timeout:
+                return 255
+            time.sleep(0.05)
+        print("Packet Ready, {} bytes".format(packet_sz))
+
+        buff = bytearray(packet_sz)
+        buff = self._sock.recv(packet_sz)[0]
+        print(buff)
+
+        # Check OP, if valid, let's parse the packet out!
+        assert buff[0] == DHCP_BOOT_REPLY, "DHCP Message OP is not BOOT Reply."
+        # Transaction ID
+        xid = buff[4:7]
+        xid = int.from_bytes(xid, 'l')
+        xid = hex(xid)
+
+        secs = buff[8]
+        flags = buff[9]
+
+        # Client IP Address (CIADDR)
+        ciaddr = buff[10:14]
+
+        # Your IP Address (YIADDR)
+        yiaddr = buff[15:19]
+
+        # Server IP Address (SIADDR)
+        siaddr = buff[20:24]
+
+        # Gateway IP Address (GIADDR)
+        giaddr = buff[25:29]
+
+
+        # Client Hardware Address (CHADDR)
+        chaddr = bytearray(6)
+        for mac in range(0, len(chaddr)):
+            chaddr[mac] = buff[28+mac]
+
+        print("CIADDR: {}\nYIADDR: {}\nSIADDR: {}\nGIADDR: {}\n".format(ciaddr, yiaddr, siaddr, giaddr))
+        print(chaddr)
+
+
+        return
 
 
     def request_dhcp_lease(self):
@@ -198,6 +249,9 @@ class DHCP:
                 self._transaction_id += 1
                 self.send_dhcp_message(STATE_DHCP_DISCOVER, ((time.monotonic() - start_time) / 1000))
                 self._dhcp_state = STATE_DHCP_DISCOVER
+            elif self._dhcp_state == STATE_DHCP_DISCOVER:
+                xid = 0
+                self.parse_dhcp_response(self._timeout, xid)
                 break
 
             # TODO: Add Discover State!
