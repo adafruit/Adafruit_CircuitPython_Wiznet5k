@@ -81,7 +81,7 @@ class DHCP:
 
 
     def send_dhcp_message(self, state, time_elapsed):
-        buff = bytearray(32)
+        buff = bytearray(27)
         # Connect UDP socket to broadcast address / dhcp port 67
         SERVER_ADDR = 255, 255, 255, 255
         self._sock.connect((SERVER_ADDR, 67))
@@ -106,13 +106,15 @@ class DHCP:
 
         # flags
         flags = htons(0x8000)
-        flags = flags.to_bytes(2, 'l')
-        buff[10:11] = flags[0:1]
+        # TODO: little endian
+        flags = flags.to_bytes(2, 'b')
+        buff[10] = flags[1]
+        buff[11] = flags[0]
 
 
-        # TODO: Possibly perform a socket send here, Arduino impl. writes to TX buffer.
-        #L163-L170
-        self._sock.send(buff)
+        buff_mac = bytearray(4)
+        buff_mac = self._mac_address
+
 
         buff_2 = bytearray(32)
         
@@ -131,22 +133,21 @@ class DHCP:
         buff_2[7] = 61
         buff_2[8] = 0x07
         buff_2[9] = 0x01
+
         for mac in range(0, len(self._mac_address)):
             buff_2[10+mac] = self._mac_address[mac]
-        
+
         # host name
         buff_2[16] = 12
         # len(hostname)
-        buff_2[16] = len(b"WIZnet") + 6
-        buff_2[17:23] = b"WIZnet"
+        buff_2[17] = len(b"WIZnet") + 6
+        buff_2[18:24] = b"WIZnet"
         # last 3 bytes of MAC address
-        print(self._mac_address[3])
-        buff_2[24:25] = self._mac_address[3].to_bytes(2, 'l')
-        buff_2[26:27] = self._mac_address[4].to_bytes(2, 'l')
-        buff_2[28:29] = self._mac_address[5].to_bytes(2, 'l')
+        print(self._mac_address)
+        buff_2[25:26] = self._mac_address[3].to_bytes(2, 'l')
+        buff_2[27:28] = self._mac_address[4].to_bytes(2, 'l')
+        buff_2[29:30] = self._mac_address[5].to_bytes(2, 'l')
 
-        # L198-L199: Transmit buffer? TODO?
-        self._sock.send(buff_2)
 
         buff_3 = bytearray(32)
 
@@ -167,9 +168,6 @@ class DHCP:
             buff_3[10] = 0
             buff_3[11] = 0
 
-            # Write buff_3 to tx buffer? TODO
-            self._sock.send(buff_4)
-        
         buff_4 = bytearray(32)
         buff_4[0] = 55
         buff_4[1] = 0x06
@@ -188,7 +186,15 @@ class DHCP:
         buff_4[8] = 255
 
         # TODO: Write to tx buffer
-        self._sock.send(buff_4)
+        #self._sock.send(buff_4)
+
+        buff_big = bytearray()
+        buff_big += buff
+        buff_big += buff_mac
+        buff_big += buff_2
+        buff_big += buff_3
+        buff_big += buff_4
+        self._sock.send(buff_big)
 
 
     def request_dhcp_lease(self):
@@ -204,10 +210,7 @@ class DHCP:
                 self._transaction_id += 1
                 self.send_dhcp_message(STATE_DHCP_DISCOVER, ((time.monotonic() - start_time) / 1000))
                 self._dhcp_state = STATE_DHCP_DISCOVER
-            elif self._dhcp_state == STATE_DHCP_REQUEST:
-                self._transaction_id += 1
-                self.send_dhcp_message(STATE_DHCP_REQUEST, ((time.monotonic() - start_time) / 1000))
-                self._dhcp_state = STATE_DHCP_REQUEST
+                break
 
             # TODO: Add Discover State!
         
