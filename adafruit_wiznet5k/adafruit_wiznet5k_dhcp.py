@@ -81,7 +81,7 @@ class DHCP:
 
 
     def send_dhcp_message(self, state, time_elapsed):
-        buff = bytearray(27)
+        buff = bytearray(282)
         # Connect UDP socket to broadcast address / dhcp port 67
         SERVER_ADDR = 255, 255, 255, 255
         self._sock.connect((SERVER_ADDR, 67))
@@ -111,31 +111,35 @@ class DHCP:
         buff[10] = flags[1]
         buff[11] = flags[0]
 
+        # NOTE: Bytearray already set 0.0.0.0 for ciaddr, yiaddr, siaddr, giaddr
 
-        buff_mac = bytearray(4)
-        buff_mac = self._mac_address
+        # chaddr
+        buff[28:34] = self._mac_address
 
+        # leave empty for 192 octets of 0's, BOOTP legacy
+
+        # Magic Cookie
+        buff[236] = ((MAGIC_COOKIE >> 24)& 0xFF)
+        buff[237] = ((MAGIC_COOKIE >> 16)& 0xFF)
+        buff[238] = ((MAGIC_COOKIE >> 8)& 0xFF)
+        buff[239] = (MAGIC_COOKIE& 0xFF)
+
+        """
+        # DHCP Message Type
+        buff[232] = 53
+        buff[233] = 0x01
+        buff[234] = state
+        """
 
         buff_2 = bytearray(32)
-        
-        # Magic Cookie
-        buff_2[0] = ((MAGIC_COOKIE >> 24)& 0xFF)
-        buff_2[1] = ((MAGIC_COOKIE >> 16)& 0xFF)
-        buff_2[2] = ((MAGIC_COOKIE >> 8)& 0xFF)
-        buff_2[3] = (MAGIC_COOKIE& 0xFF)
-
-        # DHCP Message Type
-        buff_2[4] = 53
-        buff_2[5] = 0x01
-        buff_2[6] = state
 
         # Client Identifier
-        buff_2[7] = 61
-        buff_2[8] = 0x07
-        buff_2[9] = 0x01
+        buff_2[0] = 61
+        buff_2[1] = 0x07
+        buff_2[2] = 0x01
 
         for mac in range(0, len(self._mac_address)):
-            buff_2[10+mac] = self._mac_address[mac]
+            buff_2[3+mac] = self._mac_address[mac]
 
         # host name
         buff_2[16] = 12
@@ -143,7 +147,6 @@ class DHCP:
         buff_2[17] = len(b"WIZnet") + 6
         buff_2[18:24] = b"WIZnet"
         # last 3 bytes of MAC address
-        print(self._mac_address)
         buff_2[25:26] = self._mac_address[3].to_bytes(2, 'l')
         buff_2[27:28] = self._mac_address[4].to_bytes(2, 'l')
         buff_2[29:30] = self._mac_address[5].to_bytes(2, 'l')
@@ -190,7 +193,6 @@ class DHCP:
 
         buff_big = bytearray()
         buff_big += buff
-        buff_big += buff_mac
         buff_big += buff_2
         buff_big += buff_3
         buff_big += buff_4
