@@ -81,7 +81,7 @@ class DHCP:
 
 
     def send_dhcp_message(self, state, time_elapsed):
-        buff = bytearray(282)
+        buff = bytearray(317)
         # Connect UDP socket to broadcast address / dhcp port 67
         SERVER_ADDR = 255, 255, 255, 255
         self._sock.connect((SERVER_ADDR, 67))
@@ -111,12 +111,13 @@ class DHCP:
         buff[10] = flags[1]
         buff[11] = flags[0]
 
-        # NOTE: Bytearray already set 0.0.0.0 for ciaddr, yiaddr, siaddr, giaddr
+        # NOTE: Skipping cidaddr/yiaddr/siaddr/giaddr
+        # as they're already set to 0.0.0.0
 
         # chaddr
         buff[28:34] = self._mac_address
 
-        # leave empty for 192 octets of 0's, BOOTP legacy
+        # NOTE:  192 octets of 0's, BOOTP legacy
 
         # Magic Cookie
         buff[236] = ((MAGIC_COOKIE >> 24)& 0xFF)
@@ -124,36 +125,30 @@ class DHCP:
         buff[238] = ((MAGIC_COOKIE >> 8)& 0xFF)
         buff[239] = (MAGIC_COOKIE& 0xFF)
 
-        """
-        # DHCP Message Type
-        buff[232] = 53
-        buff[233] = 0x01
-        buff[234] = state
-        """
 
-        buff_2 = bytearray(32)
+        # Option - DHCP Message Type
+        buff[240] = 53
+        buff[241] = 0x01
+        buff[242] = state
 
-        # Client Identifier
-        buff_2[0] = 61
-        buff_2[1] = 0x07
-        buff_2[2] = 0x01
 
+        # Option - Client Identifier
+        buff[243] = 61
+        # Length
+        buff[244] = 0x07
+        # HW Type - ETH
+        buff[245] = 0x01
+        # Client MAC Address
         for mac in range(0, len(self._mac_address)):
-            buff_2[3+mac] = self._mac_address[mac]
+            buff[246+mac] = self._mac_address[mac]
 
-        # host name
-        buff_2[16] = 12
-        # len(hostname)
-        buff_2[17] = len(b"WIZnet") + 6
-        buff_2[18:24] = b"WIZnet"
-        # last 3 bytes of MAC address
-        buff_2[25:26] = self._mac_address[3].to_bytes(2, 'l')
-        buff_2[27:28] = self._mac_address[4].to_bytes(2, 'l')
-        buff_2[29:30] = self._mac_address[5].to_bytes(2, 'l')
-
+        # Option - Host Name
+        buff[252] = 12
+        buff[253] = len(b"Wiznet") + 6
+        # NOTE/TODO: This appends invalid ? chars. onto hostname instead of string
+        buff[254:266] = b"Wizneteeeeee"
 
         buff_3 = bytearray(32)
-
         if state == STATE_DHCP_REQUEST:
             # Local IP
             buff_3[0] = 50
@@ -171,32 +166,23 @@ class DHCP:
             buff_3[10] = 0
             buff_3[11] = 0
 
-        buff_4 = bytearray(32)
-        buff_4[0] = 55
-        buff_4[1] = 0x06
+        buff[266] = 55
+        buff[267] = 0x06
         # subnet mask
-        buff_4[2] = 1
+        buff[268] = 1
         # routers on subnet
-        buff_4[3] = 3
+        buff[269] = 3
         # DNS
-        buff_4[4] = 6
+        buff[270] = 6
         # domain name
-        buff_4[5] = 15
-        # Renewal (T1) value
-        buff_4[6] = 58
-        # Rebinding (T2) value
-        buff_4[7] = 59
-        buff_4[8] = 255
+        buff[271] = 15
+        # renewal (T1) value
+        buff[272] = 58
+        # rebinding (T2) value
+        buff[273] = 59
+        buff[274] = 255
 
-        # TODO: Write to tx buffer
-        #self._sock.send(buff_4)
-
-        buff_big = bytearray()
-        buff_big += buff
-        buff_big += buff_2
-        buff_big += buff_3
-        buff_big += buff_4
-        self._sock.send(buff_big)
+        self._sock.send(buff)
 
 
     def request_dhcp_lease(self):
