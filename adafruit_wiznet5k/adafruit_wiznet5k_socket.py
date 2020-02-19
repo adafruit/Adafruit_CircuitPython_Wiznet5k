@@ -45,6 +45,10 @@ def htonl(x):
     return (((x)<<24 & 0xFF000000) | ((x)<< 8 & 0x00FF0000) | \
             ((x)>> 8 & 0x0000FF00) | ((x)>>24 & 0x000000FF))
 
+def htons(x):
+    return ( (((x)<<8)&0xFF00) | (((x)>>8)&0xFF) )
+
+
 SOCK_STREAM     = const(0x21) # TCP
 SOCK_DGRAM      = const(0x02) # UDP
 AF_INET         = const(3)
@@ -165,6 +169,7 @@ class socket:
             ret = self._buffer[:bufsize]
             self._buffer = self._buffer[bufsize:]
         gc.collect()
+        print(ret)
         return ret
 
     def readline(self):
@@ -192,6 +197,9 @@ class socket:
 
         """
         _the_interface.socket_close(self._socknum)
+
+    def avail_udp(self):
+        return _the_interface._udp_remaining()
 
     def available(self):
         """Returns how many bytes of data are available to be read.

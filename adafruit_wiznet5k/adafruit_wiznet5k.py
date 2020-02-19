@@ -171,6 +171,7 @@ class WIZNET:
         if is_dhcp:
             if self._debug:
                 print("* Initializing DHCP")
+            self._src_port = 68
             # Return IP assigned by DHCP
             d_client = dhcp.DHCP(self, self.mac_address)
             return d_client.request_dhcp_lease()
@@ -420,6 +421,7 @@ class WIZNET:
         assert socket_num <= self.max_sockets, "Provided socket exceeds max_sockets."
 
         if sock_type == 0x02:
+            print('UDP: ', UDP_SOCK['bytes_remaining'])
             # flush by reading remaining data from previous packet
             while UDP_SOCK['bytes_remaining'] > 0 and self.socket_read(socket_num, 1):
                 if self._debug:
@@ -428,7 +430,10 @@ class WIZNET:
                     UDP_SOCK['bytes_remaining'] = UDP_SOCK['bytes_remaining'] - 1
             print("Bytes remaining: ", UDP_SOCK['bytes_remaining'])
 
+        print('RSR: ', self._read_snrx_rsr(socket_num))
+
         res = self._get_rx_rcv_size(socket_num)
+
         res = int.from_bytes(res, 'b')
         if sock_type == SNMR_TCP:
             return res
@@ -445,6 +450,7 @@ class WIZNET:
                 UDP_SOCK['bytes_remaining'] = tmp_buf[6]
                 UDP_SOCK['bytes_remaining'] = (UDP_SOCK['bytes_remaining'] << 8) + tmp_buf[7]
                 ret = UDP_SOCK['bytes_remaining']
+                print(UDP_SOCK)
                 return ret
         return 0
 
@@ -504,12 +510,9 @@ class WIZNET:
             if status[0] == SNSR_SOCK_CLOSED or status[0] == SNSR_SOCK_FIN_WAIT or status[0] == SNSR_SOCK_CLOSE_WAIT:
                 sock = _sock
                 break
-        
-        print(dir(self))
 
         if sock == self.max_sockets:
             return 0
-        self._src_port+=1
 
         if (self._src_port == 0):
             self._src_port = 1024
