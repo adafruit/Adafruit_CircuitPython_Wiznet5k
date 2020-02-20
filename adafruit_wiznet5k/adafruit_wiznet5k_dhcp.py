@@ -102,9 +102,6 @@ class DHCP:
 
 
     def send_dhcp_message(self, state, time_elapsed):
-        # Connect UDP Socket
-        self._sock.connect((BROADCAST_SERVER_ADDR, DHCP_SERVER_PORT))
-
         # OP
         _buff[0] = DHCP_BOOT_REQUEST
         # HTYPE
@@ -117,6 +114,7 @@ class DHCP:
         # Transaction ID (xid)
         self._initial_xid = htonl(self._transaction_id)
         self._initial_xid = self._initial_xid.to_bytes(4, 'l')
+        print("XID: ", self._initial_xid)
         _buff[4:7] = self._initial_xid
 
 
@@ -148,6 +146,7 @@ class DHCP:
         # Option - DHCP Message Type
         _buff[240] = 53
         _buff[241] = 0x01
+        print("status: ", state)
         _buff[242] = state
 
 
@@ -204,12 +203,11 @@ class DHCP:
         # Send DHCP packet
         self._sock.send(_buff)
 
-    def parse_dhcp_response(self, response_timeout, transaction_id):
+    def parse_dhcp_response(self, response_timeout):
         """Parse DHCP response from DHCP server.
         Returns DHCP packet type.
 
         :param int response_timeout: Time to wait for server to return packet, in seconds.
-        :param int transaction_id: ID from DHCP transaction
         """
         start_time = time.monotonic()
         if self._debug:
@@ -239,7 +237,7 @@ class DHCP:
         if chaddr != 0:
             xid = _buff[4:8]
             if bytes(xid) < self._initial_xid:
-                return 0, transaction_id
+                return 0, 0
 
         secs = _buff[8]
         flags = _buff[9]
@@ -271,7 +269,7 @@ class DHCP:
         # Subnet Mask
         subnet_mask = _buff[269:273]
 
-        return msg_type, transaction_id
+        return msg_type, xid
 
     def request_dhcp_lease(self):
         # select an initial transaction id
@@ -286,18 +284,19 @@ class DHCP:
                 self._transaction_id += 1
                 if self._debug:
                     print("* Sending DISCOVER")
+                self._sock.connect((BROADCAST_SERVER_ADDR, DHCP_SERVER_PORT))
                 self.send_dhcp_message(STATE_DHCP_DISCOVER, ((time.monotonic() - start_time) / 1000))
                 self._dhcp_state = STATE_DHCP_DISCOVER
             elif self._dhcp_state == STATE_DHCP_DISCOVER:
-                xid = 0
-                msg_type, xid = self.parse_dhcp_response(self._timeout, xid)
+                msg_type, xid = self.parse_dhcp_response(self._timeout)
+                print("Xid: ", xid)
                 if msg_type == DHCP_OFFER:
                     # use the _transaction_id the offer returned,
                     # rather than the current one
-                    self._transaction_id = xid
+                    self._transaction_id = self._transaction_id.from_bytes(xid, 'l')
                     if self._debug:
                         print("* Sending REQUEST")
-                    self.send_dhcp_message(STATE_DHCP_REQUEST, ((time.monotonic() - start_time) / 1000))
+                    self.send_dhcp_message(DHCP_REQUEST, ((time.monotonic() - start_time) / 1000))
                     self._dhcp_state = STATE_DHCP_REQUEST
                 break
 
