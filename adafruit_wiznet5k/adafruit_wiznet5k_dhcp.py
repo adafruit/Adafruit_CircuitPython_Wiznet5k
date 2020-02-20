@@ -87,6 +87,9 @@ class DHCP:
         self._dhcp_state = STATE_DHCP_START
         self._debug = debug
 
+        # DHCP packet attributes
+        self._initial_xid = 0
+
 
     def send_dhcp_message(self, state, time_elapsed):
         # Connect UDP Socket
@@ -102,9 +105,10 @@ class DHCP:
         _buff[3] = DHCP_HOPS
 
         # Transaction ID (xid)
-        xid = htonl(self._transaction_id)
-        xid = xid.to_bytes(4, 'l')
-        _buff[4:7] = xid
+        self._initial_xid = htonl(self._transaction_id)
+        self._initial_xid = self._initial_xid.to_bytes(4, 'l')
+        _buff[4:7] = self._initial_xid
+
 
         # seconds elapsed
         _buff[8] = ((int(time_elapsed) & 0xff00) >> 8)
@@ -207,7 +211,7 @@ class DHCP:
             if (time.monotonic() - start_time) > response_timeout:
                 return 255
             # resend the original packet
-            self._sock.send(_buff)
+            #self._sock.send(_buff)
             time.sleep(0.05)
         if self._debug:
             print("* DHCP packet available, {} bytes".format(packet_sz))
@@ -220,9 +224,11 @@ class DHCP:
 
         # Transaction ID
         # TODO: Check this against transaction_id and initial XID!!!
-        xid = _buff[4:7]
-        xid = int.from_bytes(xid, 'l')
-        xid = hex(xid)
+        xid = _buff[4:8]
+        #xid = int.from_bytes(xid, 'l')
+        #xid = hex(xid)
+        print('XID: ', xid)
+        print("self._initial_xid: ", self._initial_xid)
 
         secs = _buff[8]
         flags = _buff[9]
