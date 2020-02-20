@@ -44,6 +44,16 @@ STATE_DHCP_LEASED    = const(0x03)
 STATE_DHCP_REREQUEST = const(0x04)
 STATE_DHCP_RELEASE   = const(0x05)
 
+# DHCP Message Types
+DHCP_DISCOVER = const(1)
+DHCP_OFFER    = const(2)
+DHCP_REQUEST  = const(3)
+DHCP_DECLINE  = const(4)
+DHCP_ACK      = const(5)
+DHCP_NAK      = const(6)
+DHCP_RELEASE  = const(7)
+DHCP_INFORM   = const(8)
+
 # DHCP Message OP Codes
 DHCP_BOOT_REQUEST    = const(0x01)
 DHCP_BOOT_REPLY      = const(0x02)
@@ -210,8 +220,6 @@ class DHCP:
                 print(" * Waiting for packet...")
             if (time.monotonic() - start_time) > response_timeout:
                 return 255
-            # resend the original packet
-            #self._sock.send(_buff)
             time.sleep(0.05)
         if self._debug:
             print("* DHCP packet available, {} bytes".format(packet_sz))
@@ -222,13 +230,16 @@ class DHCP:
         # Check OP, if valid, let's parse the packet out!
         assert _buff[0] == DHCP_BOOT_REPLY, "Malformed Packet - DHCP message OP is not expected BOOT Reply."
 
-        # Transaction ID
-        # TODO: Check this against transaction_id and initial XID!!!
-        xid = _buff[4:8]
-        #xid = int.from_bytes(xid, 'l')
-        #xid = hex(xid)
-        print('XID: ', xid)
-        print("self._initial_xid: ", self._initial_xid)
+
+        # Client Hardware Address (CHADDR)
+        chaddr = bytearray(6)
+        for mac in range(0, len(chaddr)):
+            chaddr[mac] = _buff[28+mac]
+
+        if chaddr != 0:
+            xid = _buff[4:8]
+            if bytes(xid) < self._initial_xid:
+                return 0, transaction_id
 
         secs = _buff[8]
         flags = _buff[9]
@@ -245,11 +256,6 @@ class DHCP:
         # Gateway IP Address (GIADDR)
         giaddr = _buff[25:29]
 
-        # Client Hardware Address (CHADDR)
-        chaddr = bytearray(6)
-        for mac in range(0, len(chaddr)):
-            chaddr[mac] = _buff[28+mac]
-
         # NOTE: Next 192 octets are 0's for BOOTP legacy
 
         # DHCP Message Type
@@ -265,8 +271,7 @@ class DHCP:
         # Subnet Mask
         subnet_mask = _buff[269:273]
 
-        return msg_type
-
+        return msg_type, transaction_id
 
     def request_dhcp_lease(self):
         # select an initial transaction id
@@ -279,14 +284,23 @@ class DHCP:
         while self._dhcp_state != STATE_DHCP_LEASED:
             if self._dhcp_state == STATE_DHCP_START:
                 self._transaction_id += 1
+                if self._debug:
+                    print("* Sending DISCOVER")
                 self.send_dhcp_message(STATE_DHCP_DISCOVER, ((time.monotonic() - start_time) / 1000))
                 self._dhcp_state = STATE_DHCP_DISCOVER
             elif self._dhcp_state == STATE_DHCP_DISCOVER:
                 xid = 0
-                self.parse_dhcp_response(self._timeout, xid)
+                msg_type, xid = self.parse_dhcp_response(self._timeout, xid)
+                if msg_type == DHCP_OFFER:
+                    # use the _transaction_id the offer returned,
+                    # rather than the current one
+                    self._transaction_id = xid
+                    if self._debug:
+                        print("* Sending REQUEST")
+                    self.send_dhcp_message(STATE_DHCP_REQUEST, ((time.monotonic() - start_time) / 1000))
+                    self._dhcp_state = STATE_DHCP_REQUEST
                 break
 
-            # TODO: Add Discover State!
         
             if msg_type == 255:
                 msg_type = 0
