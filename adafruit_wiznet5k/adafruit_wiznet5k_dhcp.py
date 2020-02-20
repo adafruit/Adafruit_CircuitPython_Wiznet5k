@@ -206,57 +206,58 @@ class DHCP:
                 print(" * Waiting for packet...")
             if (time.monotonic() - start_time) > response_timeout:
                 return 255
+            # resend the original packet
             self._sock.send(_buff)
             time.sleep(0.05)
         if self._debug:
             print("* DHCP packet available, {} bytes".format(packet_sz))
-        # TODO: reuse _buffer
-        buff = bytearray(packet_sz)
-        buff = self._sock.recv(packet_sz)[0]
+        # re-allocate and zero-out global packet buffer
+        _buff = bytearray(packet_sz)
+        _buff = self._sock.recv(packet_sz)[0]
 
         # Check OP, if valid, let's parse the packet out!
-        assert buff[0] == DHCP_BOOT_REPLY, "Malformed Packet - DHCP message OP is not expected BOOT Reply."
+        assert _buff[0] == DHCP_BOOT_REPLY, "Malformed Packet - DHCP message OP is not expected BOOT Reply."
 
         # Transaction ID
         # TODO: Check this against transaction_id and initial XID!!!
-        xid = buff[4:7]
+        xid = _buff[4:7]
         xid = int.from_bytes(xid, 'l')
         xid = hex(xid)
 
-        secs = buff[8]
-        flags = buff[9]
+        secs = _buff[8]
+        flags = _buff[9]
 
         # Client IP Address (CIADDR)
-        ciaddr = buff[10:14]
+        ciaddr = _buff[10:14]
 
         # Your IP Address (YIADDR)
-        yiaddr = buff[15:19]
+        yiaddr = _buff[15:19]
 
         # Server IP Address (SIADDR)
-        siaddr = buff[20:24]
+        siaddr = _buff[20:24]
 
         # Gateway IP Address (GIADDR)
-        giaddr = buff[25:29]
+        giaddr = _buff[25:29]
 
         # Client Hardware Address (CHADDR)
         chaddr = bytearray(6)
         for mac in range(0, len(chaddr)):
-            chaddr[mac] = buff[28+mac]
+            chaddr[mac] = _buff[28+mac]
 
         # NOTE: Next 192 octets are 0's for BOOTP legacy
 
         # DHCP Message Type
-        msg_type = buff[242]
+        msg_type = _buff[242]
         # DHCP Server ID
-        dhcp_server_id = buff[245:249]
+        dhcp_server_id = _buff[245:249]
         # Lease Time, in seconds
-        lease_time = int.from_bytes(buff[251:255], 'l')
+        lease_time = int.from_bytes(_buff[251:255], 'l')
         # T1 value
-        t1 = int.from_bytes(buff[257:261], 'l')
+        t1 = int.from_bytes(_buff[257:261], 'l')
         # T2 value
-        t2 = int.from_bytes(buff[263:267], 'l')
+        t2 = int.from_bytes(_buff[263:267], 'l')
         # Subnet Mask
-        subnet_mask = buff[269:273]
+        subnet_mask = _buff[269:273]
 
         return msg_type
 
