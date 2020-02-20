@@ -196,7 +196,7 @@ class DHCP:
         # DNS
         _buff[282] = 6
         # domain name
-        _buff[282] = 15
+        _buff[283] = 15
         # renewal (T1) value
         _buff[284] = 58
         # rebinding (T2) value
@@ -272,6 +272,8 @@ class DHCP:
         # Subnet Mask
         self.subnet_mask = _buff[269:273]
 
+        self.dns_server_ip = _buff[280:284]
+
         return msg_type, xid
 
     def request_dhcp_lease(self):
@@ -304,7 +306,7 @@ class DHCP:
                 msg_type, xid = self.parse_dhcp_response(self._timeout)
                 if msg_type == DHCP_ACK:
                     self._dhcp_state = STATE_DHCP_LEASED
-                    res = 1
+                    result = 1
                     if self._lease_time == 0:
                         self._lease_time = DEFAULT_LEASE_TIME
                     if self._t1 == 0:

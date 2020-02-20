@@ -165,16 +165,36 @@ class WIZNET:
         self._sock = 0
         self._src_port = 0
         # Set DHCP
-        self.is_dhcp = self.dhcp(dhcp)
+        if dhcp:
+            self.dhcp()
 
-    def dhcp(self, is_dhcp):
-        if is_dhcp:
+    def dhcp(self,):
+        if self._debug:
+            print("* Initializing DHCP")
+        self._src_port = 68
+        # Return IP assigned by DHCP
+        # TODO, provide this with timeout and response timeout
+        _dhcp_client = dhcp.DHCP(self, self.mac_address)
+        ret = _dhcp_client.request_dhcp_lease()
+        if ret == 1:
             if self._debug:
-                print("* Initializing DHCP")
-            self._src_port = 68
-            # Return IP assigned by DHCP
-            d_client = dhcp.DHCP(self, self.mac_address)
-            return d_client.request_dhcp_lease()
+                print("* Found DHCP server, setting configuration...")
+                # (ip_address, subnet_mask, gateway_address, dns_server)
+                _ip = (_dhcp_client.local_ip[0], _dhcp_client.local_ip[1],
+                       _dhcp_client.local_ip[2], _dhcp_client.local_ip[3])
+                print("IP: ", _ip)
+                _subnet_mask = (_dhcp_client.subnet_mask[0], _dhcp_client.subnet_mask[1],
+                                _dhcp_client.subnet_mask[2], _dhcp_client.subnet_mask[3])
+                print("Subnet Mask: ", _subnet_mask)
+                _gw_addr = (_dhcp_client.gateway_ip[0], _dhcp_client.gateway_ip[1],
+                            _dhcp_client.gateway_ip[2], _dhcp_client.gateway_ip[3])
+                print("Gateway Address: ", _gw_addr)
+                print(_dhcp_client.dns_server_ip)
+                _dns_addr = (_dhcp_client.dns_server_ip[0], _dhcp_client.dns_server_ip[1],
+                            _dhcp_client.dns_server_ip[2], _dhcp_client.dns_server_ip[3])
+                print("DNS Server IP: ", _dns_addr)
+                # TODO: these need to be converted to "nice" IPs
+                self.ifconfig((_ip, _subnet_mask, _gw_addr, _dns_addr))
         return False
 
     @property
