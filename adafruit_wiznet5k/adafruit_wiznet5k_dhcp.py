@@ -96,12 +96,13 @@ class DHCP:
 
         self._dhcp_state = STATE_DHCP_START
         self._debug = debug
-
-        # DHCP packet attributes
         self._initial_xid = 0
-        self._local_ip = 0
-        self._dhcp_server_ip = 0
 
+        self.dhcp_server_ip = 0
+        self.local_ip = 0
+        self.gateway_ip = 0
+        self.subnet_mask = 0
+        self.dns_server_ip = 0
 
     def send_dhcp_message(self, state, time_elapsed):
         # OP
@@ -171,18 +172,17 @@ class DHCP:
             # Set the parsed local IP addr
             _buff[266] = 50
             _buff[267] = 0x04
-            _buff[268] = self._local_ip[0]
-            _buff[269] = self._local_ip[1]
-            _buff[270] = self._local_ip[2]
-            _buff[271] = self._local_ip[3]
+            _buff[268] = self.local_ip[0]
+            _buff[269] = self.local_ip[1]
+            _buff[270] = self.local_ip[2]
+            _buff[271] = self.local_ip[3]
             # Set the parsed dhcp server ip addr
-            print("Server IP: ", self._dhcp_server_ip)
             _buff[272] = 54
             _buff[273] = 0x04
-            _buff[274] = self._dhcp_server_ip[0]
-            _buff[275] = self._dhcp_server_ip[1]
-            _buff[276] = self._dhcp_server_ip[2]
-            _buff[277] = self._dhcp_server_ip[3]
+            _buff[274] = self.dhcp_server_ip[0]
+            _buff[275] = self.dhcp_server_ip[1]
+            _buff[276] = self.dhcp_server_ip[2]
+            _buff[277] = self.dhcp_server_ip[3]
 
         _buff[278] = 55
         _buff[279] = 0x06
@@ -246,20 +246,20 @@ class DHCP:
         ciaddr = _buff[10:14]
 
         # Your IP Address (YIADDR)
-        self._local_ip = _buff[16:20]
+        self.local_ip = _buff[16:20]
 
         # Server IP Address (SIADDR)
         siaddr = _buff[20:24]
 
         # Gateway IP Address (GIADDR)
-        giaddr = _buff[25:29]
+        self.gateway_ip = _buff[25:29]
 
         # NOTE: Next 192 octets are 0's for BOOTP legacy
 
         # DHCP Message Type
         msg_type = _buff[242]
         # DHCP Server ID
-        self._dhcp_server_ip = _buff[245:249]
+        self.dhcp_server_ip = _buff[245:249]
         # Lease Time, in seconds
         lease_time = int.from_bytes(_buff[251:255], 'l')
         # T1 value
@@ -267,7 +267,7 @@ class DHCP:
         # T2 value
         t2 = int.from_bytes(_buff[263:267], 'l')
         # Subnet Mask
-        subnet_mask = _buff[269:273]
+        self.subnet_mask = _buff[269:273]
 
         return msg_type, xid
 
@@ -289,7 +289,6 @@ class DHCP:
                 self._dhcp_state = STATE_DHCP_DISCOVER
             elif self._dhcp_state == STATE_DHCP_DISCOVER:
                 msg_type, xid = self.parse_dhcp_response(self._timeout)
-                print("Xid: ", xid)
                 if msg_type == DHCP_OFFER:
                     # use the _transaction_id the offer returned,
                     # rather than the current one
@@ -298,9 +297,15 @@ class DHCP:
                         print("* Sending REQUEST")
                     self.send_dhcp_message(DHCP_REQUEST, ((time.monotonic() - start_time) / 1000))
                     self._dhcp_state = STATE_DHCP_REQUEST
-                break
+            elif STATE_DHCP_REQUEST:
+                msg_type, xid = self.parse_dhcp_response(self._timeout)
+                if msg_type == DHCP_ACK:
+                    self._dhcp_state = STATE_DHCP_LEASED
+                    res = 1
+                    # TODO: Set up lease tims and binding
+                elif msg_type == DHCP_NAK:
+                    self._dhcp_state = STATE_DHCP_START
 
-        
             if msg_type == 255:
                 msg_type = 0
                 self._dhcp_state = STATE_DHCP_START
