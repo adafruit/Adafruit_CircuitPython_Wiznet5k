@@ -166,39 +166,38 @@ class DHCP:
         # NOTE/TODO: This appends invalid ? chars. onto hostname instead of string
         _buff[254:266] = b"Wizneteeeeee"
 
-        _buff_3 = bytearray(32)
-        if state == STATE_DHCP_REQUEST:
+        if state == DHCP_REQUEST:
             # Local IP
-            _buff_3[0] = 50
-            _buff_3[1] = 0x04
+            _buff[266] = 50
+            _buff[267] = 0x04
             # TODO: This is the DHCP Local IP, should be 000.000.000.000, ensure!
-            _buff_3[2] = 0
-            _buff_3[3] = 0
-            _buff_3[4] = 0
-            _buff_3[5] = 0
+            _buff[268] = 0
+            _buff[269] = 0
+            _buff[270] = 0
+            _buff[271] = 0
             # DHCP Server IP
-            _buff_3[6] = 54
-            _buff_3[7] = 0x04
-            _buff_3[8] = 0
-            _buff_3[9] = 0
-            _buff_3[10] = 0
-            _buff_3[11] = 0
+            _buff[272] = 54
+            _buff[273] = 0x04
+            _buff[274] = 0
+            _buff[275] = 0
+            _buff[276] = 0
+            _buff[277] = 0
 
-        _buff[266] = 55
-        _buff[267] = 0x06
+        _buff[278] = 55
+        _buff[279] = 0x06
         # subnet mask
-        _buff[268] = 1
+        _buff[280] = 1
         # routers on subnet
-        _buff[269] = 3
+        _buff[281] = 3
         # DNS
-        _buff[270] = 6
+        _buff[282] = 6
         # domain name
-        _buff[271] = 15
+        _buff[282] = 15
         # renewal (T1) value
-        _buff[272] = 58
+        _buff[284] = 58
         # rebinding (T2) value
-        _buff[273] = 59
-        _buff[274] = 255
+        _buff[285] = 59
+        _buff[286] = 255
 
         # Send DHCP packet
         self._sock.send(_buff)
