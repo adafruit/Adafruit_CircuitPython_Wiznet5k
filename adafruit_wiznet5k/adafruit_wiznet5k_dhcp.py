@@ -99,6 +99,8 @@ class DHCP:
 
         # DHCP packet attributes
         self._initial_xid = 0
+        self._local_ip = 0
+        self._dhcp_server_ip = 0
 
 
     def send_dhcp_message(self, state, time_elapsed):
@@ -146,7 +148,6 @@ class DHCP:
         # Option - DHCP Message Type
         _buff[240] = 53
         _buff[241] = 0x01
-        print("status: ", state)
         _buff[242] = state
 
 
@@ -167,21 +168,21 @@ class DHCP:
         _buff[254:266] = b"Wizneteeeeee"
 
         if state == DHCP_REQUEST:
-            # Local IP
+            # Set the parsed local IP addr
             _buff[266] = 50
             _buff[267] = 0x04
-            # TODO: This is the DHCP Local IP, should be 000.000.000.000, ensure!
-            _buff[268] = 0
-            _buff[269] = 0
-            _buff[270] = 0
-            _buff[271] = 0
-            # DHCP Server IP
+            _buff[268] = self._local_ip[0]
+            _buff[269] = self._local_ip[1]
+            _buff[270] = self._local_ip[2]
+            _buff[271] = self._local_ip[3]
+            # Set the parsed dhcp server ip addr
+            print("Server IP: ", self._dhcp_server_ip)
             _buff[272] = 54
             _buff[273] = 0x04
-            _buff[274] = 0
-            _buff[275] = 0
-            _buff[276] = 0
-            _buff[277] = 0
+            _buff[274] = self._dhcp_server_ip[0]
+            _buff[275] = self._dhcp_server_ip[1]
+            _buff[276] = self._dhcp_server_ip[2]
+            _buff[277] = self._dhcp_server_ip[3]
 
         _buff[278] = 55
         _buff[279] = 0x06
@@ -245,7 +246,7 @@ class DHCP:
         ciaddr = _buff[10:14]
 
         # Your IP Address (YIADDR)
-        yiaddr = _buff[15:19]
+        self._local_ip = _buff[16:20]
 
         # Server IP Address (SIADDR)
         siaddr = _buff[20:24]
@@ -258,7 +259,7 @@ class DHCP:
         # DHCP Message Type
         msg_type = _buff[242]
         # DHCP Server ID
-        dhcp_server_id = _buff[245:249]
+        self._dhcp_server_ip = _buff[245:249]
         # Lease Time, in seconds
         lease_time = int.from_bytes(_buff[251:255], 'l')
         # T1 value
