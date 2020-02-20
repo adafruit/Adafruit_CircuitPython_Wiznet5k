@@ -223,14 +223,33 @@ class DHCP:
         # Gateway IP Address (GIADDR)
         giaddr = buff[25:29]
 
-
         # Client Hardware Address (CHADDR)
         chaddr = bytearray(6)
         for mac in range(0, len(chaddr)):
             chaddr[mac] = buff[28+mac]
 
+        # NOTE: Next 192 octets are 0's for BOOTP legacy
+
+        # DHCP Message Type
+        msg_type = buff[242]
+        # DHCP Server ID
+        dhcp_server_id = buff[245:249]
+        # Lease Time, in seconds
+        lease_time = int.from_bytes(buff[251:255], 'l')
+        # T1 value
+        t1 = int.from_bytes(buff[257:261], 'l')
+        print('T1: ', t1)
+        # T2 value
+        t2 = int.from_bytes(buff[263:267], 'l')
+        print('T2: ', t2)
+        # Subnet Mask
+        subnet_mask = buff[269:273]
+        # dns server identifier
+        #dns_server = 
+        
+        print("Lease time: ", lease_time)
         print("CIADDR: {}\nYIADDR: {}\nSIADDR: {}\nGIADDR: {}\n".format(ciaddr, yiaddr, siaddr, giaddr))
-        print(chaddr)
+        print('MAC: ', chaddr)
 
 
         return
