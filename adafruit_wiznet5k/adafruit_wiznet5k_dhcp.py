@@ -68,7 +68,10 @@ MAGIC_COOKIE         = const(0x63825363)
 MAX_DHCP_OPT         = const(0x10)
 
 BROADCAST_SERVER_ADDR = 255, 255, 255, 255
+# Default DHCP Server port
 DHCP_SERVER_PORT      = const(67)
+# DHCP Lease Time, in seconds
+DEFAULT_LEASE_TIME    = const(900)
 
 _buff = bytearray(317)
 
@@ -263,9 +266,9 @@ class DHCP:
         # Lease Time, in seconds
         lease_time = int.from_bytes(_buff[251:255], 'l')
         # T1 value
-        t1 = int.from_bytes(_buff[257:261], 'l')
+        self._t1 = int.from_bytes(_buff[257:261], 'l')
         # T2 value
-        t2 = int.from_bytes(_buff[263:267], 'l')
+        self._t2 = int.from_bytes(_buff[263:267], 'l')
         # Subnet Mask
         self.subnet_mask = _buff[269:273]
 
@@ -302,7 +305,16 @@ class DHCP:
                 if msg_type == DHCP_ACK:
                     self._dhcp_state = STATE_DHCP_LEASED
                     res = 1
-                    # TODO: Set up lease tims and binding
+                    if self._lease_time == 0:
+                        self._lease_time = DEFAULT_LEASE_TIME
+                    if self._t1 == 0:
+                        # T1 is 50% of _lease_time
+                        self._t1 = self._lease_time >> 1
+                    if self._t2 == 0:
+                        # T2 is 87.5% of _lease_time
+                        self._t2 = self._lease_time - (self._lease_time >> 3)
+                    self._renew_in_sec = self._t1
+                    self._rebind_in_sec = self._t2
                 elif msg_type == DHCP_NAK:
                     self._dhcp_state = STATE_DHCP_START
 
