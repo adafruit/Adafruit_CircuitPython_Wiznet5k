@@ -36,7 +36,7 @@ from adafruit_wiznet5k import adafruit_wiznet5k
 
 _the_interface = None   # pylint: disable=invalid-name
 def set_interface(iface):
-    """Helper to set the global internet interface"""
+    """Helper to set the global internet interface."""
     global _the_interface   # pylint: disable=global-statement, invalid-name
     _the_interface = iface
 
@@ -46,9 +46,11 @@ def htonl(x):
             ((x)>> 8 & 0x0000FF00) | ((x)>>24 & 0x000000FF))
 
 def htons(x):
+    """Convert 16-bit positive integers from host to network byte order."""
     return ( (((x)<<8)&0xFF00) | (((x)>>8)&0xFF) )
 
 def ntohl(x):
+    """Convert 32-bit positive integers from network to host byte order."""
     return htons(x)
 
 SOCK_STREAM     = const(0x21) # TCP
@@ -57,24 +59,28 @@ AF_INET         = const(3)
 NO_SOCKET_AVAIL = const(255)
 MAX_PACKET = const(4000)
 
+# keep track of sockets we allocate
 sockets = []
 
 class socket:
     """A simplified implementation of the Python 'socket' class
     for connecting to a Wiznet5k module.
 
+    :param int family: Socket address (and protocol) family.
+    :param int type: Socket type.
+    :param int proto: Socket protocol number, usually zero.
+    :param int fileno: If specified, values for family, type, and proto are auto-detected.
+                       NOTE: fileno is not implemented in this simplified implementation.
     """
-    def __init__(self, family=AF_INET, type=SOCK_STREAM, proto=0, fileno=0,
-                 timeout=None, socknum=None):
+    def __init__(self, family=AF_INET, type=SOCK_STREAM, proto=0, fileno=0):
         if family != AF_INET:
             raise RuntimeError("Only AF_INET family supported by W5K modules.")
         self._sock_type = type
         self._buffer = b''
 
-        self._socknum = socknum if socknum else _the_interface.get_socket(sockets)
+        self._socknum = _the_interface.get_socket(sockets)
         sockets.append(self._socknum)
 
-        self.settimeout(timeout)
 
     @property
     def socknum(self):

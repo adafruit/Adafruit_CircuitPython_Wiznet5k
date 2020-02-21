@@ -96,6 +96,7 @@ class DHCP:
         # Initalize a new UDP socket for DHCP
         socket.set_interface(eth)
         self._sock = socket.socket(type=socket.SOCK_DGRAM)
+        self._sock.settimeout(timeout)
 
         self._dhcp_state = STATE_DHCP_START
         self._debug = debug
