@@ -81,6 +81,8 @@ class socket:
         self._socknum = _the_interface.get_socket(SOCKETS)
         SOCKETS.append(self._socknum)
 
+        self.settimeout(1)
+
     @property
     def socknum(self):
         """Returns the socket object's socket number."""
@@ -112,6 +114,10 @@ class socket:
 
         """
         host, port = address
+
+        if hasattr(host, 'split'):
+            host = tuple(map(int, host.split('.'))) 
+
         if not _the_interface.socket_connect(self._socknum, host, port, conn_mode=self._sock_type):
             raise RuntimeError("Failed to connect to host", host)
         self._buffer = b''

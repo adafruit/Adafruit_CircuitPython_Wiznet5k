@@ -150,7 +150,7 @@ class WIZNET:
 
     # pylint: disable=too-many-arguments
     def __init__(self, spi_bus, cs, reset=None,
-                 is_dhcp=False, mac=DEFAULT_MAC, debug=True):
+                 is_dhcp=True, mac=DEFAULT_MAC, debug=True):
         self._debug = debug
         self._chip_type = None
         self._device = spidev.SPIDevice(spi_bus, cs,
@@ -225,14 +225,6 @@ class WIZNET:
         """Returns the configured IP address."""
         return self.read(REG_SIPR, 0x00, 4)
 
-    @ip_address.setter
-    def ip_address(self, ip_address):
-        """Configures the hardware with an IP address.
-        :param tuple ip_address: Desired IP address.
-
-        """
-        self._write_n(REG_SIPR, 0x04, ip_address)
-
     def pretty_ip(self, ip): # pylint: disable=no-self-use, invalid-name
         """Converts a bytearray IP address to a
         dotted-quad string for printing
@@ -303,8 +295,10 @@ class WIZNET:
 
         """
         ip_address, subnet_mask, gateway_address, dns_server = params
-        # set ip_address
-        self.ip_address = ip_address
+
+        # Set IP Address
+        self._write_n(REG_SIPR, 0x04, ip_address)
+
         # set subnet and gateway addresses
         for octet in range(0, 4):
             self.write(REG_SUBR+octet, 0x04, subnet_mask[octet])
