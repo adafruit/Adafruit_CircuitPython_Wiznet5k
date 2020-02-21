@@ -42,45 +42,44 @@ def set_interface(iface):
 
 def htonl(x):
     """Convert 32-bit positive integers from host to network byte order."""
-    return (((x)<<24 & 0xFF000000) | ((x)<< 8 & 0x00FF0000) | \
-            ((x)>> 8 & 0x0000FF00) | ((x)>>24 & 0x000000FF))
+    return ((x)<<24 & 0xFF000000) | ((x)<< 8 & 0x00FF0000) | \
+            ((x)>> 8 & 0x0000FF00) | ((x)>>24 & 0x000000FF)
 
 def htons(x):
     """Convert 16-bit positive integers from host to network byte order."""
-    return ( (((x)<<8)&0xFF00) | (((x)>>8)&0xFF) )
+    return (((x)<<8)&0xFF00) | (((x)>>8)&0xFF)
 
-def ntohl(x):
-    """Convert 32-bit positive integers from network to host byte order."""
-    return htons(x)
-
+# pylint: disable=bad-whitespace
 SOCK_STREAM     = const(0x21) # TCP
 SOCK_DGRAM      = const(0x02) # UDP
 AF_INET         = const(3)
 NO_SOCKET_AVAIL = const(255)
 MAX_PACKET = const(4000)
+# pylint: enable=bad-whitespace
+
 
 # keep track of sockets we allocate
-sockets = []
+SOCKETS = []
 
+#pylint: disable=invalid-name
 class socket:
     """A simplified implementation of the Python 'socket' class
     for connecting to a Wiznet5k module.
 
     :param int family: Socket address (and protocol) family.
     :param int type: Socket type.
-    :param int proto: Socket protocol number, usually zero.
-    :param int fileno: If specified, values for family, type, and proto are auto-detected.
-                       NOTE: fileno is not implemented in this simplified implementation.
+
     """
-    def __init__(self, family=AF_INET, type=SOCK_STREAM, proto=0, fileno=0):
+    # pylint: disable=redefined-builtin
+    def __init__(self, family=AF_INET, type=SOCK_STREAM):
         if family != AF_INET:
             raise RuntimeError("Only AF_INET family supported by W5K modules.")
         self._sock_type = type
         self._buffer = b''
+        self._timeout = 0
 
-        self._socknum = _the_interface.get_socket(sockets)
-        sockets.append(self._socknum)
-
+        self._socknum = _the_interface.get_socket(SOCKETS)
+        SOCKETS.append(self._socknum)
 
     @property
     def socknum(self):
@@ -90,26 +89,25 @@ class socket:
     @property
     def connected(self):
         """Returns whether or not we are connected to the socket."""
-        if (self._socknum >= _the_interface.max_sockets):
+        if self._socknum >= _the_interface.max_sockets:
             return 0
-        else:
-            status = _the_interface.socket_status(self._socknum)
-            print(status)
-            result = status in (adafruit_wiznet5k.SNSR_SOCK_CLOSED,
-                                    adafruit_wiznet5k.SNSR_SOCK_LISTEN,
-                                    adafruit_wiznet5k.SNSR_SOCK_CLOSE_WAIT,
-                                    adafruit_wiznet5k.SNSR_SOCK_FIN_WAIT)
-            if result:
-                self.close()
-                return result
+        status = _the_interface.socket_status(self._socknum)
+        result = status in (adafruit_wiznet5k.SNSR_SOCK_CLOSED,
+                            adafruit_wiznet5k.SNSR_SOCK_LISTEN,
+                            adafruit_wiznet5k.SNSR_SOCK_CLOSE_WAIT,
+                            adafruit_wiznet5k.SNSR_SOCK_FIN_WAIT)
+        if result:
+            self.close()
             return result
+        return result
 
     def gethostbyname(self, address):
         """Translate a host name to IPv4 address format."""
         raise NotImplementedError("Not implemented in this version of Wiznet5k.")
 
     def connect(self, address):
-        """Connect to a remote socket at address. (The format of address depends on the address family — see above.)
+        """Connect to a remote socket at address. (The format of address depends
+        on the address family — see above.)
         :param tuple address: Remote socket as a (host, port) tuple.
 
         """
@@ -210,8 +208,9 @@ class socket:
 
         """
         _the_interface.socket_close(self._socknum)
-        sockets.remove(self._socknum)
+        SOCKETS.remove(self._socknum)
 
+    # TODO: We shouldnt need this, read/recv should handle this for us
     def available(self):
         """Returns how many bytes of data are available to be read from the socket.
 
@@ -224,7 +223,7 @@ class socket:
         :param int value: Socket read timeout, in seconds.
 
         """
-        if value is < 0:
+        if value < 0:
             raise Exception("Timeout period should be non-negative.")
         self._timeout = value
 
@@ -233,6 +232,4 @@ class socket:
         with socket operations, or None if no timeout is set.
 
         """
-        if value == 0.0:
-            return None
         return self._timeout
