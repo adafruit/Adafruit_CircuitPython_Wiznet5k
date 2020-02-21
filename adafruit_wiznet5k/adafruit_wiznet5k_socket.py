@@ -84,15 +84,12 @@ class socket:
 
     @property
     def socknum(self):
-        """Returns the socket number of the socket object.
-
-        """
+        """Returns the socket object's socket number."""
         return self._socknum
 
     @property
     def connected(self):
-        """Returns whether or not we are connected to the socket.
-        """
+        """Returns whether or not we are connected to the socket."""
         if (self._socknum >= _the_interface.max_sockets):
             return 0
         else:
@@ -108,6 +105,7 @@ class socket:
             return result
 
     def gethostbyname(self, address):
+        """Translate a host name to IPv4 address format."""
         raise NotImplementedError("Not implemented in this version of Wiznet5k.")
 
     def connect(self, address):
@@ -214,11 +212,8 @@ class socket:
         _the_interface.socket_close(self._socknum)
         sockets.remove(self._socknum)
 
-    def avail_udp(self):
-        return _the_interface._udp_remaining()
-
     def available(self):
-        """Returns how many bytes of data are available to be read.
+        """Returns how many bytes of data are available to be read from the socket.
 
         """
         return _the_interface.socket_available(self._socknum, self._sock_type)
@@ -229,8 +224,8 @@ class socket:
         :param int value: Socket read timeout, in seconds.
 
         """
-        if value is None:
-            value = 0.0
+        if value is < 0:
+            raise Exception("Timeout period should be non-negative.")
         self._timeout = value
 
     def gettimeout(self):
