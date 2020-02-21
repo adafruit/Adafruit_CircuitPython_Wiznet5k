@@ -127,6 +127,7 @@ UDP_SOCK = {'bytes_remaining': 0,
             'remote_ip': 0,
             'remote_port': 0}
 
+
 class WIZNET:
     """Interface for WIZNET5k module.
     :param ~busio.SPI spi_bus: The SPI bus the Wiznet module is connected to.
@@ -399,6 +400,7 @@ class WIZNET:
             bus_device.write(bytes([addr & 0xFF]))
             bus_device.write(bytes([callback]))
             bus_device.write(bytes([data]))
+        return len
 
     def _write_n(self, addr, callback, data):
         """Writes data to a register address.
@@ -432,19 +434,15 @@ class WIZNET:
         assert socket_num <= self.max_sockets, "Provided socket exceeds max_sockets."
 
         if sock_type == 0x02:
-            print('UDP: ', UDP_SOCK['bytes_remaining'])
             # flush by reading remaining data from previous packet
             while UDP_SOCK['bytes_remaining'] > 0 and self.socket_read(socket_num, 1):
                 if self._debug:
                     print("Flushing {} bytes".format(UDP_SOCK['bytes_remaining']))
                 if UDP_SOCK['bytes_remaining'] > 0:
                     UDP_SOCK['bytes_remaining'] = UDP_SOCK['bytes_remaining'] - 1
-            print("Bytes remaining: ", UDP_SOCK['bytes_remaining'])
 
-        print('RSR: ', self._read_snrx_rsr(socket_num))
 
         res = self._get_rx_rcv_size(socket_num)
-
         res = int.from_bytes(res, 'b')
         if sock_type == SNMR_TCP:
             return res
@@ -776,7 +774,6 @@ class WIZNET:
 
         """
         return self._read_socket(sock, REG_SNSR)
-
 
 
     def _write_snmr(self, sock, protocol):

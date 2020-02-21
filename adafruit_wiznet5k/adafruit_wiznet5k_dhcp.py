@@ -73,6 +73,13 @@ DHCP_SERVER_PORT   = const(67)
 # DHCP Lease Time, in seconds
 DEFAULT_LEASE_TIME = const(900)
 
+# DHCP Check Lease
+DHCP_CHECK_NONE        = const(0)
+DHCP_CHECK_RENEW_FAIL  = const(1)
+DHCP_CHECK_RENEW_OK    = const(2)
+DHCP_CHECK_REBIND_FAIL = const(3)
+DHCP_CHECK_REBIND_OK   = const(4)
+
 BROADCAST_SERVER_ADDR = 255, 255, 255, 255
 _BUFF = bytearray(317)
 
@@ -107,10 +114,15 @@ class DHCP:
         self._initial_xid = 0
         self._transaction_id = 0
 
-        self.dhcp_server_ip = 0
-        self.local_ip = 0
-        self.gateway_ip = 0
+        self._reset_dhcp_lease()
+
+
+    def _reset_dhcp_lease(self):
+        # reset the network configuration
         self.subnet_mask = 0
+        self.gateway_ip = 0
+        self.local_ip = 0
+        self.dhcp_server_ip = 0
         self.dns_server_ip = 0
 
     def send_dhcp_message(self, state, time_elapsed):
@@ -265,6 +277,45 @@ class DHCP:
         self.dns_server_ip = _BUFF[285:289]
 
         return msg_type, xid
+
+    def check_lease(self):
+        """Check DHCP lease status.
+
+        """
+        rc = DHCP_CHECK_NONE
+
+        now = time.monotonic()
+
+        elapsed = now = self._last_check_lease_ms
+
+        # if more than one second passed, reduce the counters
+        if elapsed >= 1000:
+            # set new timestamps
+            self._last_check_lease_ms = now - (elapsed % 1000)
+            elapsed = elapsed / 1000
+
+            # decrease counters by elapsed seconds
+            if self._renew_in_sec < elapsed * 2:
+                self._renew_in_sec = 0
+            else:
+                self._renew_in_sec -= elapsed
+
+            if self._rebind_in_sec < elapsed * 2:
+                self._rebind_in_sec = 0
+            else:
+                self._rebind_in_sec -= elapsed
+
+        # We have a lease and need to renew it
+        if self._renew_in_sec == 0 and self._dhcp_state == STATE_DHCP_LEASED:
+            _dhcp_state = STATE_DHCP_REREQUEST
+            rc = 1 + self.request_dhcp_lease()
+        # Lease should be binded
+        if self._rebind_in_sec == 0 and self._dhcp_state == STATE_DHCP_LEASED or self._dhcp_state == STATE_DHCP_START:
+            # restart the state machine completely
+            self._dhcp_state = STATE_DHCP_START
+            self._reset_dhcp_lease()
+            rc = 3 + self.request_dhcp_lease()
+
 
     def request_dhcp_lease(self):
         """Request to renew or acquire a DHCP lease.
