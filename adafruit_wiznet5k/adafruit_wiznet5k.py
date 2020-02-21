@@ -150,7 +150,7 @@ class WIZNET:
     SNMR_PPPOE  = const(0x05)
 
     def __init__(self, spi_bus, cs, reset=None, 
-                 dhcp=True, mac=DEFAULT_MAC, debug=True):
+                 dhcp=False, mac=DEFAULT_MAC, debug=True):
         self._debug = debug
         self._device = spidev.SPIDevice(spi_bus, cs,
                                         baudrate=8000000,
@@ -162,13 +162,12 @@ class WIZNET:
         assert self._w5100_init() == 1, "Unsuccessfully initialized Wiznet module."
         # Set MAC address
         self.mac_address = mac
-        self._sock = 0
         self._src_port = 0
         # Set DHCP
         if dhcp:
-            self.dhcp()
+            self.set_dhcp()
 
-    def dhcp(self,):
+    def set_dhcp(self):
         if self._debug:
             print("* Initializing DHCP")
         self._src_port = 68
@@ -189,12 +188,12 @@ class WIZNET:
                 _gw_addr = (_dhcp_client.gateway_ip[0], _dhcp_client.gateway_ip[1],
                             _dhcp_client.gateway_ip[2], _dhcp_client.gateway_ip[3])
                 print("Gateway Address: ", _gw_addr)
-                print(_dhcp_client.dns_server_ip)
                 _dns_addr = (_dhcp_client.dns_server_ip[0], _dhcp_client.dns_server_ip[1],
                             _dhcp_client.dns_server_ip[2], _dhcp_client.dns_server_ip[3])
                 print("DNS Server IP: ", _dns_addr)
-                # TODO: these need to be converted to "nice" IPs
-                self.ifconfig((_ip, _subnet_mask, _gw_addr, _dns_addr))
+                self.ifconfig = ((_ip, _subnet_mask, _gw_addr, _dns_addr))
+        # Reset SRC_Port
+        self._src_port = 0
         return False
 
     @property
@@ -256,15 +255,15 @@ class WIZNET:
             return 0
 
     @property
-    def remote_ip(self):
+    def remote_ip(self, socket_num):
         """Returns the IP address of the host who sent the current incoming packet.
 
         """
         remote_ip = bytearray(4)
-        if self._sock >= self.max_sockets:
+        if socket_num >= self.max_sockets:
             return remote_ip
         for octet in range(0, 4):
-             remote_ip[octet] = self._read_socket(self._sock, REG_SNDIPR+octet)[0]
+             remote_ip[octet] = self._read_socket(socket_num, REG_SNDIPR+octet)[0]
         return self.pretty_ip(remote_ip)
 
     @property
@@ -314,7 +313,6 @@ class WIZNET:
             self.write(REG_GAR+octet, 0x04, gateway_address[octet])
         # set dns
         self._dns = dns_server
-        self.dhcp = False
 
     def _w5100_init(self):
         """Initializes and detects a wiznet5k module.
@@ -470,7 +468,6 @@ class WIZNET:
                 UDP_SOCK['bytes_remaining'] = tmp_buf[6]
                 UDP_SOCK['bytes_remaining'] = (UDP_SOCK['bytes_remaining'] << 8) + tmp_buf[7]
                 ret = UDP_SOCK['bytes_remaining']
-                print(UDP_SOCK)
                 return ret
         return 0
 
@@ -498,7 +495,7 @@ class WIZNET:
             print("*** Connecting: Socket# {}, conn_mode: {}".format(socket_num,conn_mode))
         # Convert hostname to a 4-byte IP address
         if isinstance(dest, str):
-            dest = self.get_host_by_name(hostname)
+            raise NotImplementedError("DNS not implemented - please provide an IP address as a tuple.")
 
         # initialize a socket and set the mode
         res = self.socket_open(socket_num, dest, port, conn_mode = conn_mode)
@@ -507,8 +504,8 @@ class WIZNET:
 
         if conn_mode == SNMR_TCP:
             # TCP client - connect socket
-            self._write_sncr(self._sock, CMD_SOCK_CONNECT)
-            self._read_sncr(self._sock)
+            self._write_sncr(socket_num, CMD_SOCK_CONNECT)
+            self._read_sncr(socket_num)
             # wait for tcp connection establishment
             while self.socket_status(socket_num)[0] != SNSR_SOCK_ESTABLISHED:
                 if self.socket_status(socket_num)[0] == SNSR_SOCK_CLOSED:
@@ -518,26 +515,27 @@ class WIZNET:
             UDP_SOCK['bytes_remaining'] = 0
         return 1
 
-    def get_socket(self):
-        """Request, allocates and returns a socket from the W5k
+    def get_socket(self, sockets):
+        """Requests, allocates and returns a socket from the W5k
         chip. Returned socket number may not exceed max_sockets. 
+        :parm int socket_num: Desired socket number
         """
         if self._debug:
             print("*** Get socket")
+
         sock = 0
-        for _sock in range(0, self.max_sockets):
+        for _sock in range(len(sockets), self.max_sockets):
             status = self.socket_status(_sock)
             if status[0] == SNSR_SOCK_CLOSED or status[0] == SNSR_SOCK_FIN_WAIT or status[0] == SNSR_SOCK_CLOSE_WAIT:
                 sock = _sock
                 break
 
-        if sock == self.max_sockets:
-            return 0
-
         if (self._src_port == 0):
             self._src_port = 1024
+        self._src_port+=1
+
         if self._debug:
-            print("Allocated socket #%d" % sock)
+            print("Allocated socket #{}:{}".format(sock, self._src_port))
         return sock
 
     def socket_open(self, socket_num, dest, port, conn_mode=SNMR_TCP):
@@ -546,7 +544,7 @@ class WIZNET:
         """
         assert self.link_status, "Ethernet cable disconnected!"
         if self._debug:
-            print("*** Open socket")
+            print("*** Opening socket %d"%socket_num)
         if self._read_snsr(socket_num)[0] == SNSR_SOCK_CLOSED:
             print("w5k socket begin, protocol={}, port={}".format(conn_mode, port))
             time.sleep(0.00025)

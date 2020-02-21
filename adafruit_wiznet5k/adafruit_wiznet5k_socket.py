@@ -48,12 +48,16 @@ def htonl(x):
 def htons(x):
     return ( (((x)<<8)&0xFF00) | (((x)>>8)&0xFF) )
 
+def ntohl(x):
+    return htons(x)
 
 SOCK_STREAM     = const(0x21) # TCP
 SOCK_DGRAM      = const(0x02) # UDP
 AF_INET         = const(3)
 NO_SOCKET_AVAIL = const(255)
 MAX_PACKET = const(4000)
+
+sockets = []
 
 class socket:
     """A simplified implementation of the Python 'socket' class
@@ -66,7 +70,10 @@ class socket:
             raise RuntimeError("Only AF_INET family supported by W5K modules.")
         self._sock_type = type
         self._buffer = b''
-        self._socknum = socknum if socknum else _the_interface.get_socket()
+
+        self._socknum = socknum if socknum else _the_interface.get_socket(sockets)
+        sockets.append(self._socknum)
+
         self.settimeout(timeout)
 
     @property
@@ -76,6 +83,7 @@ class socket:
         """
         return self._socknum
 
+    @property
     def connected(self):
         """Returns whether or not we are connected to the socket.
         """
@@ -83,17 +91,18 @@ class socket:
             return 0
         else:
             status = _the_interface.socket_status(self._socknum)
-            result = status not in (adafruit_wiznet5k.SNSR_SOCK_CLOSED,
+            print(status)
+            result = status in (adafruit_wiznet5k.SNSR_SOCK_CLOSED,
                                     adafruit_wiznet5k.SNSR_SOCK_LISTEN,
                                     adafruit_wiznet5k.SNSR_SOCK_CLOSE_WAIT,
                                     adafruit_wiznet5k.SNSR_SOCK_FIN_WAIT)
-            if not result:
+            if result:
                 self.close()
+                return result
             return result
 
     def gethostbyname(self, address):
-        # TODO: Implement later!
-        pass
+        raise NotImplementedError("Not implemented in this version of Wiznet5k.")
 
     def connect(self, address):
         """Connect to a remote socket at address. (The format of address depends on the address family — see above.)
@@ -197,6 +206,7 @@ class socket:
 
         """
         _the_interface.socket_close(self._socknum)
+        sockets.remove(self._socknum)
 
     def avail_udp(self):
         return _the_interface._udp_remaining()
