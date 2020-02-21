@@ -242,20 +242,11 @@ class DHCP:
             if bytes(xid) < self._initial_xid:
                 return 0, 0
 
-        secs = _buff[8]
-        flags = _buff[9]
-
-        # Client IP Address (CIADDR)
-        ciaddr = _buff[10:14]
-
         # Your IP Address (YIADDR)
         self.local_ip = _buff[16:20]
 
-        # Server IP Address (SIADDR)
-        siaddr = _buff[20:24]
-
         # Gateway IP Address (GIADDR)
-        self.gateway_ip = _buff[25:29]
+        self.gateway_ip = _buff[20:24]
 
         # NOTE: Next 192 octets are 0's for BOOTP legacy
 
@@ -267,12 +258,14 @@ class DHCP:
         lease_time = int.from_bytes(_buff[251:255], 'l')
         # T1 value
         self._t1 = int.from_bytes(_buff[257:261], 'l')
+        # print("T1: ", self._t1)
         # T2 value
         self._t2 = int.from_bytes(_buff[263:267], 'l')
+        # print("T2: ", self._t2)
         # Subnet Mask
-        self.subnet_mask = _buff[269:273]
-
-        self.dns_server_ip = _buff[280:284]
+        self.subnet_mask = _buff[257:261]
+        # DNS Server
+        self.dns_server_ip = _buff[273:277]
 
         return msg_type, xid
 
