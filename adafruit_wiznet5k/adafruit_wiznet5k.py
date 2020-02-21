@@ -473,11 +473,6 @@ class WIZNET:
         """
         return self._read_snsr(socket_num)
 
-    def get_host_by_name(self, hostname):
-        """Convert a hostname to a packed 4-byte IP address. Returns
-        a 4 bytearray"""
-        pass
-
     def socket_connect(self, socket_num, dest, port, conn_mode=SNMR_TCP):
         """Open and verify we've connected a socket to a dest IP address
         or hostname. By default, we use 'conn_mode'= SNMR_TCP but we
@@ -489,7 +484,7 @@ class WIZNET:
 
         # initialize a socket and set the mode
         res = self.socket_open(socket_num, dest, port, conn_mode=conn_mode)
-        if res == 1: # socket unsuccessfully opened
+        if res == 1:
             raise RuntimeError('Failed to initalize a connection with the socket.')
 
         if conn_mode == SNMR_TCP:
@@ -697,7 +692,7 @@ class WIZNET:
         self._read_sncr(socket_num)
 
         # check data was  transferred correctly
-        while(self._read_snir(socket_num)[0] & SNIR_SEND_OK) != SNIR_SEND_OK:
+        while(self._read_socket(socket_num, REG_SNIR)[0] & SNIR_SEND_OK) != SNIR_SEND_OK:
             if self.socket_status(socket_num) == SNSR_SOCK_CLOSED:
                 self.socket_close(socket_num)
                 return 0
@@ -782,11 +777,7 @@ class WIZNET:
         """
         return self._read_socket(sock, REG_SNSR)
 
-    def _read_snmr(self, sock, protocol):
-        """Read Socket n Mode Register
 
-        """
-        return self._read_socket(sock, protocol)
 
     def _write_snmr(self, sock, protocol):
         """Write to Socket n Mode Register.
@@ -813,12 +804,6 @@ class WIZNET:
 
     def _read_snmr(self, sock):
         return self._read_socket(sock, REG_SNMR)
-
-    def _read_snir(self, sock):
-        return self._read_socket(sock, REG_SNIR)
-
-    def _read_sndipr(self, sock):
-        return self._read_socket(sock, REG_SNDIPR)
 
     def _write_socket(self, sock, address, data, length=None):
         """Write to a W5k socket register.
