@@ -27,36 +27,30 @@
 
 Pure-Python interface for WIZNET 5k ethernet modules.
 
-
-* Author(s): Brent Rubell
+* Author(s): Bjoern Hartmann, Paul Stoffregen, Brent Rubell
 
 Implementation Notes
 --------------------
-
-**Hardware:**
-
 
 **Software and Dependencies:**
 
 * Adafruit CircuitPython firmware for the supported boards:
   https://github.com/adafruit/circuitpython/releases
 
-
-# * Adafruit's Bus Device library: https://github.com/adafruit/Adafruit_CircuitPython_BusDevice
+* Adafruit's Bus Device library: https://github.com/adafruit/Adafruit_CircuitPython_BusDevice
 """
 
-# imports
 import time
 import adafruit_bus_device.spi_device as spidev
 from micropython import const
-from digitalio import DigitalInOut
-from collections import namedtuple
 
 import adafruit_wiznet5k.adafruit_wiznet5k_dhcp as dhcp
 
 
 __version__ = "0.0.0-auto.0"
 __repo__ = "https://github.com/adafruit/Adafruit_CircuitPython_Wiznet5k.git"
+
+# pylint: disable=bad-whitespace
 
 # Wiznet5k Registers
 REG_MR             = const(0x0000) # Mode
@@ -118,14 +112,17 @@ SNIR_CON     = const(0x01)
 CH_SIZE     = const(0x100)
 SOCK_SIZE   = const(0x800) # MAX W5k socket size
 # Register commands
-MR_RST = const(0x80) # Mode Register RST
+MR_RST      = const(0x80) # Mode Register RST
+
+# pylint: enable=bad-whitespace
 
 # Default hardware MAC address
-DEFAULT_MAC = [0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED]
+DEFAULT_MAC = (0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED)
+
 # Maximum number of sockets to support, differs between chip versions.
 W5200_W5500_MAX_SOCK_NUM = const(0x08)
 
-# UDP
+# UDP Socket Struct.
 UDP_SOCK = {'bytes_remaining': 0,
             'remote_ip': 0,
             'remote_port': 0}
@@ -134,13 +131,14 @@ class WIZNET:
     """Interface for WIZNET5k module.
     :param ~busio.SPI spi_bus: The SPI bus the Wiznet module is connected to.
     :param ~digitalio.DigitalInOut cs: Chip select pin.
-    :param ~digitalio.DigitalInOut rst: Optional reset pin. 
+    :param ~digitalio.DigitalInOut rst: Optional reset pin.
     :param bool dhcp: Whether to start DHCP automatically or not.
     :param str mac: The Wiznet's MAC Address.
     :param bool debug: Enable debugging output.
 
     """
 
+    # pylint: disable=bad-whitespace
     # Socket registers
     SNMR_CLOSE  = const(0x00)
     SNMR_TCP    = const(0x21)
@@ -148,26 +146,41 @@ class WIZNET:
     SNMR_IPRAW  = const(0x03)
     SNMR_MACRAW = const(0x04)
     SNMR_PPPOE  = const(0x05)
+    # pylint: enable=bad-whitespace
 
-    def __init__(self, spi_bus, cs, reset=None, 
-                 dhcp=False, mac=DEFAULT_MAC, debug=True):
+    # pylint: disable=too-many-arguments
+    def __init__(self, spi_bus, cs, reset=None,
+                 is_dhcp=False, mac=DEFAULT_MAC, debug=True):
         self._debug = debug
+        self._chip_type = None
         self._device = spidev.SPIDevice(spi_bus, cs,
                                         baudrate=8000000,
                                         polarity=0, phase=0)
-        self._chip_type = None
         # init c.s.
         self._cs = cs
-        # initialize the module
-        assert self._w5100_init() == 1, "Unsuccessfully initialized Wiznet module."
+
+        # reset wiznet module prior to initialization
+        if reset:
+            reset.value = True
+            time.sleep(0.1)
+            reset.value = False
+            time.sleep(0.1)
+
+        # attempt to initialize the module
+        assert self._w5100_init() == 1, "Failed to initialize WIZnet module."
         # Set MAC address
         self.mac_address = mac
         self._src_port = 0
         # Set DHCP
-        if dhcp:
+        if is_dhcp:
             self.set_dhcp()
 
     def set_dhcp(self):
+        """Initializes the DHCP client and attempts to retrieve
+        and set network configuration from the DHCP server.
+        Returns True if DHCP configured, False otherwise.
+
+        """
         if self._debug:
             print("* Initializing DHCP")
         self._src_port = 68
@@ -177,63 +190,59 @@ class WIZNET:
         ret = _dhcp_client.request_dhcp_lease()
         if ret == 1:
             if self._debug:
-                print("* Found DHCP server, setting configuration...")
-                # (ip_address, subnet_mask, gateway_address, dns_server)
-                _ip = (_dhcp_client.local_ip[0], _dhcp_client.local_ip[1],
-                       _dhcp_client.local_ip[2], _dhcp_client.local_ip[3])
-                print("IP: ", _ip)
-                _subnet_mask = (_dhcp_client.subnet_mask[0], _dhcp_client.subnet_mask[1],
-                                _dhcp_client.subnet_mask[2], _dhcp_client.subnet_mask[3])
-                print("Subnet Mask: ", _subnet_mask)
-                _gw_addr = (_dhcp_client.gateway_ip[0], _dhcp_client.gateway_ip[1],
-                            _dhcp_client.gateway_ip[2], _dhcp_client.gateway_ip[3])
-                print("Gateway Address: ", _gw_addr)
-                _dns_addr = (_dhcp_client.dns_server_ip[0], _dhcp_client.dns_server_ip[1],
+                print("* Found DHCP server - setting configuration...")
+            _ip = (_dhcp_client.local_ip[0], _dhcp_client.local_ip[1],
+                    _dhcp_client.local_ip[2], _dhcp_client.local_ip[3])
+
+            _subnet_mask = (_dhcp_client.subnet_mask[0], _dhcp_client.subnet_mask[1],
+                            _dhcp_client.subnet_mask[2], _dhcp_client.subnet_mask[3])
+
+            _gw_addr = (_dhcp_client.gateway_ip[0], _dhcp_client.gateway_ip[1],
+                        _dhcp_client.gateway_ip[2], _dhcp_client.gateway_ip[3])
+
+            _dns_addr = (_dhcp_client.dns_server_ip[0], _dhcp_client.dns_server_ip[1],
                             _dhcp_client.dns_server_ip[2], _dhcp_client.dns_server_ip[3])
-                print("DNS Server IP: ", _dns_addr)
-                self.ifconfig = ((_ip, _subnet_mask, _gw_addr, _dns_addr))
+            self.ifconfig = ((_ip, _subnet_mask, _gw_addr, _dns_addr))
+            return 0
         # Reset SRC_Port
         self._src_port = 0
-        return False
+        return 1
 
     @property
     def max_sockets(self):
-        """Returns max number of sockets supported by chip.
-
-        """
+        """Returns max number of sockets supported by chip."""
         if self._chip_type == "w5500":
             return W5200_W5500_MAX_SOCK_NUM
-        else:
-            return -1
+        return -1
 
     @property
     def chip(self):
-        """Returns the chip type.
-
-        """
-        if self._debug:
-            print("Chip version")
+        """Returns the chip type."""
         return self._chip_type
 
     @property
     def ip_address(self):
-        """Returns the hardware's IP address.
-
-        """
+        """Returns the configured IP address."""
         return self.read(REG_SIPR, 0x00, 4)
 
     @ip_address.setter
     def ip_address(self, ip_address):
-        """Returns the hardware's IP address.
+        """Configures the hardware with an IP address.
         :param tuple ip_address: Desired IP address.
+
         """
         self._write_n(REG_SIPR, 0x04, ip_address)
 
-    @property
-    def mac_address(self):
-        """Returns the hardware's MAC address.
+    def pretty_ip(self, ip): # pylint: disable=no-self-use, invalid-name
+        """Converts a bytearray IP address to a
+        dotted-quad string for printing
 
         """
+        return "%d.%d.%d.%d" % (ip[0], ip[1], ip[2], ip[3])
+
+    @property
+    def mac_address(self):
+        """Returns the hardware's MAC address."""
         return self.read(REG_SHAR, 0x00, 6)
 
     @mac_address.setter
@@ -244,42 +253,6 @@ class WIZNET:
         """
         self._write_n(REG_SHAR, 0x04, address)
 
-    @property
-    def link_status(self):
-        """"Returns if the PHY is connected.
-        """
-        if self._chip_type == "w5500":
-            data =  self.read(REG_PHYCFGR, 0x00)
-            return data[0] & 0x01
-        else:
-            return 0
-
-    @property
-    def remote_ip(self, socket_num):
-        """Returns the IP address of the host who sent the current incoming packet.
-
-        """
-        remote_ip = bytearray(4)
-        if socket_num >= self.max_sockets:
-            return remote_ip
-        for octet in range(0, 4):
-             remote_ip[octet] = self._read_socket(socket_num, REG_SNDIPR+octet)[0]
-        return self.pretty_ip(remote_ip)
-
-    @property
-    def remote_port(self):
-        """Returns the port of the host who sent the current incoming packet.
-
-        """
-        return self._remote_port
-
-    def pretty_ip(self, ip): # pylint: disable=no-self-use, invalid-name
-        """Converts a bytearray IP address to a
-        dotted-quad string for printing
-
-        """
-        return "%d.%d.%d.%d" % (ip[0], ip[1], ip[2], ip[3])
-
     def pretty_mac(self, mac): # pylint: disable=no-self-use, invalid-name
         """Converts a bytearray MAC address to a
         dotted-quad string for printing
@@ -289,29 +262,54 @@ class WIZNET:
                                       hex(mac[3]), hex(mac[4]), hex(mac[5]))
 
     @property
-    def ifconfig(self):
-        """Returns a tuple of (ip_address, subnet_mask, gateway_address, dns_server).
+    def link_status(self):
+        """"Returns if the PHY is connected."""
+        if self._chip_type == "w5500":
+            data = self.read(REG_PHYCFGR, 0x00)
+            return data[0] & 0x01
+        return 0
+
+    @property
+    def remote_ip(self, socket_num):
+        """Returns the IP address of the host who sent the current incoming packet.
+        :param int socket num: Desired socket.
+
         """
+        remote_ip = bytearray(4)
+        if socket_num >= self.max_sockets:
+            return remote_ip
+        for octet in range(0, 4):
+            remote_ip[octet] = self._read_socket(socket_num, REG_SNDIPR+octet)[0]
+        return self.pretty_ip(remote_ip)
+
+    @property
+    def remote_port(self):
+        """Returns the port of the host who sent the current incoming packet.
+
+        """
+        return self._remote_port
+
+    @property
+    def ifconfig(self):
+        """Returns the network configuration as a tuple."""
         for octet in range(0, 4):
             subnet_mask = self.read(REG_SUBR+octet, 0x00)
         params = (self.ip_address, subnet_mask, 0, self._dns)
 
     @ip_address.setter
     def ifconfig(self, params):
-        """Sets ifconfig parameters provided tuple of
+        """Sets network configuration to provided tuple in format:
         (ip_address, subnet_mask, gateway_address, dns_server).
-        Setting if_config turns DHCP off, if on.
+
         """
         ip_address, subnet_mask, gateway_address, dns_server = params
         # set ip_address
         self.ip_address = ip_address
-        # set subnet_address
+        # set subnet and gateway addresses
         for octet in range(0, 4):
             self.write(REG_SUBR+octet, 0x04, subnet_mask[octet])
-        # set gateway_address
-        for octet in range(0, 4):
             self.write(REG_GAR+octet, 0x04, gateway_address[octet])
-        # set dns
+        # set dns server address
         self._dns = dns_server
 
     def _w5100_init(self):
@@ -395,7 +393,7 @@ class WIZNET:
                 return result
             bus_device.readinto(buffer, end=length)
 
-    def write(self, addr, cb, data):
+    def write(self, addr, callback, data):
         """Writes data to a register address.
         :param int addr: Register address.
         :param int cb: Common register block (?)
@@ -405,10 +403,10 @@ class WIZNET:
         with self._device as bus_device:
             bus_device.write(bytes([addr >> 8]))
             bus_device.write(bytes([addr & 0xFF]))
-            bus_device.write(bytes([cb]))
+            bus_device.write(bytes([callback]))
             bus_device.write(bytes([data]))
 
-    def _write_n(self, addr, cb, data):
+    def _write_n(self, addr, callback, data):
         """Writes data to a register address.
         :param int addr: Register address.
         :param int data: Data to write to the register.
@@ -418,7 +416,7 @@ class WIZNET:
         with self._device as bus_device:
             bus_device.write(bytes([addr >> 8]))
             bus_device.write(bytes([addr & 0xFF]))
-            bus_device.write(bytes([cb]))
+            bus_device.write(bytes([callback]))
             for i in range(0, len(data)):
                 bus_device.write(bytes([data[i]]))
         return len
@@ -445,7 +443,7 @@ class WIZNET:
             while UDP_SOCK['bytes_remaining'] > 0 and self.socket_read(socket_num, 1):
                 if self._debug:
                     print("Flushing {} bytes".format(UDP_SOCK['bytes_remaining']))
-                if (UDP_SOCK['bytes_remaining'] > 0):
+                if UDP_SOCK['bytes_remaining'] > 0:
                     UDP_SOCK['bytes_remaining'] = UDP_SOCK['bytes_remaining'] - 1
             print("Bytes remaining: ", UDP_SOCK['bytes_remaining'])
 
@@ -493,13 +491,10 @@ class WIZNET:
         """
         assert self.link_status, "Ethernet cable disconnected!"
         if self._debug:
-            print("*** Connecting: Socket# {}, conn_mode: {}".format(socket_num,conn_mode))
-        # Convert hostname to a 4-byte IP address
-        if isinstance(dest, str):
-            raise NotImplementedError("DNS not implemented - please provide an IP address as a tuple.")
+            print("*** Connecting: Socket# {}, conn_mode: {}".format(socket_num, conn_mode))
 
         # initialize a socket and set the mode
-        res = self.socket_open(socket_num, dest, port, conn_mode = conn_mode)
+        res = self.socket_open(socket_num, dest, port, conn_mode=conn_mode)
         if res == 1: # socket unsuccessfully opened
             raise RuntimeError('Failed to initalize a connection with the socket.')
 
@@ -518,7 +513,7 @@ class WIZNET:
 
     def get_socket(self, sockets):
         """Requests, allocates and returns a socket from the W5k
-        chip. Returned socket number may not exceed max_sockets. 
+        chip. Returned socket number may not exceed max_sockets.
         :parm int socket_num: Desired socket number
         """
         if self._debug:
@@ -527,13 +522,13 @@ class WIZNET:
         sock = 0
         for _sock in range(len(sockets), self.max_sockets):
             status = self.socket_status(_sock)
-            if status[0] == SNSR_SOCK_CLOSED or status[0] == SNSR_SOCK_FIN_WAIT or status[0] == SNSR_SOCK_CLOSE_WAIT:
+            if status[0] == SNSR_SOCK_CLOSED or status[0] == SNSR_SOCK_FIN_WAIT \
+               or status[0] == SNSR_SOCK_CLOSE_WAIT:
                 sock = _sock
                 break
 
-        if (self._src_port == 0):
+        if self._src_port == 0:
             self._src_port = 1024
-        #self._src_port+=1
 
         if self._debug:
             print("Allocated socket #{}:{}".format(sock, self._src_port))
@@ -567,7 +562,8 @@ class WIZNET:
             # open socket
             self._write_sncr(socket_num, CMD_SOCK_OPEN)
             self._read_sncr(socket_num)
-            assert self._read_snsr((socket_num))[0] == 0x13 or self._read_snsr((socket_num))[0] == 0x22, \
+            assert self._read_snsr((socket_num))[0] == 0x13 or \
+                 self._read_snsr((socket_num))[0] == 0x22, \
                 "Could not open socket in TCP or UDP mode."
             return 0
         return 1
@@ -584,7 +580,7 @@ class WIZNET:
         self._write_snir(socket_num, 0xFF)
 
     def socket_read_udp(self, socket_num, length):
-        """Performs a UDP read 
+        """Performs a UDP read
         """
         if UDP_SOCK['bytes_remaining'] > 0:
             if UDP_SOCK['bytes_remaining'] <= length:
@@ -619,7 +615,8 @@ class WIZNET:
         if ret == 0:
             # no data on socket?
             status = self._read_snmr(socket_num)
-            if(status == SNSR_SOCK_LISTEN or status == SNSR_SOCK_CLOSED or status == SNSR_SOCK_CLOSE_WAIT):
+            if(status == SNSR_SOCK_LISTEN or status == SNSR_SOCK_CLOSED \
+               or status == SNSR_SOCK_CLOSE_WAIT):
                 # remote end closed its side of the connection, EOF state
                 ret = 0
                 resp = 0
@@ -654,8 +651,8 @@ class WIZNET:
         return ret, resp
 
     def read_udp(self, socket_num, length):
-        print("UDP_SOCK['bytes_remaining']: ", UDP_SOCK['bytes_remaining'])
-        print("Length: ", length)
+        """Read UDP socket's remaining bytes.
+        """
         if UDP_SOCK['bytes_remaining'] > 0:
             if UDP_SOCK['bytes_remaining'] <= length:
                 ret, resp = self.socket_read(socket_num, UDP_SOCK['bytes_remaining'])
@@ -683,7 +680,7 @@ class WIZNET:
 
         # if buffer is available, start the transfer
         free_size = self._get_tx_free_size(socket_num)
-        while (free_size < ret):
+        while free_size < ret:
             free_size = self._get_tx_free_size(socket_num)
             status = self.socket_status(socket_num)
             if (status != SNSR_SOCK_ESTABLISHED) and (status != SNSR_SOCK_CLOSE_WAIT):
@@ -723,7 +720,7 @@ class WIZNET:
         """
         val = 0
         val_1 = self._read_snrx_rsr(sock)
-        while (val != val_1):
+        while val != val_1:
             val = self._read_snrx_rsr(sock)
         return val
 
@@ -733,7 +730,7 @@ class WIZNET:
         """
         val = 0
         val_1 = 0
-        while (val != val_1):
+        while val != val_1:
             val_1 = self._read_sntx_fsr(sock)
             if val_1 != 0:
                 val = self._read_sntx_fsr(sock)
@@ -743,7 +740,7 @@ class WIZNET:
         buf = bytearray(2)
         buf[0] = self._read_socket(sock, REG_SNRX_RD)[0]
         buf[1] = self._read_socket(sock, REG_SNRX_RD+1)[0]
-        return (buf[0] << 8 | buf[1])
+        return buf[0] << 8 | buf[1]
 
 
     def _write_snrx_rd(self, sock, data):
@@ -758,7 +755,7 @@ class WIZNET:
         buf = bytearray(2)
         buf[0] = self._read_socket(sock, 0x0024)[0]
         buf[1] = self._read_socket(sock, 0x0024+1)[0]
-        return (buf[0] << 8 | buf[1])
+        return buf[0] << 8 | buf[1]
 
 
     def _read_sntx_fsr(self, sock):
@@ -825,7 +822,7 @@ class WIZNET:
 
     def _read_snir(self, sock):
         return self._read_socket(sock, REG_SNIR)
-    
+
     def _read_sndipr(self, sock):
         return self._read_socket(sock, REG_SNDIPR)
 
@@ -833,7 +830,7 @@ class WIZNET:
         """Write to a W5k socket register.
         """
         base = self._ch_base_msb << 8
-        cntl_byte = (sock<<5)+0x0C;
+        cntl_byte = (sock<<5)+0x0C
         if length is None:
             return self.write(base + sock * CH_SIZE + address, cntl_byte, data)
         return self._write_n(base + sock * CH_SIZE + address, cntl_byte, data)
@@ -841,5 +838,5 @@ class WIZNET:
     def _read_socket(self, sock, address):
         """Read a W5k socket register.
         """
-        cntl_byte = (sock<<5)+0x08;
+        cntl_byte = (sock<<5)+0x08
         return self.read(address, cntl_byte)
