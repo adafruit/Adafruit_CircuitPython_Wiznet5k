@@ -175,18 +175,18 @@ class WIZNET:
         if is_dhcp:
             self.set_dhcp()
 
-    def set_dhcp(self):
+    def set_dhcp(self, response_timeout=1):
         """Initializes the DHCP client and attempts to retrieve
         and set network configuration from the DHCP server.
         Returns True if DHCP configured, False otherwise.
+        :param int response_timeout: Time to wait for server to return packet, in seconds.
 
         """
         if self._debug:
             print("* Initializing DHCP")
         self._src_port = 68
         # Return IP assigned by DHCP
-        # TODO, provide this with timeout and response timeout
-        _dhcp_client = dhcp.DHCP(self, self.mac_address)
+        _dhcp_client = dhcp.DHCP(self, self.mac_address, response_timeout)
         ret = _dhcp_client.request_dhcp_lease()
         if ret == 1:
             if self._debug:
