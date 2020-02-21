@@ -436,6 +436,7 @@ class WIZNET:
         """
         if self._debug:
             print("* socket_available called with protocol", sock_type)
+            print("* #", socket_num)
         assert socket_num <= self.max_sockets, "Provided socket exceeds max_sockets."
 
         if sock_type == 0x02:
@@ -532,7 +533,7 @@ class WIZNET:
 
         if (self._src_port == 0):
             self._src_port = 1024
-        self._src_port+=1
+        #self._src_port+=1
 
         if self._debug:
             print("Allocated socket #{}:{}".format(sock, self._src_port))

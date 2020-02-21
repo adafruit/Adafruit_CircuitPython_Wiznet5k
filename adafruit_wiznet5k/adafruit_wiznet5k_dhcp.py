@@ -263,9 +263,9 @@ class DHCP:
         self._t2 = int.from_bytes(_buff[263:267], 'l')
         # print("T2: ", self._t2)
         # Subnet Mask
-        self.subnet_mask = _buff[257:261]
+        self.subnet_mask = _buff[269:273]
         # DNS Server
-        self.dns_server_ip = _buff[273:277]
+        self.dns_server_ip = _buff[285:289]
 
         return msg_type, xid
 
