@@ -137,8 +137,8 @@ UDP_SOCK = {'bytes_remaining': 0,
             'remote_ip': 0,
             'remote_port': 0}
 
-class WIZNET:
-    """Interface for WIZNET5k module.
+class WIZNET5K:
+    """Interface for WIZNET5K module.
     :param ~busio.SPI spi_bus: The SPI bus the Wiznet module is connected to.
     :param ~digitalio.DigitalInOut cs: Chip select pin.
     :param ~digitalio.DigitalInOut rst: Optional reset pin.
