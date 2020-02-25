@@ -75,8 +75,7 @@ DEFAULT_LEASE_TIME = const(900)
 BROADCAST_SERVER_ADDR = 255, 255, 255, 255
 
 # pylint: enable=bad-whitespace
-
-_BUFF = bytearray(317)
+_buff = bytearray(317)
 
 class DHCP:
     """W5k DHCP Client implementation.
@@ -87,10 +86,9 @@ class DHCP:
     :param bool debug: Enable debugging output.
 
     """
-    
+
     # pylint: disable=too-many-arguments, too-many-instance-attributes
     def __init__(self, eth, mac_address, timeout=1, timeout_response=1):
-        
         self._timeout = timeout
         self._response_timeout = timeout_response
         self._mac_address = mac_address
@@ -126,93 +124,93 @@ class DHCP:
                                   attempted to acquire/renew a lease.
         """
         # OP
-        _BUFF[0] = DHCP_BOOT_REQUEST
+        _buff[0] = DHCP_BOOT_REQUEST
         # HTYPE
-        _BUFF[1] = DHCP_HTYPE10MB
+        _buff[1] = DHCP_HTYPE10MB
         # HLEN
-        _BUFF[2] = DHCP_HLENETHERNET
+        _buff[2] = DHCP_HLENETHERNET
         # HOPS
-        _BUFF[3] = DHCP_HOPS
+        _buff[3] = DHCP_HOPS
 
         # Transaction ID (xid)
         self._initial_xid = htonl(self._transaction_id)
         self._initial_xid = self._initial_xid.to_bytes(4, 'l')
-        _BUFF[4:7] = self._initial_xid
+        _buff[4:7] = self._initial_xid
 
         # seconds elapsed
-        _BUFF[8] = ((int(time_elapsed) & 0xff00) >> 8)
-        _BUFF[9] = (int(time_elapsed) & 0x00ff)
+        _buff[8] = ((int(time_elapsed) & 0xff00) >> 8)
+        _buff[9] = (int(time_elapsed) & 0x00ff)
 
         # flags
         flags = htons(0x8000)
         flags = flags.to_bytes(2, 'b')
-        _BUFF[10] = flags[1]
-        _BUFF[11] = flags[0]
+        _buff[10] = flags[1]
+        _buff[11] = flags[0]
 
         # NOTE: Skipping cidaddr/yiaddr/siaddr/giaddr
         # as they're already set to 0.0.0.0
 
         # chaddr
-        _BUFF[28:34] = self._mac_address
+        _buff[28:34] = self._mac_address
 
         # NOTE:  192 octets of 0's, BOOTP legacy
 
         # Magic Cookie
-        _BUFF[236] = ((MAGIC_COOKIE >> 24)& 0xFF)
-        _BUFF[237] = ((MAGIC_COOKIE >> 16)& 0xFF)
-        _BUFF[238] = ((MAGIC_COOKIE >> 8)& 0xFF)
-        _BUFF[239] = (MAGIC_COOKIE& 0xFF)
+        _buff[236] = ((MAGIC_COOKIE >> 24)& 0xFF)
+        _buff[237] = ((MAGIC_COOKIE >> 16)& 0xFF)
+        _buff[238] = ((MAGIC_COOKIE >> 8)& 0xFF)
+        _buff[239] = (MAGIC_COOKIE& 0xFF)
 
         # Option - DHCP Message Type
-        _BUFF[240] = 53
-        _BUFF[241] = 0x01
-        _BUFF[242] = state
+        _buff[240] = 53
+        _buff[241] = 0x01
+        _buff[242] = state
 
         # Option - Client Identifier
-        _BUFF[243] = 61
+        _buff[243] = 61
         # Length
-        _BUFF[244] = 0x07
+        _buff[244] = 0x07
         # HW Type - ETH
-        _BUFF[245] = 0x01
+        _buff[245] = 0x01
         # Client MAC Address
         for mac in range(0, len(self._mac_address)):
-            _BUFF[246+mac] = self._mac_address[mac]
+            _buff[246+mac] = self._mac_address[mac]
 
         # Option - Host Name
-        _BUFF[252] = 12
-        _BUFF[253] = len(b"Wiznet") + 6
+        _buff[252] = 12
+        _buff[253] = len(b"Wiznet") + 6
         # NOTE/TODO: This appends invalid ? chars. onto hostname instead of string
-        _BUFF[254:266] = b"Wizneteeeeee"
+        _buff[254:266] = b"Wizneteeeeee"
 
         if state == DHCP_REQUEST:
             # Set the parsed local IP addr
-            _BUFF[266] = 50
-            _BUFF[267] = 0x04
+            _buff[266] = 50
+            _buff[267] = 0x04
 
-            _BUFF[268:272] = self.local_ip
+            _buff[268:272] = self.local_ip
             # Set the parsed dhcp server ip addr
-            _BUFF[272] = 54
-            _BUFF[273] = 0x04
-            _BUFF[274:278] = self.dhcp_server_ip
+            _buff[272] = 54
+            _buff[273] = 0x04
+            _buff[274:278] = self.dhcp_server_ip
 
-        _BUFF[278] = 55
-        _BUFF[279] = 0x06
+        _buff[278] = 55
+        _buff[279] = 0x06
         # subnet mask
-        _BUFF[280] = 1
+        _buff[280] = 1
         # routers on subnet
-        _BUFF[281] = 3
+        _buff[281] = 3
         # DNS
-        _BUFF[282] = 6
+        _buff[282] = 6
         # domain name
-        _BUFF[283] = 15
+        _buff[283] = 15
         # renewal (T1) value
-        _BUFF[284] = 58
+        _buff[284] = 58
         # rebinding (T2) value
-        _BUFF[285] = 59
-        _BUFF[286] = 255
+        _buff[285] = 59
+        _buff[286] = 255
 
         # Send DHCP packet
-        self._sock.send(_BUFF)
+        self._sock.send(_buff)
 
     def parse_dhcp_response(self, response_timeout):
         """Parse DHCP response from DHCP server.
@@ -220,57 +218,55 @@ class DHCP:
 
         :param int response_timeout: Time to wait for server to return packet, in seconds.
         """
-        print("CHECKING PACKET SIZE..")
+        print("STATE: ", self._dhcp_state)
         start_time = time.monotonic()
-        packet_sz = 0
+        packet_sz = self._sock.available()
         while packet_sz <= 0:
             packet_sz = self._sock.available()
             if (time.monotonic() - start_time) > response_timeout:
                 return 255
             time.sleep(0.05)
-        # re-allocate and zero-out global packet buffer
-        _BUFF = bytearray(packet_sz)
-        _BUFF = self._sock.recv(packet_sz)[0]
+        # store packet in buffer
+        _buff = self._sock.recv(packet_sz)[0]
 
         # Check OP, if valid, let's parse the packet out!
-        assert _BUFF[0] == DHCP_BOOT_REPLY, "Malformed Packet - \
+        assert _buff[0] == DHCP_BOOT_REPLY, "Malformed Packet - \
             DHCP message OP is not expected BOOT Reply."
-
 
         # Client Hardware Address (CHADDR)
         chaddr = bytearray(6)
         for mac, _ in enumerate(chaddr):
-            chaddr[mac] = _BUFF[28+mac]
+            chaddr[mac] = _buff[28+mac]
 
         if chaddr != 0:
-            xid = _BUFF[4:8]
+            xid = _buff[4:8]
             if bytes(xid) < self._initial_xid:
                 return 0, 0
 
         # Your IP Address (YIADDR)
-        self.local_ip = _BUFF[16:20]
+        self.local_ip = _buff[16:20]
 
         # Gateway IP Address (GIADDR)
-        self.gateway_ip = _BUFF[20:24]
+        self.gateway_ip = _buff[20:24]
 
         # NOTE: Next 192 octets are 0's for BOOTP legacy
 
         # DHCP Message Type
-        msg_type = _BUFF[242]
+        msg_type = _buff[242]
         # DHCP Server ID
-        self.dhcp_server_ip = _BUFF[245:249]
+        self.dhcp_server_ip = _buff[245:249]
         # Lease Time, in seconds
-        self._lease_time = int.from_bytes(_BUFF[251:255], 'l')
+        self._lease_time = int.from_bytes(_buff[251:255], 'l')
         # T1 value
-        self._t1 = int.from_bytes(_BUFF[257:261], 'l')
+        self._t1 = int.from_bytes(_buff[257:261], 'l')
         # print("T1: ", self._t1)
         # T2 value
-        self._t2 = int.from_bytes(_BUFF[263:267], 'l')
+        self._t2 = int.from_bytes(_buff[263:267], 'l')
         # print("T2: ", self._t2)
         # Subnet Mask
-        self.subnet_mask = _BUFF[269:273]
+        self.subnet_mask = _buff[269:273]
         # DNS Server
-        self.dns_server_ip = _BUFF[285:289]
+        self.dns_server_ip = _buff[285:289]
 
         return msg_type, xid
 
@@ -287,21 +283,24 @@ class DHCP:
 
         while self._dhcp_state != STATE_DHCP_LEASED:
             if self._dhcp_state == STATE_DHCP_START:
+                print("START")
                 self._transaction_id += 1
                 self._sock.connect((BROADCAST_SERVER_ADDR, DHCP_SERVER_PORT))
                 self.send_dhcp_message(STATE_DHCP_DISCOVER,
                                        ((time.monotonic() - start_time) / 1000))
                 self._dhcp_state = STATE_DHCP_DISCOVER
             elif self._dhcp_state == STATE_DHCP_DISCOVER:
+                print("DISCOVER")
                 msg_type, xid = self.parse_dhcp_response(self._timeout)
-                print(msg_type)
                 if msg_type == DHCP_OFFER:
                     # use the _transaction_id the offer returned,
                     # rather than the current one
                     self._transaction_id = self._transaction_id.from_bytes(xid, 'l')
+                    print("REQUEST")
                     self.send_dhcp_message(DHCP_REQUEST, ((time.monotonic() - start_time) / 1000))
                     self._dhcp_state = STATE_DHCP_REQUEST
             elif STATE_DHCP_REQUEST:
+                print("LEASE")
                 msg_type, xid = self.parse_dhcp_response(self._timeout)
                 if msg_type == DHCP_ACK:
                     self._dhcp_state = STATE_DHCP_LEASED

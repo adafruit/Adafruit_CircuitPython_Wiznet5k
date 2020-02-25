@@ -54,7 +54,6 @@ SOCK_STREAM     = const(0x21) # TCP
 SOCK_DGRAM      = const(0x02) # UDP
 AF_INET         = const(3)
 NO_SOCKET_AVAIL = const(255)
-MAX_PACKET = const(4000)
 # pylint: enable=bad-whitespace
 
 
@@ -96,9 +95,9 @@ class socket:
         if status == adafruit_wiznet5k.SNSR_SOCK_CLOSE_WAIT and self.available()[0] == 0:
             result = False
         result = status not in (adafruit_wiznet5k.SNSR_SOCK_CLOSED,
-                            adafruit_wiznet5k.SNSR_SOCK_LISTEN,
-                            adafruit_wiznet5k.SNSR_SOCK_CLOSE_WAIT,
-                            adafruit_wiznet5k.SNSR_SOCK_FIN_WAIT)
+                                adafruit_wiznet5k.SNSR_SOCK_LISTEN,
+                                adafruit_wiznet5k.SNSR_SOCK_CLOSE_WAIT,
+                                adafruit_wiznet5k.SNSR_SOCK_FIN_WAIT)
         if not result:
             self.close()
             return result
@@ -121,7 +120,7 @@ class socket:
         host, port = address
 
         if hasattr(host, 'split'):
-            host = tuple(map(int, host.split('.'))) 
+            host = tuple(map(int, host.split('.')))
 
         if not _the_interface.socket_connect(self.socknum, host, port, conn_mode=self._sock_type):
             raise RuntimeError("Failed to connect to host", host)
@@ -148,10 +147,9 @@ class socket:
                 if self._sock_type == SOCK_STREAM:
                     avail = self.available()
                 elif self._sock_type == SOCK_DGRAM:
-                    avail = _the_interface._udp_remaining()
+                    avail = _the_interface.udp_remaining()
                 if avail:
                     if self._sock_type == SOCK_STREAM:
-                        buf = _the_interface.socket_read(self.socknum, avail)
                         self._buffer += _the_interface.socket_read(self.socknum, avail)
                     elif self._sock_type == SOCK_DGRAM:
                         self._buffer += _the_interface.read_udp(self.socknum, avail)
@@ -170,7 +168,7 @@ class socket:
             if self._sock_type == SOCK_STREAM:
                 avail = self.available()
             elif self._sock_type == SOCK_DGRAM:
-                avail = _the_interface._udp_remaining()
+                avail = _the_interface.udp_remaining()
             if avail:
                 stamp = time.monotonic()
                 if self._sock_type == SOCK_STREAM:
@@ -203,7 +201,7 @@ class socket:
                 avail = self.available()
                 self._buffer += _the_interface.read(self.socknum, avail)[1]
             elif self._sock_type == SOCK_DGRAM:
-                avail = _the_interface._udp_remaining()
+                avail = _the_interface.udp_remaining()
                 self._buffer += _the_interface.read_udp(self.socknum, avail)[1]
             elif self._timeout > 0 and time.monotonic() - stamp > self._timeout:
                 self.close()
