@@ -103,6 +103,10 @@ class socket:
             return result
         return result
 
+    def getpeername(self):
+        """Return the remote address to which the socket is connected."""
+        return _the_interface.remote_ip(self._socknum)
+
     def gethostbyname(self, address):
         """Translate a host name to IPv4 address format."""
         raise NotImplementedError("Not implemented in this version of Wiznet5k.")
