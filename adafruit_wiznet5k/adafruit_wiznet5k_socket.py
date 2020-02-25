@@ -193,7 +193,7 @@ class socket:
 
     def readline(self):
         """Attempt to return as many bytes as we can up to
-        but not including '\n'"""
+        but not including \n"""
         stamp = time.monotonic()
         while b'\n' not in self._buffer:
             if self._sock_type == SOCK_STREAM:
