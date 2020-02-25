@@ -412,7 +412,7 @@ class WIZNET:
                     bus_device.write(bytes([data[i]]))
 
     # Socket-Register API
-    def _udp_remaining(self):
+    def udp_remaining(self):
         if self._debug:
             print("* UDP Bytes Remaining: ", UDP_SOCK['bytes_remaining'])
         return UDP_SOCK['bytes_remaining']
@@ -559,24 +559,6 @@ class WIZNET:
         self._write_sncr(socket_num, CMD_SOCK_CLOSE)
         self._read_sncr(socket_num)
         self._write_snir(socket_num, 0xFF)
-
-    def socket_read_udp(self, socket_num, length):
-        """Performs a UDP read
-        """
-        if UDP_SOCK['bytes_remaining'] > 0:
-            if UDP_SOCK['bytes_remaining'] <= length:
-                # read remaining data directly into the buffer
-                ret, resp = self.socket_read(socket_num, UDP_SOCK['bytes_remaining'])
-            else:
-                # read provided length into buffer instead
-                ret, resp = self.socket_read(socket_num, length)
-            if ret > 0:
-                UDP_SOCK['bytes_remaining'] -= ret
-                if self._debug:
-                    print("UDP read {0} bytes: ".format(ret))
-                return ret, resp
-        # failed to read or no data
-        return -1
 
     def socket_read(self, socket_num, length):
         """Reads data from a socket into a buffer.
