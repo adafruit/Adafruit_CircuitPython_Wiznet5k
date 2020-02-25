@@ -56,7 +56,6 @@ AF_INET         = const(3)
 NO_SOCKET_AVAIL = const(255)
 # pylint: enable=bad-whitespace
 
-
 # keep track of sockets we allocate
 SOCKETS = []
 
@@ -135,7 +134,7 @@ class socket:
         _the_interface.socket_write(self.socknum, data)
         gc.collect()
 
-    def recv(self, bufsize=0):
+    def recv(self, bufsize=0): #pylint: disable=too-many-branches
         """Reads some bytes from the connected remote address.
         :param int bufsize: Maximum number of bytes to receive.
 
