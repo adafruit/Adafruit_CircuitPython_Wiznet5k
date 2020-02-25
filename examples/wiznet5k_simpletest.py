@@ -30,13 +30,22 @@ print("Connected to ", sock.getpeername())
 # Make a HTTP Request
 sock.send(b"GET /testwifi/index.html HTTP/1.1\n")
 sock.send(b"Host: 104.236.193.178")
-sock.send(b"Connection: close\n")
-sock.send(b"\n")
+sock.send(b"Connection: close\n\n")
 
-while True:
+# Start transmission timer
+start = time.monotonic()
+
+bytes_avail = 0
+while not bytes_avail:
     bytes_avail = sock.available()
-    print("{} bytes on socket".format(bytes_avail))
     if bytes_avail > 0:
-        l = sock.recv(bytes_avail)
+        data = sock.recv(bytes_avail)
+        print(data[0])
         break
-    time.sleep(1)
+    time.sleep(0.05)
+
+end = time.monotonic()
+print("Received: %d bytes"%bytes_avail)
+end = end - start / 1000000.0
+rate = bytes_avail / end / 1000.0
+print("Rate = %0.5f kbytes/second"%rate)
