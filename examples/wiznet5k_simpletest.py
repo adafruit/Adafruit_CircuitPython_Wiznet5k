@@ -4,20 +4,37 @@ import board
 import busio
 import digitalio
 from adafruit_wiznet5k.adafruit_wiznet5k import WIZNET
-from adafruit_wiznet5k.adafruit_wiznet5k_socket import SOCKET
+import adafruit_wiznet5k.adafruit_wiznet5k_socket as socket
+
+# Name address for wifitest.adafruit.com
+SERVER_ADDRESS = (('104.236.193.178'), 80)
 
 cs = digitalio.DigitalInOut(board.D10)
 spi_bus = busio.SPI(board.SCK, MOSI=board.MOSI, MISO=board.MISO)
 
-# Initialize wiznet5k module interface
+# Initialize ethernet interface with DHCP
 eth = WIZNET(spi_bus, cs)
 
-# Check if ethernet cable is connected
-assert eth.link_status == 1, "Link down. Please connect an ethernet cable."
+print("DHCP Assigned IP: ", eth.pretty_ip(eth.ip_address))
 
-# Print connection information
-print("Hardware MAC Address: ", eth.mac_address)
-print("Hardware IP Address: ", eth.ip_address)
+socket.set_interface(eth)
 
+# Create a new socket
+sock = socket.socket()
 
-socket = SOCKET(eth)
+print("Connecting to: ", SERVER_ADDRESS[0])
+sock.connect(SERVER_ADDRESS)
+
+print("Connected to ", sock.getpeername())
+
+sock.send(b"GET /testwifi/index.html HTTP/1.1")
+sock.send(b"Host: wifitest.adafruit.com")
+sock.send(b"Connection: close")
+
+while True:
+    bytes_avail = sock.available()
+    print("{} bytes on socket".format(bytes_avail))
+    if bytes_avail > 0:
+        l = sock.recv(bytes_avail)
+        break
+    time.sleep(1)
