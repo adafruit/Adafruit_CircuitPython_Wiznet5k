@@ -1,8 +1,10 @@
 # The MIT License (MIT)
 #
+# Copyright (c) 2010 WIZnet
+# Copyright (c) 2010 Arduino LLC
 # Copyright (c) 2008 Bjoern Hartmann
 # Copyright 2018 Paul Stoffregen
-# Copyright (c) 2020 Brent Rubell for Adafruit Industries
+# Modified by Brent Rubell for Adafruit Industries, 2020
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -27,7 +29,7 @@
 
 Pure-Python interface for WIZNET 5k ethernet modules.
 
-* Author(s): Bjoern Hartmann, Paul Stoffregen, Brent Rubell
+* Author(s): WIZnet, Arduino LLC, Bjoern Hartmann, Paul Stoffregen, Brent Rubell
 
 Implementation Notes
 --------------------
@@ -288,9 +290,11 @@ class WIZNET:
         """Returns the network configuration as a tuple."""
         # set subnet and gateway addresses
         for octet in range(0, 4):
-            subnet_mask += self.read(REG_SUBR+octet, 0x04, subnet_mask[octet])
-            gw_addr += self.read(REG_GAR+octet, 0x04, gw_addr[octet])
-        params = (self.ip_address, subnet_mask, gw_addr, self._dns)
+            self._pbuff += self.read(REG_SUBR+octet, 0x04)
+        for octet in range(0, 4):
+            self._pbuff[3+octet] += self.read(REG_GAR+octet, 0x04)
+
+        params = (self.ip_address, self._pbuff[0:3], self._pbuff[3:7], self._dns)
         return params
 
     @ifconfig.setter
@@ -413,6 +417,7 @@ class WIZNET:
 
     # Socket-Register API
     def udp_remaining(self):
+        """Returns amount of bytes remaining in a udp socket."""
         if self._debug:
             print("* UDP Bytes Remaining: ", UDP_SOCK['bytes_remaining'])
         return UDP_SOCK['bytes_remaining']
