@@ -15,6 +15,7 @@ Introduction
 
 Pure-Python interface for WIZNET 5k ethernet modules.
 
+NOTE: This library does not currently contain a DNS client. You will need to include a server ip address and destination port in your code.
 
 Dependencies
 =============
@@ -29,12 +30,6 @@ This is easily achieved by downloading
 
 Installing from PyPI
 =====================
-.. note:: This library is not available on PyPI yet. Install documentation is included
-   as a standard element. Stay tuned for PyPI availability!
-
-.. todo:: Remove the above note if PyPI version is/will be available at time of release.
-   If the library is not planned for PyPI, remove the entire 'Installing from PyPI' section.
-
 On supported GNU/Linux systems like the Raspberry Pi, you can install the driver locally `from
 PyPI <https://pypi.org/project/adafruit-circuitpython-wiznet5k/>`_. To install for current user:
 
@@ -59,8 +54,53 @@ To install in a virtual environment in your current project:
 
 Usage Example
 =============
+This example demonstrates making a HTTP GET request to
+wifitest.adafruit.com.
 
-.. todo:: Add a quick, simple example. It and other examples should live in the examples folder and be included in docs/examples.rst.
+.. code-block:: python
+
+    import time
+
+    import board
+    import busio
+    import digitalio
+    from adafruit_wiznet5k.adafruit_wiznet5k import WIZNET
+    import adafruit_wiznet5k.adafruit_wiznet5k_socket as socket
+
+    # Name address for wifitest.adafruit.com
+    SERVER_ADDRESS = (('104.236.193.178'), 80)
+
+    cs = digitalio.DigitalInOut(board.D10)
+    spi_bus = busio.SPI(board.SCK, MOSI=board.MOSI, MISO=board.MISO)
+
+    # Initialize ethernet interface with DHCP
+    eth = WIZNET(spi_bus, cs)
+
+    print("DHCP Assigned IP: ", eth.pretty_ip(eth.ip_address))
+
+    socket.set_interface(eth)
+
+    # Create a new socket
+    sock = socket.socket()
+
+    print("Connecting to: ", SERVER_ADDRESS[0])
+    sock.connect(SERVER_ADDRESS)
+
+    print("Connected to ", sock.getpeername())
+
+    # Make a HTTP Request
+    sock.send(b"GET /testwifi/index.html HTTP/1.1\n")
+    sock.send(b"Host: 104.236.193.178\n")
+    sock.send(b"Connection: close\n\n")
+
+    bytes_avail = 0
+    while not bytes_avail:
+        bytes_avail = sock.available()
+        if bytes_avail > 0:
+            data = sock.recv(bytes_avail)
+            print(data)
+            break
+        time.sleep(0.05)
 
 Contributing
 ============
