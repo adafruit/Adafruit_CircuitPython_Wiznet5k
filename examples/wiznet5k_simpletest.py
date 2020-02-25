@@ -27,9 +27,11 @@ sock.connect(SERVER_ADDRESS)
 
 print("Connected to ", sock.getpeername())
 
-sock.send(b"GET /testwifi/index.html HTTP/1.1")
-sock.send(b"Host: wifitest.adafruit.com")
-sock.send(b"Connection: close")
+# Make a HTTP Request
+sock.send(b"GET /testwifi/index.html HTTP/1.1\n")
+sock.send(b"Host: 104.236.193.178")
+sock.send(b"Connection: close\n")
+sock.send(b"\n")
 
 while True:
     bytes_avail = sock.available()
