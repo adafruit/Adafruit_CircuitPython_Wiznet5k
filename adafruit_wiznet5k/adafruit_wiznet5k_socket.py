@@ -80,7 +80,6 @@ class socket:
 
         self._socknum = _the_interface.get_socket(SOCKETS)
         SOCKETS.append(self._socknum)
-
         self.settimeout(1)
 
     @property
@@ -91,21 +90,23 @@ class socket:
     @property
     def connected(self):
         """Returns whether or not we are connected to the socket."""
-        if self._socknum >= _the_interface.max_sockets:
+        if self.socknum >= _the_interface.max_sockets:
             return 0
-        status = _the_interface.socket_status(self._socknum)
-        result = status in (adafruit_wiznet5k.SNSR_SOCK_CLOSED,
+        status = _the_interface.socket_status(self.socknum)[0]
+        if status == adafruit_wiznet5k.SNSR_SOCK_CLOSE_WAIT and self.available()[0] == 0:
+            result = False
+        result = status not in (adafruit_wiznet5k.SNSR_SOCK_CLOSED,
                             adafruit_wiznet5k.SNSR_SOCK_LISTEN,
                             adafruit_wiznet5k.SNSR_SOCK_CLOSE_WAIT,
                             adafruit_wiznet5k.SNSR_SOCK_FIN_WAIT)
-        if result:
+        if not result:
             self.close()
             return result
         return result
 
     def getpeername(self):
         """Return the remote address to which the socket is connected."""
-        return _the_interface.remote_ip(self._socknum)
+        return _the_interface.remote_ip(self.socknum)
 
     def gethostbyname(self, address):
         """Translate a host name to IPv4 address format."""
@@ -122,7 +123,7 @@ class socket:
         if hasattr(host, 'split'):
             host = tuple(map(int, host.split('.'))) 
 
-        if not _the_interface.socket_connect(self._socknum, host, port, conn_mode=self._sock_type):
+        if not _the_interface.socket_connect(self.socknum, host, port, conn_mode=self._sock_type):
             raise RuntimeError("Failed to connect to host", host)
         self._buffer = b''
 
@@ -132,7 +133,7 @@ class socket:
         :param bytearray data: Desired data to send to the socket.
 
         """
-        _the_interface.socket_write(self._socknum, data)
+        _the_interface.socket_write(self.socknum, data)
         gc.collect()
 
     def recv(self, bufsize=0):
@@ -150,9 +151,10 @@ class socket:
                     avail = _the_interface._udp_remaining()
                 if avail:
                     if self._sock_type == SOCK_STREAM:
-                        self._buffer += _the_interface.socket_read(self._socknum, avail)
+                        buf = _the_interface.socket_read(self.socknum, avail)
+                        self._buffer += _the_interface.socket_read(self.socknum, avail)
                     elif self._sock_type == SOCK_DGRAM:
-                        self._buffer += _the_interface.read_udp(self._socknum, avail)
+                        self._buffer += _the_interface.read_udp(self.socknum, avail)
                 else:
                     break
             gc.collect()
@@ -172,9 +174,9 @@ class socket:
             if avail:
                 stamp = time.monotonic()
                 if self._sock_type == SOCK_STREAM:
-                    recv = _the_interface.socket_read(self._socknum, min(to_read, avail))[1]
+                    recv = _the_interface.socket_read(self.socknum, min(to_read, avail))[1]
                 elif self._sock_type == SOCK_DGRAM:
-                    recv = _the_interface.read_udp(self._socknum, min(to_read, avail))[1]
+                    recv = _the_interface.read_udp(self.socknum, min(to_read, avail))[1]
                 received.append(recv)
                 to_read -= len(recv)
                 gc.collect()
@@ -190,7 +192,6 @@ class socket:
             ret = self._buffer[:bufsize]
             self._buffer = self._buffer[bufsize:]
         gc.collect()
-        print(ret)
         return ret
 
     def readline(self):
@@ -200,10 +201,10 @@ class socket:
         while b'\n' not in self._buffer:
             if self._sock_type == SOCK_STREAM:
                 avail = self.available()
-                self._buffer += _the_interface.read(self._socknum, avail)[1]
+                self._buffer += _the_interface.read(self.socknum, avail)[1]
             elif self._sock_type == SOCK_DGRAM:
                 avail = _the_interface._udp_remaining()
-                self._buffer += _the_interface.read_udp(self._socknum, avail)[1]
+                self._buffer += _the_interface.read_udp(self.socknum, avail)[1]
             elif self._timeout > 0 and time.monotonic() - stamp > self._timeout:
                 self.close()
                 raise RuntimeError("Didn't receive response, failing out...")
@@ -217,16 +218,14 @@ class socket:
         """Closes the socket.
 
         """
-        _the_interface.socket_close(self._socknum)
-        SOCKETS.remove(self._socknum)
+        _the_interface.socket_close(self.socknum)
+        SOCKETS.remove(self.socknum)
 
-    # TODO: We shouldnt need this, read/recv should handle this for us
     def available(self):
         """Returns how many bytes of data are available to be read from the socket.
 
         """
-        return _the_interface.socket_available(self._socknum, self._sock_type)
-
+        return _the_interface.socket_available(self.socknum, self._sock_type)
 
     def settimeout(self, value):
         """Sets socket read timeout.
