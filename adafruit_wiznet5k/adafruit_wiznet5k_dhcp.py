@@ -120,7 +120,7 @@ class DHCP:
     def send_dhcp_message(self, state, time_elapsed):
         """Assemble and send a DHCP message packet to a socket.
         :param int state: DHCP Message state.
-        :param float time_elapsed: Number of seconds elapsed since client attempted to acquire/renew a lease.
+        :param float time_elapsed: Number of seconds elapsed since client attempted to renew lease.
 
         """
         # OP

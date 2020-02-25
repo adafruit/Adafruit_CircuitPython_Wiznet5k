@@ -386,14 +386,14 @@ class WIZNET5K:
 
         """
         with self._device as bus_device:
-            bus_device.write(bytes([addr >> 8]))
-            bus_device.write(bytes([addr & 0xFF]))
-            bus_device.write(bytes([callback]))
+            bus_device.write(bytes([addr >> 8])) # pylint: disable=no-member
+            bus_device.write(bytes([addr & 0xFF])) # pylint: disable=no-member
+            bus_device.write(bytes([callback])) # pylint: disable=no-member
             if buffer is None:
                 self._rxbuf = bytearray(length)
-                bus_device.readinto(self._rxbuf)
+                bus_device.readinto(self._rxbuf) # pylint: disable=no-member
                 return self._rxbuf
-            bus_device.readinto(buffer, end=length)
+            bus_device.readinto(buffer, end=length) # pylint: disable=no-member
             return buffer
 
     def write(self, addr, callback, data):
@@ -405,15 +405,15 @@ class WIZNET5K:
 
         """
         with self._device as bus_device:
-            bus_device.write(bytes([addr >> 8]))
-            bus_device.write(bytes([addr & 0xFF]))
-            bus_device.write(bytes([callback]))
+            bus_device.write(bytes([addr >> 8])) # pylint: disable=no-member
+            bus_device.write(bytes([addr & 0xFF])) # pylint: disable=no-member
+            bus_device.write(bytes([callback])) # pylint: disable=no-member
 
             if hasattr(data, 'from_bytes'):
-                bus_device.write(bytes([data]))
+                bus_device.write(bytes([data])) # pylint: disable=no-member
             else:
                 for i, _ in enumerate(data):
-                    bus_device.write(bytes([data[i]]))
+                    bus_device.write(bytes([data[i]])) # pylint: disable=no-member
 
     # Socket-Register API
     def udp_remaining(self):
