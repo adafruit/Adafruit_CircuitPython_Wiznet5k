@@ -164,8 +164,11 @@ class WIZNET:
             reset.value = False
             time.sleep(0.1)
 
-        # Buffer for reading from module
+        # Buffer for reading params from module
         self._pbuff = bytearray(8)
+
+        
+        self._rbuf = bytearray(1)
 
         # attempt to initialize the module
         self._ch_base_msb = 0
@@ -246,7 +249,7 @@ class WIZNET:
         :param tuple address: Hardware MAC address.
 
         """
-        self._write_n(REG_SHAR, 0x04, address)
+        self.write(REG_SHAR, 0x04, address)
 
     def pretty_mac(self, mac): # pylint: disable=no-self-use, invalid-name
         """Converts a bytearray MAC address to a
@@ -301,7 +304,7 @@ class WIZNET:
         ip_address, subnet_mask, gateway_address, dns_server = params
 
         # Set IP Address
-        self._write_n(REG_SIPR, 0x04, ip_address)
+        self.write(REG_SIPR, 0x04, ip_address)
 
         # set subnet and gateway addresses
         for octet in range(0, 4):
@@ -385,39 +388,25 @@ class WIZNET:
             bus_device.write(bytes([addr & 0xFF]))
             bus_device.write(bytes([callback]))
             if buffer is None:
-                result = bytearray(length)
-                bus_device.readinto(result)
-                return result
+                self._rxbuf = bytearray(length)
+                bus_device.readinto(self._rxbuf)
+                return self._rxbuf
             bus_device.readinto(buffer, end=length)
             return buffer
 
     def write(self, addr, callback, data):
-        """Writes data to a register address.
-        :param int addr: Register address.
-        :param int cb: Common register block (?)
-        :param int data: Data to write to the register.
-
-        """
         with self._device as bus_device:
             bus_device.write(bytes([addr >> 8]))
             bus_device.write(bytes([addr & 0xFF]))
             bus_device.write(bytes([callback]))
-            bus_device.write(bytes([data]))
 
-    def _write_n(self, addr, callback, data):
-        """Writes data to a register address.
-        :param int addr: Register address.
-        :param int data: Data to write to the register.
-        :param int len: Length of data to write.
-
-        """
-        with self._device as bus_device:
-            bus_device.write(bytes([addr >> 8]))
-            bus_device.write(bytes([addr & 0xFF]))
-            bus_device.write(bytes([callback]))
-            for i, _ in enumerate(data):
-                bus_device.write(bytes([data[i]]))
+            if hasattr(data,'from_bytes'):
+                bus_device.write(bytes([data]))
+            else:
+                for i, _ in enumerate(data):
+                    bus_device.write(bytes([data[i]]))
         return len
+
 
     # Socket-Register API
 
@@ -689,7 +678,7 @@ class WIZNET:
         self._write_sntx_wr(socket_num, ptr)
 
         cntl_byte = (0x14+(socket_num<<5))
-        self._write_n(dst_addr, cntl_byte, buffer)
+        self.write(dst_addr, cntl_byte, buffer)
 
         self._write_sncr(socket_num, CMD_SOCK_SEND)
         self._read_sncr(socket_num)
@@ -815,7 +804,7 @@ class WIZNET:
         cntl_byte = (sock<<5)+0x0C
         if length is None:
             return self.write(base + sock * CH_SIZE + address, cntl_byte, data)
-        return self._write_n(base + sock * CH_SIZE + address, cntl_byte, data)
+        return self.write(base + sock * CH_SIZE + address, cntl_byte, data)
 
     def _read_socket(self, sock, address):
         """Read a W5k socket register.
