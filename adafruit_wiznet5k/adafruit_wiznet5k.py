@@ -166,9 +166,7 @@ class WIZNET:
 
         # Buffer for reading params from module
         self._pbuff = bytearray(8)
-
-        
-        self._rbuf = bytearray(1)
+        self._rxbuf = bytearray(MAX_PACKET)
 
         # attempt to initialize the module
         self._ch_base_msb = 0
@@ -395,22 +393,28 @@ class WIZNET:
             return buffer
 
     def write(self, addr, callback, data):
+        """Write data to a register address.
+        :param int addr: Destination address.
+        :param int callback: Callback reference.
+        :param int data: Data to write, as an integer.
+        :param bytearray data: Data to write, as a bytearray.
+
+        """
         with self._device as bus_device:
             bus_device.write(bytes([addr >> 8]))
             bus_device.write(bytes([addr & 0xFF]))
             bus_device.write(bytes([callback]))
 
-            if hasattr(data,'from_bytes'):
+            if hasattr(data, 'from_bytes'):
                 bus_device.write(bytes([data]))
             else:
                 for i, _ in enumerate(data):
                     bus_device.write(bytes([data[i]]))
-        return len
-
 
     # Socket-Register API
-
     def _udp_remaining(self):
+        if self._debug:
+            print("* UDP Bytes Remaining: ", UDP_SOCK['bytes_remaining'])
         return UDP_SOCK['bytes_remaining']
 
     def socket_available(self, socket_num, sock_type=SNMR_TCP):
@@ -425,7 +429,6 @@ class WIZNET:
         assert socket_num <= self.max_sockets, "Provided socket exceeds max_sockets."
 
         if sock_type == 0x02:
-            print('UDP: ', UDP_SOCK['bytes_remaining'])
             # flush by reading remaining data from previous packet
             while UDP_SOCK['bytes_remaining'] > 0 and self.socket_read(socket_num, 1):
                 if self._debug:
@@ -435,7 +438,6 @@ class WIZNET:
 
         res = self._get_rx_rcv_size(socket_num)
 
-        print('Res: ', res)
         res = int.from_bytes(res, 'b')
         if sock_type == SNMR_TCP:
             return res
@@ -572,8 +574,6 @@ class WIZNET:
                 UDP_SOCK['bytes_remaining'] -= ret
                 if self._debug:
                     print("UDP read {0} bytes: ".format(ret))
-                    print(UDP_SOCK['bytes_remaining'])
-                    print(resp)
                 return ret, resp
         # failed to read or no data
         return -1
@@ -617,7 +617,6 @@ class WIZNET:
             # Read data from the starting address of snrx_rd
             ctrl_byte = (0x18+(socket_num<<5))
 
-            print("Read data, len={}, at: {}".format(ret, ptr))
             resp = self.read(ptr, ctrl_byte, ret)
 
             #  After reading the received data, update Sn_RX_RD to the increased
