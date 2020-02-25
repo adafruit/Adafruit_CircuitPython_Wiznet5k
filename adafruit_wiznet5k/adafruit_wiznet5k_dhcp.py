@@ -72,12 +72,11 @@ MAX_DHCP_OPT = const(0x10)
 DHCP_SERVER_PORT   = const(67)
 # DHCP Lease Time, in seconds
 DEFAULT_LEASE_TIME = const(900)
-
 BROADCAST_SERVER_ADDR = 255, 255, 255, 255
-_BUFF = bytearray(317)
 
 # pylint: enable=bad-whitespace
 
+_BUFF = bytearray(317)
 
 class DHCP:
     """W5k DHCP Client implementation.
@@ -88,12 +87,10 @@ class DHCP:
     :param bool debug: Enable debugging output.
 
     """
-
-    # pylint: too-many-arguments, too-many-instance-attributes
+    
+    # pylint: disable=too-many-arguments, too-many-instance-attributes
     def __init__(self, eth, mac_address, timeout=1, timeout_response=1):
-        self._lease_time = 0
-        self._t1 = 0
-        self._t2 = 0
+        
         self._timeout = timeout
         self._response_timeout = timeout_response
         self._mac_address = mac_address
@@ -103,15 +100,24 @@ class DHCP:
         self._sock = socket.socket(type=socket.SOCK_DGRAM)
         self._sock.settimeout(timeout)
 
+        # DHCP state machine
         self._dhcp_state = STATE_DHCP_START
         self._initial_xid = 0
         self._transaction_id = 0
 
+        # DHCP server configuration
         self.dhcp_server_ip = 0
         self.local_ip = 0
         self.gateway_ip = 0
         self.subnet_mask = 0
         self.dns_server_ip = 0
+        # Lease configuration
+        self._lease_time = 0
+        self._last_check_lease_ms = 0
+        self._renew_in_sec = 0
+        self._rebind_in_sec = 0
+        self._t1 = 0
+        self._t2 = 0
 
     def send_dhcp_message(self, state, time_elapsed):
         """Assemble and send a DHCP message packet to a socket.

@@ -41,9 +41,9 @@ Implementation Notes
 """
 
 import time
-import adafruit_bus_device.spi_device as spidev
 from micropython import const
 
+from adafruit_bus_device.spi_device import SPIDevice
 import adafruit_wiznet5k.adafruit_wiznet5k_dhcp as dhcp
 
 
@@ -113,16 +113,24 @@ CH_SIZE     = const(0x100)
 SOCK_SIZE   = const(0x800) # MAX W5k socket size
 # Register commands
 MR_RST      = const(0x80) # Mode Register RST
+# Socket mode register
+SNMR_CLOSE  = const(0x00)
+SNMR_TCP    = const(0x21)
+SNMR_UDP    = const(0x02)
+SNMR_IPRAW  = const(0x03)
+SNMR_MACRAW = const(0x04)
+SNMR_PPPOE  = const(0x05)
 
 # pylint: enable=bad-whitespace
-
+MAX_PACKET = const(4000)
+LOCAL_PORT = const(0x400)
 # Default hardware MAC address
 DEFAULT_MAC = (0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED)
 
 # Maximum number of sockets to support, differs between chip versions.
 W5200_W5500_MAX_SOCK_NUM = const(0x08)
 
-# UDP Socket Struct.
+# UDP socket struct.
 UDP_SOCK = {'bytes_remaining': 0,
             'remote_ip': 0,
             'remote_port': 0}
@@ -138,24 +146,14 @@ class WIZNET:
 
     """
 
-    # pylint: disable=bad-whitespace
-    # Socket registers
-    SNMR_CLOSE  = const(0x00)
-    SNMR_TCP    = const(0x21)
-    SNMR_UDP    = const(0x02)
-    SNMR_IPRAW  = const(0x03)
-    SNMR_MACRAW = const(0x04)
-    SNMR_PPPOE  = const(0x05)
-    # pylint: enable=bad-whitespace
-
-    # pylint: disable=too-many-arguments
+    # pylint: disable=too-many-arguments, too-many-public-methods
     def __init__(self, spi_bus, cs, reset=None,
                  is_dhcp=True, mac=DEFAULT_MAC, debug=True):
         self._debug = debug
         self._chip_type = None
-        self._device = spidev.SPIDevice(spi_bus, cs,
-                                        baudrate=8000000,
-                                        polarity=0, phase=0)
+        self._device = SPIDevice(spi_bus, cs,
+                                 baudrate=8000000,
+                                 polarity=0, phase=0)
         # init c.s.
         self._cs = cs
 
@@ -166,11 +164,16 @@ class WIZNET:
             reset.value = False
             time.sleep(0.1)
 
+        # Buffer for reading from module
+        self._pbuff = bytearray(8)
+
         # attempt to initialize the module
+        self._ch_base_msb = 0
         assert self._w5100_init() == 1, "Failed to initialize WIZnet module."
         # Set MAC address
         self.mac_address = mac
         self._src_port = 0
+        self._dns = 0
         # Set DHCP
         if is_dhcp:
             self.set_dhcp()
@@ -192,7 +195,7 @@ class WIZNET:
             if self._debug:
                 print("* Found DHCP server - setting configuration...")
             _ip = (_dhcp_client.local_ip[0], _dhcp_client.local_ip[1],
-                    _dhcp_client.local_ip[2], _dhcp_client.local_ip[3])
+                   _dhcp_client.local_ip[2], _dhcp_client.local_ip[3])
 
             _subnet_mask = (_dhcp_client.subnet_mask[0], _dhcp_client.subnet_mask[1],
                             _dhcp_client.subnet_mask[2], _dhcp_client.subnet_mask[3])
@@ -201,7 +204,7 @@ class WIZNET:
                         _dhcp_client.gateway_ip[2], _dhcp_client.gateway_ip[3])
 
             _dns_addr = (_dhcp_client.dns_server_ip[0], _dhcp_client.dns_server_ip[1],
-                            _dhcp_client.dns_server_ip[2], _dhcp_client.dns_server_ip[3])
+                         _dhcp_client.dns_server_ip[2], _dhcp_client.dns_server_ip[3])
             self.ifconfig = ((_ip, _subnet_mask, _gw_addr, _dns_addr))
             return 0
         # Reset SRC_Port
@@ -258,12 +261,11 @@ class WIZNET:
         :param int socket num: Desired socket.
 
         """
-        remote_ip = bytearray(4)
         if socket_num >= self.max_sockets:
-            return remote_ip
+            return self._pbuff
         for octet in range(0, 4):
-            remote_ip[octet] = self._read_socket(socket_num, REG_SNDIPR+octet)[0]
-        return self.pretty_ip(remote_ip)
+            self._pbuff[octet] = self._read_socket(socket_num, REG_SNDIPR+octet)[0]
+        return self.pretty_ip(self._pbuff)
 
     @property
     def link_status(self):
@@ -278,16 +280,19 @@ class WIZNET:
         """Returns the port of the host who sent the current incoming packet.
 
         """
-        return self._remote_port
+        return self.remote_port
 
     @property
     def ifconfig(self):
         """Returns the network configuration as a tuple."""
+        # set subnet and gateway addresses
         for octet in range(0, 4):
-            subnet_mask = self.read(REG_SUBR+octet, 0x00)
-        params = (self.ip_address, subnet_mask, 0, self._dns)
+            subnet_mask += self.read(REG_SUBR+octet, 0x04, subnet_mask[octet])
+            gw_addr += self.read(REG_GAR+octet, 0x04, gw_addr[octet])
+        params = (self.ip_address, subnet_mask, gw_addr, self._dns)
+        return params
 
-    @ip_address.setter
+    @ifconfig.setter
     def ifconfig(self, params):
         """Sets network configuration to provided tuple in format:
         (ip_address, subnet_mask, gateway_address, dns_server).
@@ -349,10 +354,10 @@ class WIZNET:
         by writing to its MR register reset bit.
 
         """
-        mr = self._read_mr()
+        mode_reg = self._read_mr()
         self._write_mr(0x80)
-        mr = self._read_mr()
-        if mr[0] != 0x00:
+        mode_reg = self._read_mr()
+        if mode_reg[0] != 0x00:
             return -1
         return 0
 
@@ -370,21 +375,21 @@ class WIZNET:
         """
         self.write(REG_MR, 0x04, data)
 
-    def read(self, addr, cb, length=1, buffer=None):
+    def read(self, addr, callback, length=1, buffer=None):
         """Reads data from a register address.
         :param int addr: Register address.
-        :param int cb: Common register block (?)
 
         """
         with self._device as bus_device:
             bus_device.write(bytes([addr >> 8]))
             bus_device.write(bytes([addr & 0xFF]))
-            bus_device.write(bytes([cb]))
+            bus_device.write(bytes([callback]))
             if buffer is None:
                 result = bytearray(length)
                 bus_device.readinto(result)
                 return result
             bus_device.readinto(buffer, end=length)
+            return buffer
 
     def write(self, addr, callback, data):
         """Writes data to a register address.
@@ -410,7 +415,7 @@ class WIZNET:
             bus_device.write(bytes([addr >> 8]))
             bus_device.write(bytes([addr & 0xFF]))
             bus_device.write(bytes([callback]))
-            for i in range(0, len(data)):
+            for i, _ in enumerate(data):
                 bus_device.write(bytes([data[i]]))
         return len
 
@@ -447,16 +452,15 @@ class WIZNET:
             return res
         if res > 0:
             # parse the udp rx packet
-            tmp_buf = bytearray(8)
             ret = 0
             # read the first 8 header bytes
-            ret, tmp_buf = self.socket_read(socket_num, 8)
+            ret, self._pbuff = self.socket_read(socket_num, 8)
             if ret > 0:
-                UDP_SOCK['remote_ip'] = tmp_buf
-                UDP_SOCK['remote_port'] = tmp_buf[4]
-                UDP_SOCK['remote_port'] = (UDP_SOCK['remote_port'] << 8) + tmp_buf[5]
-                UDP_SOCK['bytes_remaining'] = tmp_buf[6]
-                UDP_SOCK['bytes_remaining'] = (UDP_SOCK['bytes_remaining'] << 8) + tmp_buf[7]
+                UDP_SOCK['remote_ip'] = self._pbuff
+                UDP_SOCK['remote_port'] = self._pbuff[4]
+                UDP_SOCK['remote_port'] = (UDP_SOCK['remote_port'] << 8) + self._pbuff[5]
+                UDP_SOCK['bytes_remaining'] = self._pbuff[6]
+                UDP_SOCK['bytes_remaining'] = (UDP_SOCK['bytes_remaining'] << 8) + self._pbuff[7]
                 ret = UDP_SOCK['bytes_remaining']
                 return ret
         return 0
@@ -601,8 +605,9 @@ class WIZNET:
         if ret == 0:
             # no data on socket?
             status = self._read_snmr(socket_num)
-            if(status == SNSR_SOCK_LISTEN or status == SNSR_SOCK_CLOSED \
-               or status == SNSR_SOCK_CLOSE_WAIT):
+            if status in (SNSR_SOCK_LISTEN,
+                          SNSR_SOCK_CLOSED,
+                          SNSR_SOCK_CLOSE_WAIT):
                 # remote end closed its side of the connection, EOF state
                 ret = 0
                 resp = 0
@@ -669,7 +674,8 @@ class WIZNET:
         while free_size < ret:
             free_size = self._get_tx_free_size(socket_num)
             status = self.socket_status(socket_num)
-            if (status != SNSR_SOCK_ESTABLISHED) and (status != SNSR_SOCK_CLOSE_WAIT):
+            if status not in (SNSR_SOCK_ESTABLISHED,
+                              SNSR_SOCK_CLOSE_WAIT):
                 ret = 0
                 break
 
@@ -725,10 +731,9 @@ class WIZNET:
         return val
 
     def _read_snrx_rd(self, sock):
-        buf = bytearray(2)
-        buf[0] = self._read_socket(sock, REG_SNRX_RD)[0]
-        buf[1] = self._read_socket(sock, REG_SNRX_RD+1)[0]
-        return buf[0] << 8 | buf[1]
+        self._pbuff[0] = self._read_socket(sock, REG_SNRX_RD)[0]
+        self._pbuff[1] = self._read_socket(sock, REG_SNRX_RD+1)[0]
+        return self._pbuff[0] << 8 | self._pbuff[1]
 
 
     def _write_snrx_rd(self, sock, data):
@@ -740,10 +745,9 @@ class WIZNET:
         self._write_socket(sock, REG_SNTX_WR+1, data & 0xff)
 
     def _read_sntx_wr(self, sock):
-        buf = bytearray(2)
-        buf[0] = self._read_socket(sock, 0x0024)[0]
-        buf[1] = self._read_socket(sock, 0x0024+1)[0]
-        return buf[0] << 8 | buf[1]
+        self._pbuff[0] = self._read_socket(sock, 0x0024)[0]
+        self._pbuff[1] = self._read_socket(sock, 0x0024+1)[0]
+        return self._pbuff[0] << 8 | self._pbuff[1]
 
 
     def _read_sntx_fsr(self, sock):
