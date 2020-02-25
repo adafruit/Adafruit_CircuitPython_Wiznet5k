@@ -438,12 +438,10 @@ class WIZNET:
                     print("Flushing {} bytes".format(UDP_SOCK['bytes_remaining']))
                 if UDP_SOCK['bytes_remaining'] > 0:
                     UDP_SOCK['bytes_remaining'] = UDP_SOCK['bytes_remaining'] - 1
-            print("Bytes remaining: ", UDP_SOCK['bytes_remaining'])
-
-        print('RSR: ', self._read_snrx_rsr(socket_num))
 
         res = self._get_rx_rcv_size(socket_num)
 
+        print('Res: ', res)
         res = int.from_bytes(res, 'b')
         if sock_type == SNMR_TCP:
             return res
@@ -709,7 +707,9 @@ class WIZNET:
         val = 0
         val_1 = self._read_snrx_rsr(sock)
         while val != val_1:
-            val = self._read_snrx_rsr(sock)
+            val_1 = self._read_snrx_rsr(sock)
+            if val_1 != 0:
+                val = self._read_snrx_rsr(sock)
         return val
 
     def _get_tx_free_size(self, sock):
