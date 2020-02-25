@@ -179,8 +179,10 @@ class DHCP:
         # Option - Host Name
         _buff[252] = 12
         _buff[253] = len(b"Wiznet") + 6
-        # NOTE/TODO: This appends invalid ? chars. onto hostname instead of string
-        _buff[254:266] = b"Wizneteeeeee"
+        _buff[254:260] = b"WIZnet"
+
+        for mac in range(0, 5):
+            _buff[260+mac] = self._mac_address[mac]
 
         if state == DHCP_REQUEST:
             # Set the parsed local IP addr
@@ -218,7 +220,6 @@ class DHCP:
 
         :param int response_timeout: Time to wait for server to return packet, in seconds.
         """
-        print("STATE: ", self._dhcp_state)
         start_time = time.monotonic()
         packet_sz = self._sock.available()
         while packet_sz <= 0:
@@ -259,10 +260,8 @@ class DHCP:
         self._lease_time = int.from_bytes(_buff[251:255], 'l')
         # T1 value
         self._t1 = int.from_bytes(_buff[257:261], 'l')
-        # print("T1: ", self._t1)
         # T2 value
         self._t2 = int.from_bytes(_buff[263:267], 'l')
-        # print("T2: ", self._t2)
         # Subnet Mask
         self.subnet_mask = _buff[269:273]
         # DNS Server
@@ -283,24 +282,20 @@ class DHCP:
 
         while self._dhcp_state != STATE_DHCP_LEASED:
             if self._dhcp_state == STATE_DHCP_START:
-                print("START")
                 self._transaction_id += 1
                 self._sock.connect((BROADCAST_SERVER_ADDR, DHCP_SERVER_PORT))
                 self.send_dhcp_message(STATE_DHCP_DISCOVER,
                                        ((time.monotonic() - start_time) / 1000))
                 self._dhcp_state = STATE_DHCP_DISCOVER
             elif self._dhcp_state == STATE_DHCP_DISCOVER:
-                print("DISCOVER")
                 msg_type, xid = self.parse_dhcp_response(self._timeout)
                 if msg_type == DHCP_OFFER:
                     # use the _transaction_id the offer returned,
                     # rather than the current one
                     self._transaction_id = self._transaction_id.from_bytes(xid, 'l')
-                    print("REQUEST")
                     self.send_dhcp_message(DHCP_REQUEST, ((time.monotonic() - start_time) / 1000))
                     self._dhcp_state = STATE_DHCP_REQUEST
             elif STATE_DHCP_REQUEST:
-                print("LEASE")
                 msg_type, xid = self.parse_dhcp_response(self._timeout)
                 if msg_type == DHCP_ACK:
                     self._dhcp_state = STATE_DHCP_LEASED
