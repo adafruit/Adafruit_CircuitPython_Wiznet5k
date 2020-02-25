@@ -150,7 +150,7 @@ class WIZNET5K:
 
     # pylint: disable=too-many-arguments, too-many-public-methods
     def __init__(self, spi_bus, cs, reset=None,
-                 is_dhcp=True, mac=DEFAULT_MAC, debug=True):
+                 is_dhcp=True, mac=DEFAULT_MAC, debug=False):
         self._debug = debug
         self._chip_type = None
         self._device = SPIDevice(spi_bus, cs,
@@ -528,7 +528,8 @@ class WIZNET5K:
         if self._debug:
             print("*** Opening socket %d"%socket_num)
         if self._read_snsr(socket_num)[0] == SNSR_SOCK_CLOSED:
-            print("w5k socket begin, protocol={}, port={}".format(conn_mode, port))
+            if self._debug:
+                print("w5k socket begin, protocol={}, port={}".format(conn_mode, port))
             time.sleep(0.00025)
 
             self._write_snmr(socket_num, conn_mode)
