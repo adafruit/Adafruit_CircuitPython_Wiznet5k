@@ -29,7 +29,7 @@ print("Connected to ", sock.getpeername())
 
 # Make a HTTP Request
 sock.send(b"GET /testwifi/index.html HTTP/1.1\n")
-sock.send(b"Host: 104.236.193.178")
+sock.send(b"Host: 104.236.193.178\n")
 sock.send(b"Connection: close\n\n")
 
 # Start transmission timer
