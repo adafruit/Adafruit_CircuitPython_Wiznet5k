@@ -265,8 +265,6 @@ class DHCP:
         self._t2 = int.from_bytes(_BUFF[263:267], 'l')
         # Subnet Mask
         self.subnet_mask = _BUFF[269:273]
-        print(_BUFF)
-        #time.sleep(100)
         # DNS Server
         self.dns_server_ip = _BUFF[281:285]
 

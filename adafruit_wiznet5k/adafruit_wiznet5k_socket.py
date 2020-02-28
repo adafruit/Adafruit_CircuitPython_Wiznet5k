@@ -145,7 +145,6 @@ class socket:
 
         if hasattr(host, 'split'):
             host = tuple(map(int, host.split('.')))
-        print(self._sock_type)
         if not _the_interface.socket_connect(self.socknum, host, port, conn_mode=self._sock_type):
             raise RuntimeError("Failed to connect to host", host)
         self._buffer = b''
@@ -156,7 +155,6 @@ class socket:
         :param bytearray data: Desired data to send to the socket.
 
         """
-        print(self.socknum, data)
         _the_interface.socket_write(self.socknum, data)
         gc.collect()
 

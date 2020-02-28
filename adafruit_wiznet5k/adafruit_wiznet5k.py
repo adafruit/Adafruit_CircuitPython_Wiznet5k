@@ -505,7 +505,6 @@ class WIZNET5K:
             self._read_sncr(socket_num)
             # wait for tcp connection establishment
             while self.socket_status(socket_num)[0] != SNSR_SOCK_ESTABLISHED:
-                print(self.socket_status(socket_num)[0])
                 if self.socket_status(socket_num)[0] == SNSR_SOCK_CLOSED:
                     raise RuntimeError('Failed to establish connection.')
                 time.sleep(1)

@@ -10,7 +10,7 @@ cs = digitalio.DigitalInOut(board.D10)
 spi_bus = busio.SPI(board.SCK, MOSI=board.MOSI, MISO=board.MISO)
 
 # Initialize ethernet interface with DHCP
-eth = WIZNET5K(spi_bus, cs, debug=True)
+eth = WIZNET5K(spi_bus, cs)
 
 print("DHCP Assigned IP: ", eth.pretty_ip(eth.ip_address))
 
@@ -21,6 +21,8 @@ port = 80
 
 addr_info = socket.getaddrinfo(host, port, 0, socket.SOCK_STREAM)
 sock = socket.socket(addr_info[0], addr_info[1], addr_info[2])
+
+sock.connect(addr_info[4])
 
 print("Connected to ", sock.getpeername())
 
