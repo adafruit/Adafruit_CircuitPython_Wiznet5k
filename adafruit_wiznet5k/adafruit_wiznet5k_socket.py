@@ -60,6 +60,7 @@ NO_SOCKET_AVAIL = const(255)
 # keep track of sockets we allocate
 SOCKETS = []
 
+#pylint: disable=too-many-arguments, unused-argument
 def getaddrinfo(host, port, family=0, socktype=0, proto=0, flags=0):
     """Translate the host/port argument into a sequence of 5-tuples that
     contain all the necessary arguments for creating a socket connected to that service.
@@ -74,9 +75,9 @@ def gethostbyname(hostname):
     is returned as a string.
     :param str hostname: Desired hostname.
     """
-    ip = _the_interface.get_host_by_name(hostname)
-    ip = "{}.{}.{}.{}".format(ip[0], ip[1], ip[2], ip[3])
-    return ip
+    addr = _the_interface.get_host_by_name(hostname)
+    addr = "{}.{}.{}.{}".format(addr[0], addr[1], addr[2], addr[3])
+    return addr
 
 #pylint: disable=invalid-name
 class socket:
@@ -86,12 +87,12 @@ class socket:
     :param int type: Socket type.
 
     """
-    # pylint: disable=redefined-builtin
+    # pylint: disable=redefined-builtin,unused-argument
     def __init__(self, family=AF_INET, type=SOCK_STREAM, proto=0, fileno=None, socknum=None):
         if family != AF_INET:
             raise RuntimeError("Only AF_INET family supported by W5K modules.")
         self._sock_type = type
-        self._buffer = b''
+        self._buffer = b""
         self._timeout = 0
 
         self._socknum = _the_interface.get_socket(SOCKETS)
@@ -129,10 +130,10 @@ class socket:
         :param str ip_string: IP Address, as a dotted-quad string.
 
         """
-        self._bufffer = b""
-        self._bufffer = [int(item) for item in ip_string.split('.')]
-        self._bufffer = bytearray(self._bufffer)
-        return self._bufffer
+        self._buffer = b''
+        self._buffer = [int(item) for item in ip_string.split('.')]
+        self._buffer = bytearray(self._buffer)
+        return self._buffer
 
     def connect(self, address, conntype=None):
         """Connect to a remote socket at address. (The format of address depends

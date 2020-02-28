@@ -208,7 +208,7 @@ class WIZNET5K:
                         _dhcp_client.gateway_ip[2], _dhcp_client.gateway_ip[3])
 
             self._dns = (_dhcp_client.dns_server_ip[0], _dhcp_client.dns_server_ip[1],
-                              _dhcp_client.dns_server_ip[2], _dhcp_client.dns_server_ip[3])
+                         _dhcp_client.dns_server_ip[2], _dhcp_client.dns_server_ip[3])
             self.ifconfig = ((_ip, _subnet_mask, _gw_addr, self._dns))
             return 0
         self._src_port = 0

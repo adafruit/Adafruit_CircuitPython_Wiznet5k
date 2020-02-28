@@ -36,6 +36,8 @@ from micropython import const
 import adafruit_wiznet5k.adafruit_wiznet5k_socket as socket
 from adafruit_wiznet5k.adafruit_wiznet5k_socket import htons
 
+# pylint: disable=bad-whitespace
+
 QUERY_FLAG             = const(0x00)
 OPCODE_STANDARD_QUERY  = const(0x00)
 RECURSION_DESIRED_FLAG = 1<<8
@@ -51,7 +53,8 @@ INVALID_SERVER   = const(-2)
 TRUNCATED        = const(-3)
 INVALID_RESPONSE = const(-4)
 
-DNS_PORT = const(0x35) # port used for DNS request
+DNS_PORT         = const(0x35) # port used for DNS request
+# pylint: enable=bad-whitespace
 
 class DNS:
     """W5K DNS implementation.
@@ -91,8 +94,8 @@ class DNS:
         addr = -1
         while (retries < 3) and (addr == -1):
             addr = self._parse_dns_response()
-            retries+=1
-        
+            retries += 1
+
         self._sock.close()
         return addr
 
@@ -116,7 +119,6 @@ class DNS:
         # Validate request identifier
         if not hex(int.from_bytes(self._pkt_buf[0:2], 'l')) == hex(self._request_id):
             return -1
-
         # Validate flags
         if not int.from_bytes(self._pkt_buf[2:4], 'l') == 0x8180:
             return -1
@@ -136,11 +138,8 @@ class DNS:
                     return -1
                 # return the address
                 return self._pkt_buf[51:55]
-            else:
-                # not the correct answer type or class
-                an_count+=1
-
-        return -1
+            # not the correct answer type or class
+            an_count += 1
 
     def _build_dns_header(self):
         """Builds DNS header."""
@@ -186,5 +185,3 @@ class DNS:
         # Class IN
         self._pkt_buf.append(htons(CLASS_IN) & 0xFF)
         self._pkt_buf.append(htons(CLASS_IN) >> 8)
-
-
