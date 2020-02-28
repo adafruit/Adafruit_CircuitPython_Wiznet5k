@@ -72,7 +72,7 @@ MAX_DHCP_OPT = const(0x10)
 DHCP_SERVER_PORT   = const(67)
 # DHCP Lease Time, in seconds
 DEFAULT_LEASE_TIME = const(900)
-BROADCAST_SERVER_ADDR = 255, 255, 255, 255
+BROADCAST_SERVER_ADDR = (('255.255.255.255'))
 
 # pylint: enable=bad-whitespace
 _BUFF = bytearray(317)
@@ -120,7 +120,7 @@ class DHCP:
     def send_dhcp_message(self, state, time_elapsed):
         """Assemble and send a DHCP message packet to a socket.
         :param int state: DHCP Message state.
-        :param float time_elapsed: Number of seconds elapsed since client attempted to renew lease.
+        :param float time_elapsed: Number of seconds elapsed since client attempted to acquire/renew a lease.
 
         """
         # OP
@@ -264,8 +264,10 @@ class DHCP:
         self._t2 = int.from_bytes(_BUFF[263:267], 'l')
         # Subnet Mask
         self.subnet_mask = _BUFF[269:273]
+        print(_BUFF)
+        #time.sleep(100)
         # DNS Server
-        self.dns_server_ip = _BUFF[285:289]
+        self.dns_server_ip = _BUFF[281:285]
 
         return msg_type, xid
 
@@ -322,4 +324,6 @@ class DHCP:
 
         self._transaction_id += 1
         self._last_check_lease_ms = time.monotonic()
+        # close the socket, we're done with it
+        self._sock.close()
         return result

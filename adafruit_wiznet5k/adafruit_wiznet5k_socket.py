@@ -51,6 +51,7 @@ def htons(x):
 
 # pylint: disable=bad-whitespace
 SOCK_STREAM     = const(0x21) # TCP
+TCP_MODE        = 80
 SOCK_DGRAM      = const(0x02) # UDP
 AF_INET         = const(3)
 NO_SOCKET_AVAIL = const(255)
@@ -59,17 +60,34 @@ NO_SOCKET_AVAIL = const(255)
 # keep track of sockets we allocate
 SOCKETS = []
 
+def getaddrinfo(host, port, family=0, socktype=0, proto=0, flags=0):
+    """Translate the host/port argument into a sequence of 5-tuples that
+    contain all the necessary arguments for creating a socket connected to that service.
+
+    """
+    if not isinstance(port, int):
+        raise RuntimeError("Port must be an integer")
+    return [AF_INET, socktype, proto, '', (gethostbyname(host), port)]
+
+def gethostbyname(hostname):
+    """Translate a host name to IPv4 address format. The IPv4 address
+    is returned as a string.
+    :param str hostname: Desired hostname.
+    """
+    ip = _the_interface.get_host_by_name(hostname)
+    ip = "{}.{}.{}.{}".format(ip[0], ip[1], ip[2], ip[3])
+    return ip
+
 #pylint: disable=invalid-name
 class socket:
     """A simplified implementation of the Python 'socket' class
     for connecting to a Wiznet5k module.
-
     :param int family: Socket address (and protocol) family.
     :param int type: Socket type.
 
     """
     # pylint: disable=redefined-builtin
-    def __init__(self, family=AF_INET, type=SOCK_STREAM):
+    def __init__(self, family=AF_INET, type=SOCK_STREAM, proto=0, fileno=None, socknum=None):
         if family != AF_INET:
             raise RuntimeError("Only AF_INET family supported by W5K modules.")
         self._sock_type = type
@@ -106,11 +124,17 @@ class socket:
         """Return the remote address to which the socket is connected."""
         return _the_interface.remote_ip(self.socknum)
 
-    def gethostbyname(self, address):
-        """Translate a host name to IPv4 address format."""
-        raise NotImplementedError("Not implemented in this version of Wiznet5k.")
+    def inet_aton(self, ip_string):
+        """Convert an IPv4 address from dotted-quad string format.
+        :param str ip_string: IP Address, as a dotted-quad string.
 
-    def connect(self, address):
+        """
+        self._bufffer = b""
+        self._bufffer = [int(item) for item in ip_string.split('.')]
+        self._bufffer = bytearray(self._bufffer)
+        return self._bufffer
+
+    def connect(self, address, conntype=None):
         """Connect to a remote socket at address. (The format of address depends
         on the address family — see above.)
         :param tuple address: Remote socket as a (host, port) tuple.
@@ -120,7 +144,7 @@ class socket:
 
         if hasattr(host, 'split'):
             host = tuple(map(int, host.split('.')))
-
+        print(self._sock_type)
         if not _the_interface.socket_connect(self.socknum, host, port, conn_mode=self._sock_type):
             raise RuntimeError("Failed to connect to host", host)
         self._buffer = b''
@@ -131,6 +155,7 @@ class socket:
         :param bytearray data: Desired data to send to the socket.
 
         """
+        print(self.socknum, data)
         _the_interface.socket_write(self.socknum, data)
         gc.collect()
 
@@ -211,10 +236,13 @@ class socket:
         self._buffer = b''
         return firstline[0]
 
-    def close(self):
-        """Closes the socket.
+    def disconnect(self):
+        """Disconnects a TCP socket."""
+        assert self._sock_type == SOCK_STREAM, "Socket must be a TCP socket."
+        _the_interface.socket_disconnect(self.socknum)
 
-        """
+    def close(self):
+        """Closes the socket."""
         _the_interface.socket_close(self.socknum)
         SOCKETS.remove(self.socknum)
 
