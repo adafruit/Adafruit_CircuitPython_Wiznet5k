@@ -6,24 +6,21 @@ import digitalio
 from adafruit_wiznet5k.adafruit_wiznet5k import WIZNET5K
 import adafruit_wiznet5k.adafruit_wiznet5k_socket as socket
 
-# Name address for wifitest.adafruit.com
-SERVER_ADDRESS = (('104.236.193.178'), 80)
-
 cs = digitalio.DigitalInOut(board.D10)
 spi_bus = busio.SPI(board.SCK, MOSI=board.MOSI, MISO=board.MISO)
 
 # Initialize ethernet interface with DHCP
-eth = WIZNET5K(spi_bus, cs)
+eth = WIZNET5K(spi_bus, cs, debug=True)
 
 print("DHCP Assigned IP: ", eth.pretty_ip(eth.ip_address))
 
 socket.set_interface(eth)
 
-# Create a new socket
-sock = socket.socket()
+host = 'wifitest.adafruit.com'
+port = 80
 
-print("Connecting to: ", SERVER_ADDRESS[0])
-sock.connect(SERVER_ADDRESS)
+addr_info = socket.getaddrinfo(host, port, 0, socket.SOCK_STREAM)
+sock = socket.socket(addr_info[0], addr_info[1], addr_info[2])
 
 print("Connected to ", sock.getpeername())
 
