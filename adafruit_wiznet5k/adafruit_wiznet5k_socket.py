@@ -203,7 +203,28 @@ class socket:
             self._buffer = self._buffer[bufsize:]
         gc.collect()
         return ret
+    def readlines(self):
+        """Attempt to return as many bytes as we can up to
+        but not including \n"""
+        stamp = time.monotonic()
+        while b'\n' not in self._buffer:
+            if self._sock_type == SOCK_STREAM:
+                avail = self.available()
+                reading = _the_interface.socket_read(self.socknum, avail)
 
+                self._buffer += reading[1]
+                # self._buffer += reading#[0] #bsedit
+            elif self._sock_type == SOCK_DGRAM:
+                avail = _the_interface.udp_remaining()
+                self._buffer += _the_interface.read_udp(self.socknum, avail)[1]
+            elif self._timeout > 0 and time.monotonic() - stamp > self._timeout:
+                self.close()
+                raise RuntimeError("Didn't receive response, failing out...")
+        lines = self._buffer.split(b'\n')
+        gc.collect()
+        # clear tmp data buffer
+        self._buffer = b''
+        return lines
     def readline(self):
         """Attempt to return as many bytes as we can up to
         but not including \n"""
@@ -211,10 +232,8 @@ class socket:
         while b'\n' not in self._buffer:
             if self._sock_type == SOCK_STREAM:
                 avail = self.available()
-                reading = _the_interface.read(self.socknum, avail)
-                print("reading:", reading)
-                # self._buffer += reading[1]
-                self._buffer += reading#[0] #bsedit
+                reading = _the_interface.socket_read(self.socknum, avail)
+                self._buffer += reading[1]
             elif self._sock_type == SOCK_DGRAM:
                 avail = _the_interface.udp_remaining()
                 self._buffer += _the_interface.read_udp(self.socknum, avail)[1]
