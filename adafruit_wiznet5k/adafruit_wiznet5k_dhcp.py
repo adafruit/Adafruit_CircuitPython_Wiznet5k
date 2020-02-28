@@ -225,7 +225,7 @@ class DHCP:
         while packet_sz <= 0:
             packet_sz = self._sock.available()
             if (time.monotonic() - start_time) > response_timeout:
-                return 255
+                return (255, 0)
             time.sleep(0.05)
         # store packet in buffer
         _BUFF = self._sock.recv(packet_sz)[0]
@@ -288,11 +288,7 @@ class DHCP:
                                        ((time.monotonic() - start_time) / 1000))
                 self._dhcp_state = STATE_DHCP_DISCOVER
             elif self._dhcp_state == STATE_DHCP_DISCOVER:
-                resp = self.parse_dhcp_response(self._timeout)
-                if resp == 255:
-                    print("Timeout waiting for DHCP response")
-                    continue
-                msg_type, xid  = resp
+                msg_type, xid = self.parse_dhcp_response(self._timeout)
                 if msg_type == DHCP_OFFER:
                     # use the _transaction_id the offer returned,
                     # rather than the current one
