@@ -225,7 +225,7 @@ class DHCP:
         while packet_sz <= 0:
             packet_sz = self._sock.available()
             if (time.monotonic() - start_time) > response_timeout:
-                return 255
+                return (255, 0)
             time.sleep(0.05)
         # store packet in buffer
         _BUFF = self._sock.recv(packet_sz)[0]
