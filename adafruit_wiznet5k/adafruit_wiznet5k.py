@@ -147,7 +147,9 @@ class WIZNET5K:
     :param bool debug: Enable debugging output.
 
     """
-
+    TCP_MODE = const(0)
+    UDP_MODE = const(1)
+    TLS_MODE = const(2)
     # pylint: disable=too-many-arguments, too-many-public-methods
     def __init__(self, spi_bus, cs, reset=None,
                  is_dhcp=True, mac=DEFAULT_MAC, debug=False):

@@ -35,9 +35,14 @@ from micropython import const
 from adafruit_wiznet5k import adafruit_wiznet5k
 
 _the_interface = None   # pylint: disable=invalid-name
+
+
+
+
 def set_interface(iface):
     """Helper to set the global internet interface."""
     global _the_interface   # pylint: disable=global-statement, invalid-name
+    print("Setting interface to:", iface)
     _the_interface = iface
 
 def htonl(x):
@@ -58,7 +63,14 @@ NO_SOCKET_AVAIL = const(255)
 
 # keep track of sockets we allocate
 SOCKETS = []
-
+# pylint: disable=too-many-arguments, unused-argument
+def getaddrinfo(host, port, family=0, socktype=SOCK_STREAM, proto=0, flags=0):
+    """Given a hostname and a port name, return a 'socket.getaddrinfo'
+    compatible list of tuples. Honestly, we ignore anything but host & port"""
+    if not isinstance(port, int):
+        raise RuntimeError("Port must be an integer")
+    ipaddr = host
+    return [(AF_INET, socktype, proto, '', (ipaddr, port))]
 #pylint: disable=invalid-name
 class socket:
     """A simplified implementation of the Python 'socket' class
@@ -69,7 +81,8 @@ class socket:
 
     """
     # pylint: disable=redefined-builtin
-    def __init__(self, family=AF_INET, type=SOCK_STREAM):
+    # addr_info[0], addr_info[1], addr_info[2]
+    def __init__(self, family=AF_INET, type=SOCK_STREAM, proto=None):
         if family != AF_INET:
             raise RuntimeError("Only AF_INET family supported by W5K modules.")
         self._sock_type = type
@@ -110,7 +123,7 @@ class socket:
         """Translate a host name to IPv4 address format."""
         raise NotImplementedError("Not implemented in this version of Wiznet5k.")
 
-    def connect(self, address):
+    def connect(self, address, conntype=None):
         """Connect to a remote socket at address. (The format of address depends
         on the address family — see above.)
         :param tuple address: Remote socket as a (host, port) tuple.
@@ -198,7 +211,10 @@ class socket:
         while b'\n' not in self._buffer:
             if self._sock_type == SOCK_STREAM:
                 avail = self.available()
-                self._buffer += _the_interface.read(self.socknum, avail)[1]
+                reading = _the_interface.read(self.socknum, avail)
+                print("reading:", reading)
+                # self._buffer += reading[1]
+                self._buffer += reading#[0] #bsedit
             elif self._sock_type == SOCK_DGRAM:
                 avail = _the_interface.udp_remaining()
                 self._buffer += _the_interface.read_udp(self.socknum, avail)[1]
