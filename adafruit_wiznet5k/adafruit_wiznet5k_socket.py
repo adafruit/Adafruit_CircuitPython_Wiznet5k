@@ -223,13 +223,13 @@ class socket:
         while b'\r\n' not in self._buffer:
             if self._sock_type == SOCK_STREAM:
                 avail = self.available()
-                print("Avail: ", avail)
                 if avail:
                     reading = _the_interface.socket_read(self.socknum, avail)
                     self._buffer += reading[1]
             elif self._sock_type == SOCK_DGRAM:
                 avail = _the_interface.udp_remaining()
-                self._buffer += _the_interface.read_udp(self.socknum, avail)[1]
+                if avail:
+                    self._buffer += _the_interface.read_udp(self.socknum, avail)[1]
             elif self._timeout > 0 and time.monotonic() - stamp > self._timeout:
                 self.close()
                 raise RuntimeError("Didn't receive response, failing out...")
