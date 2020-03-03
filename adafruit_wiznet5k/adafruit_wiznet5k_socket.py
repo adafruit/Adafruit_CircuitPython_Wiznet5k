@@ -185,6 +185,7 @@ class socket:
             return ret
         stamp = time.monotonic()
 
+        # TODO: this needs to be repaired for requests
         to_read = bufsize - len(self._buffer)
         received = []
         while to_read > 0:
@@ -222,6 +223,7 @@ class socket:
         while b'\r\n' not in self._buffer:
             if self._sock_type == SOCK_STREAM:
                 avail = self.available()
+                print("Avail: ", avail)
                 if avail:
                     reading = _the_interface.socket_read(self.socknum, avail)
                     self._buffer += reading[1]
@@ -231,11 +233,11 @@ class socket:
             elif self._timeout > 0 and time.monotonic() - stamp > self._timeout:
                 self.close()
                 raise RuntimeError("Didn't receive response, failing out...")
-        firstline = self._buffer.split(b'\n', 1)
+        #firstline = self._buffer.split(b'\n', 1)
+        firstline, self._buffer = self._buffer.split(b'\r\n', 1)
         gc.collect()
-        # clear tmp data buffer
-        self._buffer = b''
-        return firstline[0]
+        #return firstline[0]
+        return firstline
 
     def disconnect(self):
         """Disconnects a TCP socket."""
