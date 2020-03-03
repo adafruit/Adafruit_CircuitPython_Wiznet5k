@@ -47,6 +47,7 @@ from micropython import const
 
 from adafruit_bus_device.spi_device import SPIDevice
 import adafruit_wiznet5k.adafruit_wiznet5k_dhcp as dhcp
+import adafruit_wiznet5k.adafruit_wiznet5k_dns as dns
 
 
 __version__ = "0.0.0-auto.0"
@@ -206,13 +207,27 @@ class WIZNET5K:
             _gw_addr = (_dhcp_client.gateway_ip[0], _dhcp_client.gateway_ip[1],
                         _dhcp_client.gateway_ip[2], _dhcp_client.gateway_ip[3])
 
-            _dns_addr = (_dhcp_client.dns_server_ip[0], _dhcp_client.dns_server_ip[1],
+            self._dns = (_dhcp_client.dns_server_ip[0], _dhcp_client.dns_server_ip[1],
                          _dhcp_client.dns_server_ip[2], _dhcp_client.dns_server_ip[3])
-            self.ifconfig = ((_ip, _subnet_mask, _gw_addr, _dns_addr))
+            self.ifconfig = ((_ip, _subnet_mask, _gw_addr, self._dns))
             return 0
-        # Reset SRC_Port
         self._src_port = 0
         return 1
+
+    def get_host_by_name(self, hostname):
+        """Convert a hostname to a packed 4-byte IP Address.
+        Returns a 4 bytearray.
+        """
+        if self._debug:
+            print("* Get host by name")
+        if isinstance(hostname, str):
+            hostname = bytes(hostname, 'utf-8')
+        self._src_port = int(time.monotonic())
+        # Return IP assigned by DHCP
+        _dns_client = dns.DNS(self, self._dns)
+        ret = _dns_client.gethostbyname(hostname)
+        self._src_port = 0
+        return ret
 
     @property
     def max_sockets(self):
@@ -289,10 +304,11 @@ class WIZNET5K:
     def ifconfig(self):
         """Returns the network configuration as a tuple."""
         # set subnet and gateway addresses
+        self._pbuff = bytearray(8)
         for octet in range(0, 4):
             self._pbuff += self.read(REG_SUBR+octet, 0x04)
         for octet in range(0, 4):
-            self._pbuff[3+octet] += self.read(REG_GAR+octet, 0x04)
+            self._pbuff += self.read(REG_GAR+octet, 0x04)
 
         params = (self.ip_address, self._pbuff[0:3], self._pbuff[3:7], self._dns)
         return params
@@ -430,7 +446,6 @@ class WIZNET5K:
         """
         if self._debug:
             print("* socket_available called with protocol", sock_type)
-            print("* #", socket_num)
         assert socket_num <= self.max_sockets, "Provided socket exceeds max_sockets."
 
         if sock_type == 0x02:
@@ -556,15 +571,18 @@ class WIZNET5K:
         return 1
 
     def socket_close(self, socket_num):
-        """Closes a socket.
-
-        """
-        assert self.link_status, "Ethernet cable disconnected!"
+        """Closes a socket."""
         if self._debug:
             print("*** Closing socket #%d" % socket_num)
         self._write_sncr(socket_num, CMD_SOCK_CLOSE)
         self._read_sncr(socket_num)
-        self._write_snir(socket_num, 0xFF)
+
+    def socket_disconnect(self, socket_num):
+        """Disconnect a TCP connection."""
+        if self._debug:
+            print("*** Disconnecting socket #%d" % socket_num)
+        self._write_sncr(socket_num, CMD_SOCK_DISCON)
+        self._read_sncr(socket_num)
 
     def socket_read(self, socket_num, length):
         """Reads data from a socket into a buffer.
@@ -673,7 +691,7 @@ class WIZNET5K:
         # check data was  transferred correctly
         while(self._read_socket(socket_num, REG_SNIR)[0] & SNIR_SEND_OK) != SNIR_SEND_OK:
             if self.socket_status(socket_num) == SNSR_SOCK_CLOSED:
-                self.socket_close(socket_num)
+                #self.socket_close(socket_num)
                 return 0
             time.sleep(0.01)
 
