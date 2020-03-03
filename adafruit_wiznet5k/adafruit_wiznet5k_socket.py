@@ -68,7 +68,7 @@ def getaddrinfo(host, port, family=0, socktype=0, proto=0, flags=0):
     """
     if not isinstance(port, int):
         raise RuntimeError("Port must be an integer")
-    return [AF_INET, socktype, proto, '', (gethostbyname(host), port)]
+    return [(AF_INET, socktype, proto, '', (gethostbyname(host), port))]
 
 def gethostbyname(hostname):
     """Translate a host name to IPv4 address format. The IPv4 address
@@ -219,10 +219,12 @@ class socket:
         """Attempt to return as many bytes as we can up to
         but not including \n"""
         stamp = time.monotonic()
-        while b'\n' not in self._buffer:
+        while b'\r\n' not in self._buffer:
             if self._sock_type == SOCK_STREAM:
                 avail = self.available()
-                self._buffer += _the_interface.read(self.socknum, avail)[1]
+                if avail:
+                    reading = _the_interface.socket_read(self.socknum, avail)
+                    self._buffer += reading[1]
             elif self._sock_type == SOCK_DGRAM:
                 avail = _the_interface.udp_remaining()
                 self._buffer += _the_interface.read_udp(self.socknum, avail)[1]

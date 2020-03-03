@@ -149,6 +149,9 @@ class WIZNET5K:
 
     """
 
+    TCP_MODE = const(0x21)
+    UDP_MODE = const(0x02)
+
     # pylint: disable=too-many-arguments, too-many-public-methods
     def __init__(self, spi_bus, cs, reset=None,
                  is_dhcp=True, mac=DEFAULT_MAC, debug=False):
