@@ -72,7 +72,7 @@ MAX_DHCP_OPT = const(0x10)
 DHCP_SERVER_PORT   = const(67)
 # DHCP Lease Time, in seconds
 DEFAULT_LEASE_TIME = const(900)
-BROADCAST_SERVER_ADDR = (('255.255.255.255'))
+BROADCAST_SERVER_ADDR = '255.255.255.255'
 
 # pylint: enable=bad-whitespace
 _BUFF = bytearray(317)
@@ -283,7 +283,7 @@ class DHCP:
         while self._dhcp_state != STATE_DHCP_LEASED:
             if self._dhcp_state == STATE_DHCP_START:
                 self._transaction_id += 1
-                self._sock.connect((BROADCAST_SERVER_ADDR, DHCP_SERVER_PORT))
+                self._sock.connect(((BROADCAST_SERVER_ADDR), DHCP_SERVER_PORT))
                 self.send_dhcp_message(STATE_DHCP_DISCOVER,
                                        ((time.monotonic() - start_time) / 1000))
                 self._dhcp_state = STATE_DHCP_DISCOVER
