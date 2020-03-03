@@ -158,12 +158,12 @@ class socket:
         _the_interface.socket_write(self.socknum, data)
         gc.collect()
 
+
     def recv(self, bufsize=0): #pylint: disable=too-many-branches
         """Reads some bytes from the connected remote address.
         :param int bufsize: Maximum number of bytes to receive.
-
         """
-        assert _the_interface.link_status, "Ethernet cable disconnected!"
+        # print("Socket read", bufsize)
         if bufsize == 0:
             # read everything on the socket
             while True:
@@ -173,9 +173,9 @@ class socket:
                     avail = _the_interface.udp_remaining()
                 if avail:
                     if self._sock_type == SOCK_STREAM:
-                        self._buffer += _the_interface.socket_read(self.socknum, avail)
+                        self._buffer += _the_interface.socket_read(self.socknum, avail)[1]
                     elif self._sock_type == SOCK_DGRAM:
-                        self._buffer += _the_interface.read_udp(self.socknum, avail)
+                        self._buffer += _the_interface.read_udp(self.socknum, avail)[1]
                 else:
                     break
             gc.collect()
@@ -185,7 +185,6 @@ class socket:
             return ret
         stamp = time.monotonic()
 
-        # TODO: this needs to be repaired for requests
         to_read = bufsize - len(self._buffer)
         received = []
         while to_read > 0:
@@ -204,7 +203,7 @@ class socket:
                 gc.collect()
             if self._timeout > 0 and time.monotonic() - stamp > self._timeout:
                 break
-        self._buffer = received
+        self._buffer += b''.join(received)
 
         ret = None
         if len(self._buffer) == bufsize:
@@ -218,25 +217,22 @@ class socket:
 
     def readline(self):
         """Attempt to return as many bytes as we can up to
-        but not including \n"""
+        but not including '\r\n'"""
         stamp = time.monotonic()
         while b'\r\n' not in self._buffer:
             if self._sock_type == SOCK_STREAM:
                 avail = self.available()
                 if avail:
-                    reading = _the_interface.socket_read(self.socknum, avail)
-                    self._buffer += reading[1]
+                    self._buffer += _the_interface.socket_read(self.socknum, avail)[1]
             elif self._sock_type == SOCK_DGRAM:
                 avail = _the_interface.udp_remaining()
                 if avail:
-                    self._buffer += _the_interface.read_udp(self.socknum, avail)[1]
+                    self._buffer += _the_interface.read_udp(self.socknum, avail)
             elif self._timeout > 0 and time.monotonic() - stamp > self._timeout:
                 self.close()
                 raise RuntimeError("Didn't receive response, failing out...")
-        #firstline = self._buffer.split(b'\n', 1)
         firstline, self._buffer = self._buffer.split(b'\r\n', 1)
         gc.collect()
-        #return firstline[0]
         return firstline
 
     def disconnect(self):

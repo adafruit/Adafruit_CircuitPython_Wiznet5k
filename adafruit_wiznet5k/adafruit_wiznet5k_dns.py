@@ -114,7 +114,7 @@ class DNS:
                 return -1
             time.sleep(0.05)
         # store packet in buffer
-        self._pkt_buf = self._sock.recv(packet_sz)[0]
+        self._pkt_buf = self._sock.recv()
 
         # Validate request identifier
         if not int.from_bytes(self._pkt_buf[0:2], 'l') == self._request_id:

@@ -228,7 +228,7 @@ class DHCP:
                 return (255, 0)
             time.sleep(0.05)
         # store packet in buffer
-        _BUFF = self._sock.recv(packet_sz)[0]
+        _BUFF = self._sock.recv()
 
         # Check OP, if valid, let's parse the packet out!
         assert _BUFF[0] == DHCP_BOOT_REPLY, "Malformed Packet - \
