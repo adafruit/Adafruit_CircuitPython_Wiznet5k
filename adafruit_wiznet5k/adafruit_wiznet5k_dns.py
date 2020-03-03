@@ -30,6 +30,7 @@ ethernet modules.
 * Author(s): MCQN Ltd, Brent Rubell
 
 """
+import gc
 import time
 from random import getrandbits
 from micropython import const
@@ -122,16 +123,24 @@ class DNS:
         # Validate flags
         if not int.from_bytes(self._pkt_buf[2:4], 'l') == 0x8180:
             return -1
-        # Validate Answer RRs (>=1)
+        # Number of questions
+        qr_count = int.from_bytes(self._pkt_buf[4:6], 'l')
+        if not qr_count >= 1:
+            return -1
+        # Number of answers
         an_count = int.from_bytes(self._pkt_buf[6:8], 'l')
         if not an_count >= 1:
             return -1
+        # ARCOUNT [8:10], unused
+        # RRCOUNT [10:12], unused
+        
 
         # iterate over ANCOUNT since answer may not be type A
         while an_count > 0:
             ans_type = int.from_bytes(self._pkt_buf[41:43], 'l')
             ans_class = int.from_bytes(self._pkt_buf[43:45], 'l')
             ans_len = int.from_bytes(self._pkt_buf[49:51], 'l')
+            #print(ans_type, ans_class, ans_len)
             if  ans_type == TYPE_A and ans_class == CLASS_IN:
                 if ans_len != 4:
                     # invalid size ret.'d
