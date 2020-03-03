@@ -117,7 +117,7 @@ class DNS:
         self._pkt_buf = self._sock.recv(packet_sz)[0]
 
         # Validate request identifier
-        if not hex(int.from_bytes(self._pkt_buf[0:2], 'l')) == hex(self._request_id):
+        if not int.from_bytes(self._pkt_buf[0:2], 'l') == self._request_id:
             return -1
         # Validate flags
         if not int.from_bytes(self._pkt_buf[2:4], 'l') == 0x8180:
