@@ -133,22 +133,10 @@ class DNS:
             return -1
         # ARCOUNT [8:10], unused
         # RRCOUNT [10:12], unused
-        
 
-        # iterate over ANCOUNT since answer may not be type A
-        while an_count > 0:
-            ans_type = int.from_bytes(self._pkt_buf[41:43], 'l')
-            ans_class = int.from_bytes(self._pkt_buf[43:45], 'l')
-            ans_len = int.from_bytes(self._pkt_buf[49:51], 'l')
-            #print(ans_type, ans_class, ans_len)
-            if  ans_type == TYPE_A and ans_class == CLASS_IN:
-                if ans_len != 4:
-                    # invalid size ret.'d
-                    return -1
-                # return the address
-                return self._pkt_buf[51:55]
-            # not the correct answer type or class
-            an_count += 1
+        for i in range(0, an_count): # iterate tru answers
+            idx = self._pkt_buf.find(b'\x00\x04')
+            return self._pkt_buf[idx+2:idx+6]
 
     def _build_dns_header(self):
         """Builds DNS header."""
