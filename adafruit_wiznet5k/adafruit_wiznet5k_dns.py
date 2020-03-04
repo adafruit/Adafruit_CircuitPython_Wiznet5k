@@ -181,30 +181,43 @@ class DNS:
             return -1
         ptr += 2
 
-        # find answer response, TODO: Remove in favor of stream-like approach above
-        idx = self._pkt_buf.find(b'\xc0\x0c')
-        # Validate Type A
-        ans_type = int.from_bytes(self._pkt_buf[idx+2:idx+4], 'l')
+        # Let's take the first type-a answer
+        if self._pkt_buf[ptr] != 0xc0:
+            return -1
+        ptr += 1
+
+        if self._pkt_buf[ptr] != 0xc:
+            return -1
+        ptr += 1
+
+        # Validate Answer Type A
+        ans_type = int.from_bytes(self._pkt_buf[ptr:ptr+2], 'l')
         if not ans_type == TYPE_A:
             if self._debug:
                 print("* DNS ERROR: Incorrect Answer Type: ", ans_type)
             return -1
-        # Validate Class IN
-        class_type = int.from_bytes(self._pkt_buf[idx+4:idx+6], 'l')
-        if not class_type == CLASS_IN:
+        ptr += 2
+
+        # Validate Answer Class IN
+        ans_class = int.from_bytes(self._pkt_buf[ptr:ptr+2], 'l')
+        if not ans_class == TYPE_A:
             if self._debug:
-                print("* DNS ERROR: Incorrect Class Type: ", class_type)
+                print("* DNS ERROR: Incorrect Answer Class: ", ans_class)
             return -1
-        # Ignore 2-byte TTL
+        ptr += 2
+
+        # skip over TTL
+        ptr += 4
+
         # Validate addr is IPv4
-        data_length = int.from_bytes(self._pkt_buf[idx+10:idx+12], 'l')
-        if not data_length == DATA_LEN:
+        data_len = int.from_bytes(self._pkt_buf[ptr:ptr+2], 'l')
+        if not data_len == DATA_LEN:
             if self._debug:
-                print("* DNS ERROR: Unexpected Data Length: ", data_length)
+                print("* DNS ERROR: Unexpected Data Length: ", data_len)
             return -1
+        ptr += 2
         # Return address
-        gc.collect()
-        return self._pkt_buf[idx+12:idx+16]
+        return self._pkt_buf[ptr:ptr+4]
 
     def _build_dns_header(self):
         """Builds DNS header."""
