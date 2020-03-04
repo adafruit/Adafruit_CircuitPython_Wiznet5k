@@ -233,7 +233,7 @@ class WIZNET5K: # pylint: disable=too-many-public-methods
             hostname = bytes(hostname, 'utf-8')
         self._src_port = int(time.monotonic())
         # Return IP assigned by DHCP
-        _dns_client = dns.DNS(self, self._dns)
+        _dns_client = dns.DNS(self, self._dns, debug=self._debug)
         ret = _dns_client.gethostbyname(hostname)
         if self._debug:
             print("* Resolved IP: ", ret)

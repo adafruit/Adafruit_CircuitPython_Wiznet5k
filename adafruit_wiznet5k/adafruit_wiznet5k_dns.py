@@ -62,7 +62,8 @@ class DNS:
 
     :param iface: Network interface
     """
-    def __init__(self, iface, dns_address):
+    def __init__(self, iface, dns_address, debug=False):
+        self._debug = debug
         self._iface = iface
         socket.set_interface(iface)
         self._sock = socket.socket(type=socket.SOCK_DGRAM)
@@ -88,6 +89,8 @@ class DNS:
 
         # Send DNS request packet
         self._sock.connect((self._dns_server, DNS_PORT))
+        if self._debug:
+            print("* DNS: Sending request packet...")
         self._sock.send(self._pkt_buf)
 
         # wait and retry 3 times for a response
@@ -95,12 +98,13 @@ class DNS:
         addr = -1
         while (retries < 3) and (addr == -1):
             addr = self._parse_dns_response()
+            if addr == -1 and self._debug:
+                print("* DNS: Failed to resolve DNS response, retrying...")
             retries += 1
 
         self._sock.close()
         return addr
 
-    # pylint: disable=too-many-return-statements
     def _parse_dns_response(self):
         """Receives and parses DNS query response.
         Returns desired hostname address if obtained, -1 otherwise.
