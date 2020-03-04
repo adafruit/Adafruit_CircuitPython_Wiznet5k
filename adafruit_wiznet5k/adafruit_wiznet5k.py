@@ -199,8 +199,6 @@ class WIZNET5K: # pylint: disable=too-many-public-methods
         _dhcp_client = dhcp.DHCP(self, self.mac_address, response_timeout)
         ret = _dhcp_client.request_dhcp_lease()
         if ret == 1:
-            if self._debug:
-                print("* Found DHCP server - setting configuration...")
             _ip = (_dhcp_client.local_ip[0], _dhcp_client.local_ip[1],
                    _dhcp_client.local_ip[2], _dhcp_client.local_ip[3])
 
@@ -213,7 +211,15 @@ class WIZNET5K: # pylint: disable=too-many-public-methods
             self._dns = (_dhcp_client.dns_server_ip[0], _dhcp_client.dns_server_ip[1],
                          _dhcp_client.dns_server_ip[2], _dhcp_client.dns_server_ip[3])
             self.ifconfig = ((_ip, _subnet_mask, _gw_addr, self._dns))
+            if self._debug:
+                print("* Found DHCP Server:")
+                print("IP: {}\nSubnet Mask: {}\nGW Addr: {}\nDNS Server: {}".format(_ip,
+                                                                                    _subnet_mask,
+                                                                                    _gw_addr,
+                                                                                    self._dns))
             return 0
+        if self._debug:
+            print("* Failed to find DHCP server!")
         self._src_port = 0
         return 1
 
