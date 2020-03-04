@@ -29,6 +29,7 @@ Pure-Python implementation of Jordan Terrell's DHCP library v0.3
 * Author(s): Jordan Terrell, Brent Rubell
 
 """
+import gc
 import time
 from random import randrange
 from micropython import const
@@ -267,6 +268,7 @@ class DHCP:
         # DNS Server
         self.dns_server_ip = _BUFF[281:285]
 
+        gc.collect()
         return msg_type, xid
 
     def request_dhcp_lease(self):
@@ -324,4 +326,5 @@ class DHCP:
         self._last_check_lease_ms = time.monotonic()
         # close the socket, we're done with it
         self._sock.close()
+        gc.collect()
         return result

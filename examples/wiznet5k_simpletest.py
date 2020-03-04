@@ -24,7 +24,6 @@ print("MAC Address:", [hex(i) for i in eth.mac_address])
 print("My IP address is:", eth.pretty_ip(eth.ip_address))
 print("IP lookup adafruit.com: %s" %eth.pretty_ip(eth.get_host_by_name("adafruit.com")))
 
-
 #eth._debug = True
 print("Fetching text from", TEXT_URL)
 r = requests.get(TEXT_URL)
