@@ -196,7 +196,7 @@ class WIZNET5K: # pylint: disable=too-many-public-methods
             print("* Initializing DHCP")
         self._src_port = 68
         # Return IP assigned by DHCP
-        _dhcp_client = dhcp.DHCP(self, self.mac_address, response_timeout)
+        _dhcp_client = dhcp.DHCP(self, self.mac_address, response_timeout, debug=self._debug)
         ret = _dhcp_client.request_dhcp_lease()
         if ret == 1:
             _ip = (_dhcp_client.local_ip[0], _dhcp_client.local_ip[1],

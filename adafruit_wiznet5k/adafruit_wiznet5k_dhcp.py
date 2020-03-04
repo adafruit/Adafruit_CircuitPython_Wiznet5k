@@ -89,7 +89,8 @@ class DHCP:
     """
 
     # pylint: disable=too-many-arguments, too-many-instance-attributes, invalid-name
-    def __init__(self, eth, mac_address, timeout=1, timeout_response=1):
+    def __init__(self, eth, mac_address, timeout=1, timeout_response=1, debug=False):
+        self._debug = debug
         self._timeout = timeout
         self._response_timeout = timeout_response
         self._mac_address = mac_address
@@ -230,6 +231,8 @@ class DHCP:
             time.sleep(0.05)
         # store packet in buffer
         _BUFF = self._sock.recv()
+        if self._debug:
+            print("DHCP Response: ", _BUFF)
 
         # Check OP, if valid, let's parse the packet out!
         assert _BUFF[0] == DHCP_BOOT_REPLY, "Malformed Packet - \
