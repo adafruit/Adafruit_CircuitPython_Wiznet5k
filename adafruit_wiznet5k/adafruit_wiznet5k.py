@@ -556,7 +556,8 @@ class WIZNET5K: # pylint: disable=too-many-public-methods
             print("*** Opening socket %d"%socket_num)
         if self._read_snsr(socket_num)[0] == SNSR_SOCK_CLOSED:
             if self._debug:
-                print("w5k socket begin, protocol={}, port={}".format(conn_mode, port))
+                print("w5k socket begin, protocol={}, port={}, ip={}".format(conn_mode, port,
+                                                                             self.pretty_ip(dest)))
             time.sleep(0.00025)
 
             self._write_snmr(socket_num, conn_mode)
