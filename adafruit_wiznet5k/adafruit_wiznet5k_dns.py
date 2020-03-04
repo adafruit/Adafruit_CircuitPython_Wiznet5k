@@ -100,6 +100,7 @@ class DNS:
         self._sock.close()
         return addr
 
+    # pylint: disable=too-many-return-statements
     def _parse_dns_response(self):
         """Receives and parses DNS query response.
         Returns desired hostname address if obtained, -1 otherwise.
@@ -114,7 +115,7 @@ class DNS:
                 # timed out!
                 return -1
             time.sleep(0.05)
-        # store packet in buffer
+        # recv paket into buf
         self._pkt_buf = self._sock.recv()
 
         # Validate request identifier
@@ -132,16 +133,21 @@ class DNS:
         if not an_count >= 1:
             return -1
 
-        while an_count > 0:
-            idx = self._pkt_buf.find(b'\xc0\x0c')
-            print("Packet IDX: ", idx)
-            print(self._pkt_buf)
-            # TODO: validate subsequent based off IDX
-            # answer record found, types OK
-            gc.collect()
-            an_count -= 1
-            return self._pkt_buf[idx+12:idx+16]
-
+        # find answer response
+        idx = self._pkt_buf.find(b'\xc0\x0c')
+        # Validate Type A
+        if not int.from_bytes(self._pkt_buf[idx+2:idx+4], 'l') == TYPE_A:
+            return -1
+        # Validate Class IN
+        if not int.from_bytes(self._pkt_buf[idx+4:idx+6], 'l') == CLASS_IN:
+            return -1
+        # Ignore 2-byte TTL
+        # Validate addr is IPv4
+        if not int.from_bytes(self._pkt_buf[idx+10:idx+12], 'l') == DATA_LEN:
+            return -1
+        # Return address
+        gc.collect()
+        return self._pkt_buf[idx+12:idx+16]
 
     def _build_dns_header(self):
         """Builds DNS header."""
