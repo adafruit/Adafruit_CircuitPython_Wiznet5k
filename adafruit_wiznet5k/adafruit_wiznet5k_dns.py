@@ -30,7 +30,6 @@ ethernet modules.
 * Author(s): MCQN Ltd, Brent Rubell
 
 """
-import gc
 import time
 from random import getrandbits
 from micropython import const
