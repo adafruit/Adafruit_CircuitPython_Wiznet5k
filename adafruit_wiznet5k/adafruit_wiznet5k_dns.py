@@ -105,7 +105,7 @@ class DNS:
         self._sock.close()
         return addr
 
-    def _parse_dns_response(self): # pylint: disable=too-many-return-statements, too-many-branches
+    def _parse_dns_response(self): # pylint: disable=too-many-return-statements, too-many-branches, too-many-statements, too-many-locals
         """Receives and parses DNS query response.
         Returns desired hostname address if obtained, -1 otherwise.
 
@@ -152,7 +152,36 @@ class DNS:
         if not an_count >= 1:
             return -1
 
-        # find answer response
+        # Parse query
+        ptr = 12
+        name_len = 1
+        while name_len > 0:
+            # read the length of the name
+            name_len = self._pkt_buf[ptr]
+            if name_len == 0x00:
+                # we reached the end of this name
+                ptr += 1 # inc. pointer by 0x00
+                break
+            # advance pointer
+            ptr += name_len + 1
+
+        # Validate Query is Type A
+        q_type = int.from_bytes(self._pkt_buf[ptr:ptr+2], 'l')
+        if not q_type == TYPE_A:
+            if self._debug:
+                print("* DNS ERROR: Incorrect Query Type: ", q_type)
+            return -1
+        ptr += 2
+
+        # Validate Query is Type A
+        q_class = int.from_bytes(self._pkt_buf[ptr:ptr+2], 'l')
+        if not q_class == TYPE_A:
+            if self._debug:
+                print("* DNS ERROR: Incorrect Query Class: ", q_class)
+            return -1
+        ptr += 2
+
+        # find answer response, TODO: Remove in favor of stream-like approach above
         idx = self._pkt_buf.find(b'\xc0\x0c')
         # Validate Type A
         ans_type = int.from_bytes(self._pkt_buf[idx+2:idx+4], 'l')
