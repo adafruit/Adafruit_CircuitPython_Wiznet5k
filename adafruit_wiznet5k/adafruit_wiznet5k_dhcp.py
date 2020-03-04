@@ -228,7 +228,7 @@ class DHCP:
         # Send DHCP packet
         self._sock.send(_BUFF)
 
-    def parse_dhcp_response(self, response_timeout):
+    def parse_dhcp_response(self, response_timeout): # pylint: disable=too-many-branches, too-many-statements
         """Parse DHCP response from DHCP server.
         Returns DHCP packet type.
 
@@ -243,107 +243,77 @@ class DHCP:
             time.sleep(0.05)
         # store packet in buffer
         _BUFF = self._sock.recv()
-       # _BUFF = b'\x02\x01\x06\x00\x00\x00\x05\x0e\x00\x00\x80\x00\x00\x00\x00\x00\n\x00\x010\x00\x00\x00\x00\x00\x00\x00\x00\xde\xad\xbe\xef\xfe\xed\xed\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00c\x82Sc5\x01\x056\x04\n\x00\x01\x013\x04\x00\x00\xa8\xc0\x01\x04\xff\xff\xff\x00\x03\x04\n\x00\x01\x01\x06\x04\n\x00\x01\x01\x0f\x10fios-router.home:\x04\x00\x00T`;\x04\x00\x00\x93\xa8\xff'
         if self._debug:
             print("DHCP Response: ", _BUFF)
 
-        # Check OP, if valid, let's parse the packet out!
+        # -- Parse Packet, FIXED -- #
+        # Validate OP
         assert _BUFF[0] == DHCP_BOOT_REPLY, "Malformed Packet - \
             DHCP message OP is not expected BOOT Reply."
 
-        # Parse out FIXED portion of DHCP packet
-        op = _BUFF[0]
-        htype = _BUFF[1]
-        hlen = _BUFF[2]
-        hops = _BUFF[3]
         xid = _BUFF[4:8]
-        if bytes(_BUFF[4:8]) < self._initial_xid:
-            print("yes")
-            #return 0, 0
+        if bytes(xid) < self._initial_xid:
+            return 0, 0
 
-
-        secs = _BUFF[8:10]
-        flags = _BUFF[10:12]
-        ciaddr = _BUFF[12:16]
-
-        self.local_ip =  _BUFF[16:20]
-        self.gateway_ip = _BUFF[24:28]
-        yiaddr = _BUFF[16:20]
-        siaddr = _BUFF[20:24]
-        giaddr = _BUFF[24:28]
+        self.local_ip = _BUFF[16:20]
         if _BUFF[28:34] == 0:
-            print("no")
-            #return 0, 0
+            return 0, 0
 
         if int.from_bytes(_BUFF[235:240], 'l') != MAGIC_COOKIE:
-            print("NO!")
-            #return 0, 0
+            return 0, 0
 
-
-        # Parse out VARIABLE options
-        print('Remaining Option Len: ', len(_BUFF[240:]))
-        print(_BUFF[240:])
+        # -- Parse Packet, VARIABLE -- #
         ptr = 240
         buff_remaining = len(_BUFF[240:])
         while buff_remaining > 0:
-            print("reading..", ptr)
-            print('byte: ', _BUFF[ptr])
             if _BUFF[ptr] == MSG_TYPE:
                 ptr += 1
                 opt_len = _BUFF[ptr]
                 ptr += opt_len
                 msg_type = _BUFF[ptr]
                 ptr += 1
-                print("MSG TYPE: ", msg_type)
             elif _BUFF[ptr] == SUBNET_MASK:
                 ptr += 1
                 opt_len = _BUFF[ptr]
                 ptr += 1
                 self.subnet_mask = _BUFF[ptr:ptr+opt_len]
                 ptr += opt_len
-                print("SUBNET MASK:  ", self.subnet_mask)
             elif _BUFF[ptr] == DHCP_SERVER_ID:
                 ptr += 1
                 opt_len = _BUFF[ptr]
                 ptr += 1
                 self.dhcp_server_ip = _BUFF[ptr:ptr+opt_len]
                 ptr += opt_len
-                print("DHCP SERVER ID: ", self.dhcp_server_ip)
             elif _BUFF[ptr] == LEASE_TIME:
                 ptr += 1
                 opt_len = _BUFF[ptr]
                 ptr += 1
-                self._lease_time =  int.from_bytes(_BUFF[ptr:ptr+opt_len], 'l')
+                self._lease_time = int.from_bytes(_BUFF[ptr:ptr+opt_len], 'l')
                 ptr += opt_len
-                print("Lease Time: ", self._lease_time)
             elif _BUFF[ptr] == ROUTERS_ON_SUBNET:
                 ptr += 1
                 opt_len = _BUFF[ptr]
                 ptr += 1
-                gateway_ip = _BUFF[ptr:ptr+opt_len]
+                self.gateway_ip = _BUFF[ptr:ptr+opt_len]
                 ptr += opt_len
-                print("gateway_ip:  ", gateway_ip)
             elif _BUFF[ptr] == DNS_SERVERS:
                 ptr += 2 # move past length
                 # NOTE: we're only using the first DNS server
                 opt_len = _BUFF[ptr]
                 self.dns_server_ip = _BUFF[ptr:ptr+4]
                 ptr += opt_len # still increment even though we only read 1 addr.
-                print("dns_server:  ", self.dns_server_ip)
             elif _BUFF[ptr] == T1_VAL:
                 ptr += 1
                 opt_len = _BUFF[ptr]
                 ptr += 1
                 self._t1 = int.from_bytes(_BUFF[ptr:ptr+opt_len], 'l')
                 ptr += opt_len
-                print("t1:  ", self._t1)
             elif _BUFF[ptr] == T2_VAL:
                 ptr += 1
                 opt_len = _BUFF[ptr]
                 ptr += 1
                 self._t2 = int.from_bytes(_BUFF[ptr:ptr+opt_len], 'l')
                 ptr += opt_len
-                print("t2:  ", self._t2)
             elif _BUFF[ptr] == OPT_END:
                 break
             else:
@@ -354,12 +324,11 @@ class DHCP:
                 # no-op
                 ptr += opt_len
             buff_remaining = ptr - buff_remaining
-            print('remaining: ', buff_remaining)
 
         gc.collect()
         return msg_type, xid
 
-    def request_dhcp_lease(self):
+    def request_dhcp_lease(self): # pylint: disable=too-many-branches
         """Request to renew or acquire a DHCP lease.
 
         """
