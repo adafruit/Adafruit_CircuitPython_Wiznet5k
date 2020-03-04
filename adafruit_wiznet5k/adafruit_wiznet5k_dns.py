@@ -133,12 +133,14 @@ class DNS:
             return -1
 
         while an_count > 0:
-            idx = self._pkt_buf.find(b'\x00\x04')
+            idx = self._pkt_buf.find(b'\xc0\x0c')
+            print("Packet IDX: ", idx)
+            print(self._pkt_buf)
             # TODO: validate subsequent based off IDX
             # answer record found, types OK
             gc.collect()
             an_count -= 1
-            return self._pkt_buf[idx+2:idx+6]
+            return self._pkt_buf[idx+12:idx+16]
 
 
     def _build_dns_header(self):
