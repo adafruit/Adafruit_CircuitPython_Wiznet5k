@@ -216,8 +216,10 @@ class socket:
         return ret
 
     def readline(self):
-        """Attempt to return as many bytes as we can up to
-        but not including '\r\n'"""
+        """Attempt to return as many bytes as we can up to \
+        but not including '\r\n'.
+
+        """
         stamp = time.monotonic()
         while b'\r\n' not in self._buffer:
             if self._sock_type == SOCK_STREAM:
