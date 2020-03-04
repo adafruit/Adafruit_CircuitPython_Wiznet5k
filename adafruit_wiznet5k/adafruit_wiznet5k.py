@@ -229,6 +229,7 @@ class WIZNET5K: # pylint: disable=too-many-public-methods
         # Return IP assigned by DHCP
         _dns_client = dns.DNS(self, self._dns)
         ret = _dns_client.gethostbyname(hostname)
+        assert ret != -1, "Failed to resolve hostname from DNS server."
         self._src_port = 0
         return ret
 
