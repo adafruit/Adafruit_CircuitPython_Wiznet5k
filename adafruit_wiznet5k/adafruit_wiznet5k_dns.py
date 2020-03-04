@@ -131,12 +131,15 @@ class DNS:
         an_count = int.from_bytes(self._pkt_buf[6:8], 'l')
         if not an_count >= 1:
             return -1
-        # ARCOUNT [8:10], unused
-        # RRCOUNT [10:12], unused
 
-        for i in range(0, an_count): # iterate tru answers
+        while an_count > 0:
             idx = self._pkt_buf.find(b'\x00\x04')
+            # TODO: validate subsequent based off IDX
+            # answer record found, types OK
+            gc.collect()
+            an_count -= 1
             return self._pkt_buf[idx+2:idx+6]
+
 
     def _build_dns_header(self):
         """Builds DNS header."""

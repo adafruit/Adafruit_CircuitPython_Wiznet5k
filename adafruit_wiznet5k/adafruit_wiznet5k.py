@@ -138,7 +138,7 @@ UDP_SOCK = {'bytes_remaining': 0,
             'remote_ip': 0,
             'remote_port': 0}
 
-class WIZNET5K:
+class WIZNET5K: # pylint: disable=too-many-public-methods
     """Interface for WIZNET5K module.
     :param ~busio.SPI spi_bus: The SPI bus the Wiznet module is connected to.
     :param ~digitalio.DigitalInOut cs: Chip select pin.
@@ -152,7 +152,7 @@ class WIZNET5K:
     TCP_MODE = const(0x21)
     UDP_MODE = const(0x02)
 
-    # pylint: disable=too-many-arguments, too-many-public-methods
+    # pylint: disable=too-many-arguments
     def __init__(self, spi_bus, cs, reset=None,
                  is_dhcp=True, mac=DEFAULT_MAC, debug=False):
         self._debug = debug
