@@ -512,16 +512,23 @@ class WIZNET5K: # pylint: disable=too-many-public-methods
 
         if conn_mode == SNMR_TCP:
             # TCP client - connect socket
-            self._write_sncr(socket_num, CMD_SOCK_CONNECT)
-            self._read_sncr(socket_num)
+            self._send_socket_cmd(socket_num, CMD_SOCK_CONNECT)
             # wait for tcp connection establishment
             while self.socket_status(socket_num)[0] != SNSR_SOCK_ESTABLISHED:
+                if self._debug:
+                    print("STATUS:", self.socket_status(socket_num)[0])
                 if self.socket_status(socket_num)[0] == SNSR_SOCK_CLOSED:
                     raise RuntimeError('Failed to establish connection.')
                 time.sleep(1)
         elif conn_mode == SNMR_UDP:
             UDP_SOCK['bytes_remaining'] = 0
         return 1
+
+    def _send_socket_cmd(self, socket, cmd):
+        self._write_sncr(socket, cmd)
+        while self._read_sncr(socket) != b'\x00':
+            if self._debug:
+                print("waiting for sncr to clear...")
 
     def get_socket(self, sockets):
         """Requests, allocates and returns a socket from the W5k
