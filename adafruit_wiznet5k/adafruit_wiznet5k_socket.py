@@ -141,6 +141,7 @@ class socket:
         :param tuple address: Remote socket as a (host, port) tuple.
 
         """
+        assert conntype != 0x03, "Error: SSL/TLS is not currently supported by CircuitPython."
         host, port = address
 
         if hasattr(host, 'split'):

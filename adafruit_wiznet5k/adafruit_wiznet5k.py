@@ -151,6 +151,7 @@ class WIZNET5K: # pylint: disable=too-many-public-methods
 
     TCP_MODE = const(0x21)
     UDP_MODE = const(0x02)
+    TLS_MODE = const(0x03) # This is NOT currently implemented
 
     # pylint: disable=too-many-arguments
     def __init__(self, spi_bus, cs, reset=None,
