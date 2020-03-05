@@ -314,15 +314,8 @@ class WIZNET5K: # pylint: disable=too-many-public-methods
     @property
     def ifconfig(self):
         """Returns the network configuration as a tuple."""
-        # set subnet and gateway addresses
-        self._pbuff = bytearray(8)
-        for octet in range(0, 4):
-            self._pbuff += self.read(REG_SUBR+octet, 0x04)
-        for octet in range(0, 4):
-            self._pbuff += self.read(REG_GAR+octet, 0x04)
-
-        params = (self.ip_address, self._pbuff[0:3], self._pbuff[3:7], self._dns)
-        return params
+        return (self.ip_address, self.read(REG_SUBR, 0x00, 4),
+                self.read(REG_GAR, 0x00, 4), self._dns)
 
     @ifconfig.setter
     def ifconfig(self, params):
@@ -332,14 +325,10 @@ class WIZNET5K: # pylint: disable=too-many-public-methods
         """
         ip_address, subnet_mask, gateway_address, dns_server = params
 
-        # Set IP Address
         self.write(REG_SIPR, 0x04, ip_address)
+        self.write(REG_SUBR, 0x04, subnet_mask)
+        self.write(REG_GAR, 0x04, gateway_address)
 
-        # set subnet and gateway addresses
-        for octet in range(0, 4):
-            self.write(REG_SUBR+octet, 0x04, subnet_mask[octet])
-            self.write(REG_GAR+octet, 0x04, gateway_address[octet])
-        # set dns server address
         self._dns = dns_server
 
     def _w5100_init(self):
