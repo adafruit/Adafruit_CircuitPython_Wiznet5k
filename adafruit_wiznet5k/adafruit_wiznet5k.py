@@ -183,7 +183,8 @@ class WIZNET5K: # pylint: disable=too-many-public-methods
         self._dns = 0
         # Set DHCP
         if is_dhcp:
-            self.set_dhcp()
+            ret = self.set_dhcp()
+            assert ret == 0, "Failed to configure DHCP Server!"
 
     def set_dhcp(self, response_timeout=1):
         """Initializes the DHCP client and attempts to retrieve
@@ -218,10 +219,7 @@ class WIZNET5K: # pylint: disable=too-many-public-methods
                                                                                     _gw_addr,
                                                                                     self._dns))
             return 0
-        if self._debug:
-            print("* Failed to find DHCP server!")
-        self._src_port = 0
-        return 1
+        return -1
 
     def get_host_by_name(self, hostname):
         """Convert a hostname to a packed 4-byte IP Address.

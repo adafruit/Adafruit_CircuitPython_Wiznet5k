@@ -296,9 +296,9 @@ class DHCP:
                 self.gateway_ip = _BUFF[ptr:ptr+opt_len]
                 ptr += opt_len
             elif _BUFF[ptr] == DNS_SERVERS:
-                ptr += 2 # move past length
-                # NOTE: we're only using the first DNS server
+                ptr += 1
                 opt_len = _BUFF[ptr]
+                ptr += 1
                 self.dns_server_ip = _BUFF[ptr:ptr+4]
                 ptr += opt_len # still increment even though we only read 1 addr.
             elif _BUFF[ptr] == T1_VAL:
@@ -333,7 +333,7 @@ class DHCP:
         gc.collect()
         return msg_type, xid
 
-    def request_dhcp_lease(self): # pylint: disable=too-many-branches
+    def request_dhcp_lease(self): # pylint: disable=too-many-branches, too-many-statements
         """Request to renew or acquire a DHCP lease.
 
         """
@@ -365,6 +365,8 @@ class DHCP:
                         print("* DHCP: Request")
                     self.send_dhcp_message(DHCP_REQUEST, ((time.monotonic() - start_time) / 1000))
                     self._dhcp_state = STATE_DHCP_REQUEST
+                else:
+                    print("* Received DHCP Message is not OFFER")
             elif STATE_DHCP_REQUEST:
                 if self._debug:
                     print("* DHCP: Parsing ACK")
@@ -384,6 +386,8 @@ class DHCP:
                     self._rebind_in_sec = self._t2
                 elif msg_type == DHCP_NAK:
                     self._dhcp_state = STATE_DHCP_START
+                else:
+                    print("* Received DHCP Message is not OFFER")
 
                 if msg_type == 255:
                     msg_type = 0
