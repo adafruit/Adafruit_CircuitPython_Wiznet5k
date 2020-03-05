@@ -264,8 +264,7 @@ class DHCP:
 
         # -- Parse Packet, VARIABLE -- #
         ptr = 240
-        buff_remaining = len(_BUFF[240:])
-        while buff_remaining > 0:
+        while _BUFF[ptr] != OPT_END:
             if _BUFF[ptr] == MSG_TYPE:
                 ptr += 1
                 opt_len = _BUFF[ptr]
@@ -314,8 +313,6 @@ class DHCP:
                 ptr += 1
                 self._t2 = int.from_bytes(_BUFF[ptr:ptr+opt_len], 'l')
                 ptr += opt_len
-            elif _BUFF[ptr] == OPT_END:
-                break
             else:
                 # We're not interested in this option
                 ptr += 1
@@ -323,7 +320,10 @@ class DHCP:
                 ptr += 1
                 # no-op
                 ptr += opt_len
-            buff_remaining = ptr - buff_remaining
+
+        if self._debug:
+            print("Msg Type: {}\nSubnet Mask: {}\n\
+                  DHCP Server ID:{}\n".format(msg_type, self.subnet_mask, self.dhcp_server_ip))
 
         gc.collect()
         return msg_type, xid
