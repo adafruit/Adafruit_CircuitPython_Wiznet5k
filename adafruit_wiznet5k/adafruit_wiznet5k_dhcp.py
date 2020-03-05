@@ -322,8 +322,13 @@ class DHCP:
                 ptr += opt_len
 
         if self._debug:
-            print("Msg Type: {}\nSubnet Mask: {}\n\
-                  DHCP Server ID:{}\n".format(msg_type, self.subnet_mask, self.dhcp_server_ip))
+            print("Msg Type: {}\nSubnet Mask: {}\nDHCP Server ID:{}\nDNS Server IP:{}\
+                  \nGateway IP:{}\nT1:{}\nT2:{}\nLease Time:{}".format(msg_type, self.subnet_mask,
+                                                                       self.dhcp_server_ip,
+                                                                       self.dns_server_ip,
+                                                                       self.gateway_ip,
+                                                                       self._t1, self._t2,
+                                                                       self._lease_time))
 
         gc.collect()
         return msg_type, xid
