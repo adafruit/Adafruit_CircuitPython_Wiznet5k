@@ -41,7 +41,7 @@ Implementation Notes
 
 * Adafruit's Bus Device library: https://github.com/adafruit/Adafruit_CircuitPython_BusDevice
 """
-
+from random import randint
 import time
 from micropython import const
 
@@ -540,8 +540,8 @@ class WIZNET5K: # pylint: disable=too-many-public-methods
                 break
 
         if self._src_port == 0:
-            self._src_port = 1024
-
+            # Dynamic ports 49152 to 65535.
+            self._src_port += randint(49152, 65535)
         if self._debug:
             print("Allocated socket #{}:{}".format(sock, self._src_port))
         return sock
