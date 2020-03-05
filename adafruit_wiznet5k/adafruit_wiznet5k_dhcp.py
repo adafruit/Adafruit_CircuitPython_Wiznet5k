@@ -253,6 +253,7 @@ class DHCP:
 
         xid = _BUFF[4:8]
         if bytes(xid) < self._initial_xid:
+            print("f")
             return 0, 0
 
         self.local_ip = _BUFF[16:20]

@@ -95,7 +95,7 @@ class DNS:
         # wait and retry 3 times for a response
         retries = 0
         addr = -1
-        while (retries < 3) and (addr == -1):
+        while (retries < 5) and (addr == -1):
             addr = self._parse_dns_response()
             if addr == -1 and self._debug:
                 print("* DNS ERROR: Failed to resolve DNS response, retrying...")

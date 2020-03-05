@@ -219,6 +219,7 @@ class WIZNET5K: # pylint: disable=too-many-public-methods
                                                                                     _subnet_mask,
                                                                                     _gw_addr,
                                                                                     self._dns))
+            self._src_port = 0
             return 0
         return -1
 
@@ -495,9 +496,13 @@ class WIZNET5K: # pylint: disable=too-many-public-methods
             print("*** Connecting: Socket# {}, conn_mode: {}".format(socket_num, conn_mode))
 
         # initialize a socket and set the mode
-        res = self.socket_open(socket_num, dest, port, conn_mode=conn_mode)
+        res = self.socket_open(socket_num, port, conn_mode=conn_mode)
         if res == 1:
             raise RuntimeError('Failed to initalize a connection with the socket.')
+
+
+        self._write_sndipr(socket_num, dest)
+        self._write_sndport(socket_num, port)
 
         if conn_mode == SNMR_TCP:
             # TCP client - connect socket
@@ -535,14 +540,11 @@ class WIZNET5K: # pylint: disable=too-many-public-methods
                 sock = _sock
                 break
 
-        if self._src_port == 0:
-            # Dynamic ports 49152 to 65535.
-            self._src_port += randint(49152, 65535)
         if self._debug:
-            print("Allocated socket #{}:{}".format(sock, self._src_port))
+            print("Allocated socket #{}".format(sock))
         return sock
 
-    def socket_open(self, socket_num, dest, port, conn_mode=SNMR_TCP):
+    def socket_open(self, socket_num, port, conn_mode=SNMR_TCP):
         """Opens a socket to a destination IP address or hostname. By default, we use
         'conn_mode'=SNMR_TCP but we may also use SNMR_UDP.
         """
@@ -551,23 +553,18 @@ class WIZNET5K: # pylint: disable=too-many-public-methods
             print("*** Opening socket %d"%socket_num)
         if self._read_snsr(socket_num)[0] == SNSR_SOCK_CLOSED:
             if self._debug:
-                print("w5k socket begin, protocol={}, port={}, ip={}".format(conn_mode, port,
-                                                                             self.pretty_ip(dest)))
+                print("w5k socket begin, protocol={}, port={}".format(conn_mode, port))
             time.sleep(0.00025)
 
             self._write_snmr(socket_num, conn_mode)
             self._write_snir(socket_num, 0xFF)
 
-            if self._src_port > 0:
-                # write to socket source port
-                self._write_sock_port(socket_num, self._src_port)
+            if port > 0:
+                # write to defined port
+                self._write_sock_port(socket_num, port)
             else:
                 # if source port is not set, set the local port number
-                self._write_sock_port(socket_num, LOCAL_PORT)
-
-            # set socket destination IP and port
-            self._write_sndipr(socket_num, dest)
-            self._write_sndport(socket_num, port)
+                self._write_sock_port(socket_num, randint(49152, 65535))
 
             # open socket
             self._write_sncr(socket_num, CMD_SOCK_OPEN)
@@ -584,6 +581,7 @@ class WIZNET5K: # pylint: disable=too-many-public-methods
             print("*** Closing socket #%d" % socket_num)
         self._write_sncr(socket_num, CMD_SOCK_CLOSE)
         self._read_sncr(socket_num)
+        self._src_port = 0
 
     def socket_disconnect(self, socket_num):
         """Disconnect a TCP connection."""
