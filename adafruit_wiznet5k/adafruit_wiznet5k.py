@@ -219,6 +219,7 @@ class WIZNET5K: # pylint: disable=too-many-public-methods
                                                                                     _subnet_mask,
                                                                                     _gw_addr,
                                                                                     self._dns))
+            self._src_port = 0
             return 0
         return -1
 
@@ -492,16 +493,19 @@ class WIZNET5K: # pylint: disable=too-many-public-methods
         """
         assert self.link_status, "Ethernet cable disconnected!"
         if self._debug:
-            print("*** Connecting: Socket# {}, conn_mode: {}".format(socket_num, conn_mode))
-
+                print("* w5k socket connect, protocol={}, port={}, ip={}".format(conn_mode, port,
+                                                                             self.pretty_ip(dest)))
         # initialize a socket and set the mode
-        res = self.socket_open(socket_num, dest, port, conn_mode=conn_mode)
+        res = self.socket_open(socket_num, conn_mode=conn_mode)
         if res == 1:
             raise RuntimeError('Failed to initalize a connection with the socket.')
 
+        # set socket destination IP and port
+        self._write_sndipr(socket_num, dest)
+        self._write_sndport(socket_num, port)
+        self._send_socket_cmd(socket_num, CMD_SOCK_CONNECT)
+
         if conn_mode == SNMR_TCP:
-            # TCP client - connect socket
-            self._send_socket_cmd(socket_num, CMD_SOCK_CONNECT)
             # wait for tcp connection establishment
             while self.socket_status(socket_num)[0] != SNSR_SOCK_ESTABLISHED:
                 time.sleep(0.001)
@@ -539,8 +543,8 @@ class WIZNET5K: # pylint: disable=too-many-public-methods
             print("Allocated socket #{}".format(sock))
         return sock
 
-    def socket_open(self, socket_num, dest, port, conn_mode=SNMR_TCP):
-        """Opens a socket to a destination IP address or hostname. By default, we use
+    def socket_open(self, socket_num, conn_mode=SNMR_TCP):
+        """Opens a TCP or UDP socket. By default, we use
         'conn_mode'=SNMR_TCP but we may also use SNMR_UDP.
         """
         assert self.link_status, "Ethernet cable disconnected!"
@@ -548,8 +552,7 @@ class WIZNET5K: # pylint: disable=too-many-public-methods
             print("*** Opening socket %d"%socket_num)
         if self._read_snsr(socket_num)[0] == SNSR_SOCK_CLOSED:
             if self._debug:
-                print("w5k socket begin, protocol={}, port={}, ip={}".format(conn_mode, port,
-                                                                             self.pretty_ip(dest)))
+                print("* Opening W5k Socket, protocol={}".format(conn_mode))
             time.sleep(0.00025)
 
             self._write_snmr(socket_num, conn_mode)
@@ -560,10 +563,6 @@ class WIZNET5K: # pylint: disable=too-many-public-methods
                 self._write_sock_port(socket_num, self._src_port)
             else:
                 self._write_sock_port(socket_num, randint(49152, 65535))
-
-            # set socket destination IP and port
-            self._write_sndipr(socket_num, dest)
-            self._write_sndport(socket_num, port)
 
             # open socket
             self._write_sncr(socket_num, CMD_SOCK_OPEN)
