@@ -313,6 +313,8 @@ class DHCP:
                 ptr += 1
                 self._t2 = int.from_bytes(_BUFF[ptr:ptr+opt_len], 'l')
                 ptr += opt_len
+            elif _BUFF[ptr] == 0:
+                break
             else:
                 # We're not interested in this option
                 ptr += 1
