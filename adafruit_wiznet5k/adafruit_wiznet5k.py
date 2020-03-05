@@ -493,7 +493,7 @@ class WIZNET5K: # pylint: disable=too-many-public-methods
         """
         assert self.link_status, "Ethernet cable disconnected!"
         if self._debug:
-                print("* w5k socket connect, protocol={}, port={}, ip={}".format(conn_mode, port,
+            print("* w5k socket connect, protocol={}, port={}, ip={}".format(conn_mode, port,
                                                                              self.pretty_ip(dest)))
         # initialize a socket and set the mode
         res = self.socket_open(socket_num, conn_mode=conn_mode)
