@@ -68,7 +68,7 @@ def getaddrinfo(host, port, family=0, socktype=0, proto=0, flags=0):
     """
     if not isinstance(port, int):
         raise RuntimeError("Port must be an integer")
-    return [AF_INET, socktype, proto, '', (gethostbyname(host), port)]
+    return [(AF_INET, socktype, proto, '', (gethostbyname(host), port))]
 
 def gethostbyname(hostname):
     """Translate a host name to IPv4 address format. The IPv4 address
@@ -141,6 +141,7 @@ class socket:
         :param tuple address: Remote socket as a (host, port) tuple.
 
         """
+        assert conntype != 0x03, "Error: SSL/TLS is not currently supported by CircuitPython."
         host, port = address
 
         if hasattr(host, 'split'):
@@ -158,12 +159,12 @@ class socket:
         _the_interface.socket_write(self.socknum, data)
         gc.collect()
 
+
     def recv(self, bufsize=0): #pylint: disable=too-many-branches
         """Reads some bytes from the connected remote address.
         :param int bufsize: Maximum number of bytes to receive.
-
         """
-        assert _the_interface.link_status, "Ethernet cable disconnected!"
+        # print("Socket read", bufsize)
         if bufsize == 0:
             # read everything on the socket
             while True:
@@ -173,9 +174,9 @@ class socket:
                     avail = _the_interface.udp_remaining()
                 if avail:
                     if self._sock_type == SOCK_STREAM:
-                        self._buffer += _the_interface.socket_read(self.socknum, avail)
+                        self._buffer += _the_interface.socket_read(self.socknum, avail)[1]
                     elif self._sock_type == SOCK_DGRAM:
-                        self._buffer += _the_interface.read_udp(self.socknum, avail)
+                        self._buffer += _the_interface.read_udp(self.socknum, avail)[1]
                 else:
                     break
             gc.collect()
@@ -203,7 +204,7 @@ class socket:
                 gc.collect()
             if self._timeout > 0 and time.monotonic() - stamp > self._timeout:
                 break
-        self._buffer = received
+        self._buffer += b''.join(received)
 
         ret = None
         if len(self._buffer) == bufsize:
@@ -216,24 +217,26 @@ class socket:
         return ret
 
     def readline(self):
-        """Attempt to return as many bytes as we can up to
-        but not including \n"""
+        """Attempt to return as many bytes as we can up to \
+        but not including '\r\n'.
+
+        """
         stamp = time.monotonic()
-        while b'\n' not in self._buffer:
+        while b'\r\n' not in self._buffer:
             if self._sock_type == SOCK_STREAM:
                 avail = self.available()
-                self._buffer += _the_interface.read(self.socknum, avail)[1]
+                if avail:
+                    self._buffer += _the_interface.socket_read(self.socknum, avail)[1]
             elif self._sock_type == SOCK_DGRAM:
                 avail = _the_interface.udp_remaining()
-                self._buffer += _the_interface.read_udp(self.socknum, avail)[1]
+                if avail:
+                    self._buffer += _the_interface.read_udp(self.socknum, avail)
             elif self._timeout > 0 and time.monotonic() - stamp > self._timeout:
                 self.close()
                 raise RuntimeError("Didn't receive response, failing out...")
-        firstline = self._buffer.split(b'\n', 1)
+        firstline, self._buffer = self._buffer.split(b'\r\n', 1)
         gc.collect()
-        # clear tmp data buffer
-        self._buffer = b''
-        return firstline[0]
+        return firstline
 
     def disconnect(self):
         """Disconnects a TCP socket."""

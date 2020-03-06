@@ -41,7 +41,7 @@ Implementation Notes
 
 * Adafruit's Bus Device library: https://github.com/adafruit/Adafruit_CircuitPython_BusDevice
 """
-
+from random import randint
 import time
 from micropython import const
 
@@ -138,7 +138,7 @@ UDP_SOCK = {'bytes_remaining': 0,
             'remote_ip': 0,
             'remote_port': 0}
 
-class WIZNET5K:
+class WIZNET5K: # pylint: disable=too-many-public-methods
     """Interface for WIZNET5K module.
     :param ~busio.SPI spi_bus: The SPI bus the Wiznet module is connected to.
     :param ~digitalio.DigitalInOut cs: Chip select pin.
@@ -149,7 +149,11 @@ class WIZNET5K:
 
     """
 
-    # pylint: disable=too-many-arguments, too-many-public-methods
+    TCP_MODE = const(0x21)
+    UDP_MODE = const(0x02)
+    TLS_MODE = const(0x03) # This is NOT currently implemented
+
+    # pylint: disable=too-many-arguments
     def __init__(self, spi_bus, cs, reset=None,
                  is_dhcp=True, mac=DEFAULT_MAC, debug=False):
         self._debug = debug
@@ -180,7 +184,8 @@ class WIZNET5K:
         self._dns = 0
         # Set DHCP
         if is_dhcp:
-            self.set_dhcp()
+            ret = self.set_dhcp()
+            assert ret == 0, "Failed to configure DHCP Server!"
 
     def set_dhcp(self, response_timeout=1):
         """Initializes the DHCP client and attempts to retrieve
@@ -193,11 +198,9 @@ class WIZNET5K:
             print("* Initializing DHCP")
         self._src_port = 68
         # Return IP assigned by DHCP
-        _dhcp_client = dhcp.DHCP(self, self.mac_address, response_timeout)
+        _dhcp_client = dhcp.DHCP(self, self.mac_address, response_timeout, debug=self._debug)
         ret = _dhcp_client.request_dhcp_lease()
         if ret == 1:
-            if self._debug:
-                print("* Found DHCP server - setting configuration...")
             _ip = (_dhcp_client.local_ip[0], _dhcp_client.local_ip[1],
                    _dhcp_client.local_ip[2], _dhcp_client.local_ip[3])
 
@@ -210,9 +213,15 @@ class WIZNET5K:
             self._dns = (_dhcp_client.dns_server_ip[0], _dhcp_client.dns_server_ip[1],
                          _dhcp_client.dns_server_ip[2], _dhcp_client.dns_server_ip[3])
             self.ifconfig = ((_ip, _subnet_mask, _gw_addr, self._dns))
+            if self._debug:
+                print("* Found DHCP Server:")
+                print("IP: {}\nSubnet Mask: {}\nGW Addr: {}\nDNS Server: {}".format(_ip,
+                                                                                    _subnet_mask,
+                                                                                    _gw_addr,
+                                                                                    self._dns))
+            self._src_port = 0
             return 0
-        self._src_port = 0
-        return 1
+        return -1
 
     def get_host_by_name(self, hostname):
         """Convert a hostname to a packed 4-byte IP Address.
@@ -224,8 +233,11 @@ class WIZNET5K:
             hostname = bytes(hostname, 'utf-8')
         self._src_port = int(time.monotonic())
         # Return IP assigned by DHCP
-        _dns_client = dns.DNS(self, self._dns)
+        _dns_client = dns.DNS(self, self._dns, debug=self._debug)
         ret = _dns_client.gethostbyname(hostname)
+        if self._debug:
+            print("* Resolved IP: ", ret)
+        assert ret != -1, "Failed to resolve hostname!"
         self._src_port = 0
         return ret
 
@@ -303,15 +315,8 @@ class WIZNET5K:
     @property
     def ifconfig(self):
         """Returns the network configuration as a tuple."""
-        # set subnet and gateway addresses
-        self._pbuff = bytearray(8)
-        for octet in range(0, 4):
-            self._pbuff += self.read(REG_SUBR+octet, 0x04)
-        for octet in range(0, 4):
-            self._pbuff += self.read(REG_GAR+octet, 0x04)
-
-        params = (self.ip_address, self._pbuff[0:3], self._pbuff[3:7], self._dns)
-        return params
+        return (self.ip_address, self.read(REG_SUBR, 0x00, 4),
+                self.read(REG_GAR, 0x00, 4), self._dns)
 
     @ifconfig.setter
     def ifconfig(self, params):
@@ -321,14 +326,10 @@ class WIZNET5K:
         """
         ip_address, subnet_mask, gateway_address, dns_server = params
 
-        # Set IP Address
         self.write(REG_SIPR, 0x04, ip_address)
+        self.write(REG_SUBR, 0x04, subnet_mask)
+        self.write(REG_GAR, 0x04, gateway_address)
 
-        # set subnet and gateway addresses
-        for octet in range(0, 4):
-            self.write(REG_SUBR+octet, 0x04, subnet_mask[octet])
-            self.write(REG_GAR+octet, 0x04, gateway_address[octet])
-        # set dns server address
         self._dns = dns_server
 
     def _w5100_init(self):
@@ -492,25 +493,35 @@ class WIZNET5K:
         """
         assert self.link_status, "Ethernet cable disconnected!"
         if self._debug:
-            print("*** Connecting: Socket# {}, conn_mode: {}".format(socket_num, conn_mode))
-
+            print("* w5k socket connect, protocol={}, port={}, ip={}".format(conn_mode, port,
+                                                                             self.pretty_ip(dest)))
         # initialize a socket and set the mode
-        res = self.socket_open(socket_num, dest, port, conn_mode=conn_mode)
+        res = self.socket_open(socket_num, conn_mode=conn_mode)
         if res == 1:
             raise RuntimeError('Failed to initalize a connection with the socket.')
 
+        # set socket destination IP and port
+        self._write_sndipr(socket_num, dest)
+        self._write_sndport(socket_num, port)
+        self._send_socket_cmd(socket_num, CMD_SOCK_CONNECT)
+
         if conn_mode == SNMR_TCP:
-            # TCP client - connect socket
-            self._write_sncr(socket_num, CMD_SOCK_CONNECT)
-            self._read_sncr(socket_num)
             # wait for tcp connection establishment
             while self.socket_status(socket_num)[0] != SNSR_SOCK_ESTABLISHED:
+                time.sleep(0.001)
+                if self._debug:
+                    print("SN_SR:", self.socket_status(socket_num)[0])
                 if self.socket_status(socket_num)[0] == SNSR_SOCK_CLOSED:
                     raise RuntimeError('Failed to establish connection.')
-                time.sleep(1)
         elif conn_mode == SNMR_UDP:
             UDP_SOCK['bytes_remaining'] = 0
         return 1
+
+    def _send_socket_cmd(self, socket, cmd):
+        self._write_sncr(socket, cmd)
+        while self._read_sncr(socket) != b'\x00':
+            if self._debug:
+                print("waiting for sncr to clear...")
 
     def get_socket(self, sockets):
         """Requests, allocates and returns a socket from the W5k
@@ -528,15 +539,12 @@ class WIZNET5K:
                 sock = _sock
                 break
 
-        if self._src_port == 0:
-            self._src_port = 1024
-
         if self._debug:
-            print("Allocated socket #{}:{}".format(sock, self._src_port))
+            print("Allocated socket #{}".format(sock))
         return sock
 
-    def socket_open(self, socket_num, dest, port, conn_mode=SNMR_TCP):
-        """Opens a socket to a destination IP address or hostname. By default, we use
+    def socket_open(self, socket_num, conn_mode=SNMR_TCP):
+        """Opens a TCP or UDP socket. By default, we use
         'conn_mode'=SNMR_TCP but we may also use SNMR_UDP.
         """
         assert self.link_status, "Ethernet cable disconnected!"
@@ -544,7 +552,7 @@ class WIZNET5K:
             print("*** Opening socket %d"%socket_num)
         if self._read_snsr(socket_num)[0] == SNSR_SOCK_CLOSED:
             if self._debug:
-                print("w5k socket begin, protocol={}, port={}".format(conn_mode, port))
+                print("* Opening W5k Socket, protocol={}".format(conn_mode))
             time.sleep(0.00025)
 
             self._write_snmr(socket_num, conn_mode)
@@ -554,12 +562,7 @@ class WIZNET5K:
                 # write to socket source port
                 self._write_sock_port(socket_num, self._src_port)
             else:
-                # if source port is not set, set the local port number
-                self._write_sock_port(socket_num, LOCAL_PORT)
-
-            # set socket destination IP and port
-            self._write_sndipr(socket_num, dest)
-            self._write_sndport(socket_num, port)
+                self._write_sock_port(socket_num, randint(49152, 65535))
 
             # open socket
             self._write_sncr(socket_num, CMD_SOCK_OPEN)

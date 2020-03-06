@@ -61,7 +61,8 @@ class DNS:
 
     :param iface: Network interface
     """
-    def __init__(self, iface, dns_address):
+    def __init__(self, iface, dns_address, debug=False):
+        self._debug = debug
         self._iface = iface
         socket.set_interface(iface)
         self._sock = socket.socket(type=socket.SOCK_DGRAM)
@@ -87,19 +88,23 @@ class DNS:
 
         # Send DNS request packet
         self._sock.connect((self._dns_server, DNS_PORT))
+        if self._debug:
+            print("* DNS: Sending request packet...")
         self._sock.send(self._pkt_buf)
 
         # wait and retry 3 times for a response
         retries = 0
         addr = -1
-        while (retries < 3) and (addr == -1):
+        while (retries < 5) and (addr == -1):
             addr = self._parse_dns_response()
+            if addr == -1 and self._debug:
+                print("* DNS ERROR: Failed to resolve DNS response, retrying...")
             retries += 1
 
         self._sock.close()
         return addr
 
-    def _parse_dns_response(self):
+    def _parse_dns_response(self): # pylint: disable=too-many-return-statements, too-many-branches, too-many-statements, too-many-locals
         """Receives and parses DNS query response.
         Returns desired hostname address if obtained, -1 otherwise.
 
@@ -110,36 +115,108 @@ class DNS:
         while packet_sz <= 0:
             packet_sz = self._sock.available()
             if (time.monotonic() - start_time) > 1.0:
-                # timed out!
+                if self._debug:
+                    print("* DNS ERROR: Did not receive DNS response!")
                 return -1
             time.sleep(0.05)
-        # store packet in buffer
-        self._pkt_buf = self._sock.recv(packet_sz)[0]
+        # recv packet into buf
+        self._pkt_buf = self._sock.recv()
+
+        if self._debug:
+            print("DNS Packet Received: ", self._pkt_buf)
 
         # Validate request identifier
-        if not int.from_bytes(self._pkt_buf[0:2], 'l') == self._request_id:
+        xid = int.from_bytes(self._pkt_buf[0:2], 'l')
+        if not xid == self._request_id:
+            if self._debug:
+                print("* DNS ERROR: Received request identifer {} \
+                      does not match expected {}".format(xid, self._request_id))
             return -1
         # Validate flags
-        if not int.from_bytes(self._pkt_buf[2:4], 'l') == 0x8180:
+        flags = int.from_bytes(self._pkt_buf[2:4], 'l')
+        if not flags == 0x8180:
+            if self._debug:
+                print("* DNS ERROR: Invalid flags, ", flags)
             return -1
-        # Validate Answer RRs (>=1)
+        # Number of questions
+        qr_count = int.from_bytes(self._pkt_buf[4:6], 'l')
+        if not qr_count >= 1:
+            if self._debug:
+                print("* DNS ERROR: Question count >=1, ", qr_count)
+            return -1
+        # Number of answers
         an_count = int.from_bytes(self._pkt_buf[6:8], 'l')
+        if self._debug:
+            print("* DNS Answer Count: ", an_count)
         if not an_count >= 1:
             return -1
 
-        # iterate over ANCOUNT since answer may not be type A
-        while an_count > 0:
-            ans_type = int.from_bytes(self._pkt_buf[41:43], 'l')
-            ans_class = int.from_bytes(self._pkt_buf[43:45], 'l')
-            ans_len = int.from_bytes(self._pkt_buf[49:51], 'l')
-            if  ans_type == TYPE_A and ans_class == CLASS_IN:
-                if ans_len != 4:
-                    # invalid size ret.'d
-                    return -1
-                # return the address
-                return self._pkt_buf[51:55]
-            # not the correct answer type or class
-            an_count += 1
+        # Parse query
+        ptr = 12
+        name_len = 1
+        while name_len > 0:
+            # read the length of the name
+            name_len = self._pkt_buf[ptr]
+            if name_len == 0x00:
+                # we reached the end of this name
+                ptr += 1 # inc. pointer by 0x00
+                break
+            # advance pointer
+            ptr += name_len + 1
+
+        # Validate Query is Type A
+        q_type = int.from_bytes(self._pkt_buf[ptr:ptr+2], 'l')
+        if not q_type == TYPE_A:
+            if self._debug:
+                print("* DNS ERROR: Incorrect Query Type: ", q_type)
+            return -1
+        ptr += 2
+
+        # Validate Query is Type A
+        q_class = int.from_bytes(self._pkt_buf[ptr:ptr+2], 'l')
+        if not q_class == TYPE_A:
+            if self._debug:
+                print("* DNS ERROR: Incorrect Query Class: ", q_class)
+            return -1
+        ptr += 2
+
+        # Let's take the first type-a answer
+        if self._pkt_buf[ptr] != 0xc0:
+            return -1
+        ptr += 1
+
+        if self._pkt_buf[ptr] != 0xc:
+            return -1
+        ptr += 1
+
+        # Validate Answer Type A
+        ans_type = int.from_bytes(self._pkt_buf[ptr:ptr+2], 'l')
+        if not ans_type == TYPE_A:
+            if self._debug:
+                print("* DNS ERROR: Incorrect Answer Type: ", ans_type)
+            return -1
+        ptr += 2
+
+        # Validate Answer Class IN
+        ans_class = int.from_bytes(self._pkt_buf[ptr:ptr+2], 'l')
+        if not ans_class == TYPE_A:
+            if self._debug:
+                print("* DNS ERROR: Incorrect Answer Class: ", ans_class)
+            return -1
+        ptr += 2
+
+        # skip over TTL
+        ptr += 4
+
+        # Validate addr is IPv4
+        data_len = int.from_bytes(self._pkt_buf[ptr:ptr+2], 'l')
+        if not data_len == DATA_LEN:
+            if self._debug:
+                print("* DNS ERROR: Unexpected Data Length: ", data_len)
+            return -1
+        ptr += 2
+        # Return address
+        return self._pkt_buf[ptr:ptr+4]
 
     def _build_dns_header(self):
         """Builds DNS header."""
