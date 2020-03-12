@@ -97,7 +97,7 @@ class socket:
 
         self._socknum = _the_interface.get_socket(SOCKETS)
         SOCKETS.append(self._socknum)
-        self.settimeout(1)
+        self.settimeout(self._timeout)
 
     @property
     def socknum(self):
@@ -186,9 +186,11 @@ class socket:
             return ret
         stamp = time.monotonic()
 
+
         to_read = bufsize - len(self._buffer)
         received = []
         while to_read > 0:
+            # print("Bytes to read:", to_read)
             if self._sock_type == SOCK_STREAM:
                 avail = self.available()
             elif self._sock_type == SOCK_DGRAM:
@@ -199,6 +201,7 @@ class socket:
                     recv = _the_interface.socket_read(self.socknum, min(to_read, avail))[1]
                 elif self._sock_type == SOCK_DGRAM:
                     recv = _the_interface.read_udp(self.socknum, min(to_read, avail))[1]
+                recv = bytes(recv)
                 received.append(recv)
                 to_read -= len(recv)
                 gc.collect()
