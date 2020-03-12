@@ -265,6 +265,11 @@ class WIZNET5K: # pylint: disable=too-many-public-methods
         """
         return "%d.%d.%d.%d" % (ip[0], ip[1], ip[2], ip[3])
 
+    def unpretty_ip(self, ip): # pylint: disable=no-self-use, invalid-name
+        """Converts a dotted-quad string to a bytearray IP address"""
+        octets = [int(x) for x in ip.split('.')]
+        return bytes(octets)
+
     @property
     def mac_address(self):
         """Returns the hardware's MAC address."""
