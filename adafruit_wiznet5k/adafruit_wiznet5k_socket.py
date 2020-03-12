@@ -144,7 +144,6 @@ class socket:
         assert conntype != 0x03, "Error: SSL/TLS is not currently supported by CircuitPython."
         host, port = address
 
-        print(address)
         if hasattr(host, 'split'):
             host = tuple(map(int, host.split('.')))
         if not _the_interface.socket_connect(self.socknum, host, port, conn_mode=self._sock_type):
@@ -165,7 +164,7 @@ class socket:
         """Reads some bytes from the connected remote address.
         :param int bufsize: Maximum number of bytes to receive.
         """
-        print("Socket read", bufsize)
+        # print("Socket read", bufsize)
         if bufsize == 0:
             # read everything on the socket
             while True:
@@ -191,27 +190,23 @@ class socket:
         to_read = bufsize - len(self._buffer)
         received = []
         while to_read > 0:
-            print("Bytes to read:", to_read)
+            # print("Bytes to read:", to_read)
             if self._sock_type == SOCK_STREAM:
                 avail = self.available()
             elif self._sock_type == SOCK_DGRAM:
                 avail = _the_interface.udp_remaining()
-            #print('Bytes Avail: ', avail)
             if avail:
                 stamp = time.monotonic()
                 if self._sock_type == SOCK_STREAM:
-                    print("to_read: {}\navail:{}\n".format(to_read, avail))
                     recv = _the_interface.socket_read(self.socknum, min(to_read, avail))[1]
                 elif self._sock_type == SOCK_DGRAM:
                     recv = _the_interface.read_udp(self.socknum, min(to_read, avail))[1]
-                print('RCV: ', recv)
                 recv = bytes(recv)
                 received.append(recv)
                 to_read -= len(recv)
                 gc.collect()
             if self._timeout > 0 and time.monotonic() - stamp > self._timeout:
                 break
-        print("{}, \nType:{}".format(received, type(received)))
         self._buffer += b''.join(received)
 
         ret = None
