@@ -30,14 +30,16 @@ requests.set_socket(socket, eth)
 print("Chip Version:", eth.chip)
 print("MAC Address:", [hex(i) for i in eth.mac_address])
 print("My IP address is:", eth.pretty_ip(eth.ip_address))
-print("IP lookup adafruit.com: %s" %eth.pretty_ip(eth.get_host_by_name("adafruit.com")))
+print(
+    "IP lookup adafruit.com: %s" % eth.pretty_ip(eth.get_host_by_name("adafruit.com"))
+)
 
-#eth._debug = True
+# eth._debug = True
 print("Fetching text from", TEXT_URL)
 r = requests.get(TEXT_URL)
-print('-'*40)
+print("-" * 40)
 print(r.text)
-print('-'*40)
+print("-" * 40)
 r.close()
 
 print()

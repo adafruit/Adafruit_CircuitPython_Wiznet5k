@@ -23,14 +23,19 @@ requests.set_socket(socket, eth)
 counter = 0
 
 while True:
-    print("Posting data...", end='')
+    print("Posting data...", end="")
     data = counter
-    feed = 'test'
-    payload = {'value':data}
+    feed = "test"
+    payload = {"value": data}
     response = requests.post(
-        "http://io.adafruit.com/api/v2/"+secrets['aio_username']+"/feeds/"+feed+"/data",
+        "http://io.adafruit.com/api/v2/"
+        + secrets["aio_username"]
+        + "/feeds/"
+        + feed
+        + "/data",
         json=payload,
-        headers={"X-AIO-KEY":secrets['aio_key']})
+        headers={"X-AIO-KEY": secrets["aio_key"]},
+    )
     print(response.json())
     response.close()
     counter = counter + 1

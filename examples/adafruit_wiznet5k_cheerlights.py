@@ -26,7 +26,7 @@ DATA_LOCATION = ["feeds", 0, "field2"]
 pixels = neopixel.NeoPixel(board.NEOPIXEL, 1, brightness=0.3)
 pixels.fill(0)
 
-attempts = 3 # Number of attempts to retry each request
+attempts = 3  # Number of attempts to retry each request
 failure_count = 0
 response = None
 
@@ -48,8 +48,10 @@ while True:
         print("Request failed, retrying...\n", error)
         failure_count += 1
         if failure_count >= attempts:
-            raise AssertionError("Failed to resolve hostname, \
-                                  please check your router's DNS configuration.")
+            raise AssertionError(
+                "Failed to resolve hostname, \
+                                  please check your router's DNS configuration."
+            )
         continue
     if not value:
         continue
@@ -57,7 +59,7 @@ while True:
         color = int(value[1:], 16)
         red = color >> 16 & 0xFF
         green = color >> 8 & 0xFF
-        blue = color& 0xFF
+        blue = color & 0xFF
         gamma_corrected = fancy.gamma_adjust(fancy.CRGB(red, green, blue)).pack()
 
         pixels.fill(gamma_corrected)
