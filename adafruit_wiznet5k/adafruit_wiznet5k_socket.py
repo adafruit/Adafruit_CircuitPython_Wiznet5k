@@ -34,33 +34,42 @@ import time
 from micropython import const
 from adafruit_wiznet5k import adafruit_wiznet5k
 
-_the_interface = None   # pylint: disable=invalid-name
+_the_interface = None  # pylint: disable=invalid-name
+
+
 def set_interface(iface):
     """Helper to set the global internet interface."""
-    global _the_interface   # pylint: disable=global-statement, invalid-name
+    global _the_interface  # pylint: disable=global-statement, invalid-name
     _the_interface = iface
+
 
 def htonl(x):
     """Convert 32-bit positive integers from host to network byte order."""
-    return ((x)<<24 & 0xFF000000) | ((x)<< 8 & 0x00FF0000) | \
-            ((x)>> 8 & 0x0000FF00) | ((x)>>24 & 0x000000FF)
+    return (
+        ((x) << 24 & 0xFF000000)
+        | ((x) << 8 & 0x00FF0000)
+        | ((x) >> 8 & 0x0000FF00)
+        | ((x) >> 24 & 0x000000FF)
+    )
+
 
 def htons(x):
     """Convert 16-bit positive integers from host to network byte order."""
-    return (((x)<<8)&0xFF00) | (((x)>>8)&0xFF)
+    return (((x) << 8) & 0xFF00) | (((x) >> 8) & 0xFF)
+
 
 # pylint: disable=bad-whitespace
-SOCK_STREAM     = const(0x21) # TCP
-TCP_MODE        = 80
-SOCK_DGRAM      = const(0x02) # UDP
-AF_INET         = const(3)
+SOCK_STREAM = const(0x21)  # TCP
+TCP_MODE = 80
+SOCK_DGRAM = const(0x02)  # UDP
+AF_INET = const(3)
 NO_SOCKET_AVAIL = const(255)
 # pylint: enable=bad-whitespace
 
 # keep track of sockets we allocate
 SOCKETS = []
 
-#pylint: disable=too-many-arguments, unused-argument
+# pylint: disable=too-many-arguments, unused-argument
 def getaddrinfo(host, port, family=0, socktype=0, proto=0, flags=0):
     """Translate the host/port argument into a sequence of 5-tuples that
     contain all the necessary arguments for creating a socket connected to that service.
@@ -68,7 +77,8 @@ def getaddrinfo(host, port, family=0, socktype=0, proto=0, flags=0):
     """
     if not isinstance(port, int):
         raise RuntimeError("Port must be an integer")
-    return [(AF_INET, socktype, proto, '', (gethostbyname(host), port))]
+    return [(AF_INET, socktype, proto, "", (gethostbyname(host), port))]
+
 
 def gethostbyname(hostname):
     """Translate a host name to IPv4 address format. The IPv4 address
@@ -79,7 +89,8 @@ def gethostbyname(hostname):
     addr = "{}.{}.{}.{}".format(addr[0], addr[1], addr[2], addr[3])
     return addr
 
-#pylint: disable=invalid-name
+
+# pylint: disable=invalid-name
 class socket:
     """A simplified implementation of the Python 'socket' class
     for connecting to a Wiznet5k module.
@@ -87,8 +98,11 @@ class socket:
     :param int type: Socket type.
 
     """
+
     # pylint: disable=redefined-builtin,unused-argument
-    def __init__(self, family=AF_INET, type=SOCK_STREAM, proto=0, fileno=None, socknum=None):
+    def __init__(
+        self, family=AF_INET, type=SOCK_STREAM, proto=0, fileno=None, socknum=None
+    ):
         if family != AF_INET:
             raise RuntimeError("Only AF_INET family supported by W5K modules.")
         self._sock_type = type
@@ -110,12 +124,17 @@ class socket:
         if self.socknum >= _the_interface.max_sockets:
             return 0
         status = _the_interface.socket_status(self.socknum)[0]
-        if status == adafruit_wiznet5k.SNSR_SOCK_CLOSE_WAIT and self.available()[0] == 0:
+        if (
+            status == adafruit_wiznet5k.SNSR_SOCK_CLOSE_WAIT
+            and self.available()[0] == 0
+        ):
             result = False
-        result = status not in (adafruit_wiznet5k.SNSR_SOCK_CLOSED,
-                                adafruit_wiznet5k.SNSR_SOCK_LISTEN,
-                                adafruit_wiznet5k.SNSR_SOCK_CLOSE_WAIT,
-                                adafruit_wiznet5k.SNSR_SOCK_FIN_WAIT)
+        result = status not in (
+            adafruit_wiznet5k.SNSR_SOCK_CLOSED,
+            adafruit_wiznet5k.SNSR_SOCK_LISTEN,
+            adafruit_wiznet5k.SNSR_SOCK_CLOSE_WAIT,
+            adafruit_wiznet5k.SNSR_SOCK_FIN_WAIT,
+        )
         if not result:
             self.close()
             return result
@@ -130,8 +149,8 @@ class socket:
         :param str ip_string: IP Address, as a dotted-quad string.
 
         """
-        self._buffer = b''
-        self._buffer = [int(item) for item in ip_string.split('.')]
+        self._buffer = b""
+        self._buffer = [int(item) for item in ip_string.split(".")]
         self._buffer = bytearray(self._buffer)
         return self._buffer
 
@@ -141,14 +160,18 @@ class socket:
         :param tuple address: Remote socket as a (host, port) tuple.
 
         """
-        assert conntype != 0x03, "Error: SSL/TLS is not currently supported by CircuitPython."
+        assert (
+            conntype != 0x03
+        ), "Error: SSL/TLS is not currently supported by CircuitPython."
         host, port = address
 
-        if hasattr(host, 'split'):
-            host = tuple(map(int, host.split('.')))
-        if not _the_interface.socket_connect(self.socknum, host, port, conn_mode=self._sock_type):
+        if hasattr(host, "split"):
+            host = tuple(map(int, host.split(".")))
+        if not _the_interface.socket_connect(
+            self.socknum, host, port, conn_mode=self._sock_type
+        ):
             raise RuntimeError("Failed to connect to host", host)
-        self._buffer = b''
+        self._buffer = b""
 
     def send(self, data):
         """Send data to the socket. The socket must be connected to
@@ -159,8 +182,7 @@ class socket:
         _the_interface.socket_write(self.socknum, data)
         gc.collect()
 
-
-    def recv(self, bufsize=0): #pylint: disable=too-many-branches
+    def recv(self, bufsize=0):  # pylint: disable=too-many-branches
         """Reads some bytes from the connected remote address.
         :param int bufsize: Maximum number of bytes to receive.
         """
@@ -174,18 +196,19 @@ class socket:
                     avail = _the_interface.udp_remaining()
                 if avail:
                     if self._sock_type == SOCK_STREAM:
-                        self._buffer += _the_interface.socket_read(self.socknum, avail)[1]
+                        self._buffer += _the_interface.socket_read(self.socknum, avail)[
+                            1
+                        ]
                     elif self._sock_type == SOCK_DGRAM:
                         self._buffer += _the_interface.read_udp(self.socknum, avail)[1]
                 else:
                     break
             gc.collect()
             ret = self._buffer
-            self._buffer = b''
+            self._buffer = b""
             gc.collect()
             return ret
         stamp = time.monotonic()
-
 
         to_read = bufsize - len(self._buffer)
         received = []
@@ -198,7 +221,9 @@ class socket:
             if avail:
                 stamp = time.monotonic()
                 if self._sock_type == SOCK_STREAM:
-                    recv = _the_interface.socket_read(self.socknum, min(to_read, avail))[1]
+                    recv = _the_interface.socket_read(
+                        self.socknum, min(to_read, avail)
+                    )[1]
                 elif self._sock_type == SOCK_DGRAM:
                     recv = _the_interface.read_udp(self.socknum, min(to_read, avail))[1]
                 recv = bytes(recv)
@@ -207,12 +232,12 @@ class socket:
                 gc.collect()
             if self._timeout > 0 and time.monotonic() - stamp > self._timeout:
                 break
-        self._buffer += b''.join(received)
+        self._buffer += b"".join(received)
 
         ret = None
         if len(self._buffer) == bufsize:
             ret = self._buffer
-            self._buffer = b''
+            self._buffer = b""
         else:
             ret = self._buffer[:bufsize]
             self._buffer = self._buffer[bufsize:]
@@ -225,7 +250,7 @@ class socket:
 
         """
         stamp = time.monotonic()
-        while b'\r\n' not in self._buffer:
+        while b"\r\n" not in self._buffer:
             if self._sock_type == SOCK_STREAM:
                 avail = self.available()
                 if avail:
@@ -237,7 +262,7 @@ class socket:
             elif self._timeout > 0 and time.monotonic() - stamp > self._timeout:
                 self.close()
                 raise RuntimeError("Didn't receive response, failing out...")
-        firstline, self._buffer = self._buffer.split(b'\r\n', 1)
+        firstline, self._buffer = self._buffer.split(b"\r\n", 1)
         gc.collect()
         return firstline
 

@@ -39,56 +39,57 @@ from adafruit_wiznet5k.adafruit_wiznet5k_socket import htonl, htons
 # pylint: disable=bad-whitespace
 
 # DHCP State Machine
-STATE_DHCP_START     = const(0x00)
-STATE_DHCP_DISCOVER  = const(0x01)
-STATE_DHCP_REQUEST   = const(0x02)
-STATE_DHCP_LEASED    = const(0x03)
+STATE_DHCP_START = const(0x00)
+STATE_DHCP_DISCOVER = const(0x01)
+STATE_DHCP_REQUEST = const(0x02)
+STATE_DHCP_LEASED = const(0x03)
 STATE_DHCP_REREQUEST = const(0x04)
-STATE_DHCP_RELEASE   = const(0x05)
+STATE_DHCP_RELEASE = const(0x05)
 
 # DHCP Message Types
 DHCP_DISCOVER = const(1)
-DHCP_OFFER    = const(2)
-DHCP_REQUEST  = const(3)
-DHCP_DECLINE  = const(4)
-DHCP_ACK      = const(5)
-DHCP_NAK      = const(6)
-DHCP_RELEASE  = const(7)
-DHCP_INFORM   = const(8)
+DHCP_OFFER = const(2)
+DHCP_REQUEST = const(3)
+DHCP_DECLINE = const(4)
+DHCP_ACK = const(5)
+DHCP_NAK = const(6)
+DHCP_RELEASE = const(7)
+DHCP_INFORM = const(8)
 
 # DHCP Message OP Codes
 DHCP_BOOT_REQUEST = const(0x01)
-DHCP_BOOT_REPLY   = const(0x02)
+DHCP_BOOT_REPLY = const(0x02)
 
-DHCP_HTYPE10MB  = const(0x01)
+DHCP_HTYPE10MB = const(0x01)
 DHCP_HTYPE100MB = const(0x02)
 
 DHCP_HLENETHERNET = const(0x06)
-DHCP_HOPS         = const(0x00)
+DHCP_HOPS = const(0x00)
 
 MAGIC_COOKIE = const(0x63825363)
 MAX_DHCP_OPT = const(0x10)
 
 # Default DHCP Server port
-DHCP_SERVER_PORT   = const(67)
+DHCP_SERVER_PORT = const(67)
 # DHCP Lease Time, in seconds
 DEFAULT_LEASE_TIME = const(900)
-BROADCAST_SERVER_ADDR = '255.255.255.255'
+BROADCAST_SERVER_ADDR = "255.255.255.255"
 
 # DHCP Response Options
-MSG_TYPE          = 53
-SUBNET_MASK       = 1
+MSG_TYPE = 53
+SUBNET_MASK = 1
 ROUTERS_ON_SUBNET = 3
-DNS_SERVERS       = 6
-DHCP_SERVER_ID    = 54
-T1_VAL            = 58
-T2_VAL            = 59
-LEASE_TIME        = 51
-OPT_END           = 255
+DNS_SERVERS = 6
+DHCP_SERVER_ID = 54
+T1_VAL = 58
+T2_VAL = 59
+LEASE_TIME = 51
+OPT_END = 255
 
 
 # pylint: enable=bad-whitespace
 _BUFF = bytearray(317)
+
 
 class DHCP:
     """W5k DHCP Client implementation.
@@ -148,16 +149,16 @@ class DHCP:
 
         # Transaction ID (xid)
         self._initial_xid = htonl(self._transaction_id)
-        self._initial_xid = self._initial_xid.to_bytes(4, 'l')
+        self._initial_xid = self._initial_xid.to_bytes(4, "l")
         _BUFF[4:7] = self._initial_xid
 
         # seconds elapsed
-        _BUFF[8] = ((int(time_elapsed) & 0xff00) >> 8)
-        _BUFF[9] = (int(time_elapsed) & 0x00ff)
+        _BUFF[8] = (int(time_elapsed) & 0xFF00) >> 8
+        _BUFF[9] = int(time_elapsed) & 0x00FF
 
         # flags
         flags = htons(0x8000)
-        flags = flags.to_bytes(2, 'b')
+        flags = flags.to_bytes(2, "b")
         _BUFF[10] = flags[1]
         _BUFF[11] = flags[0]
 
@@ -170,10 +171,10 @@ class DHCP:
         # NOTE:  192 octets of 0's, BOOTP legacy
 
         # Magic Cookie
-        _BUFF[236] = ((MAGIC_COOKIE >> 24)& 0xFF)
-        _BUFF[237] = ((MAGIC_COOKIE >> 16)& 0xFF)
-        _BUFF[238] = ((MAGIC_COOKIE >> 8)& 0xFF)
-        _BUFF[239] = (MAGIC_COOKIE& 0xFF)
+        _BUFF[236] = (MAGIC_COOKIE >> 24) & 0xFF
+        _BUFF[237] = (MAGIC_COOKIE >> 16) & 0xFF
+        _BUFF[238] = (MAGIC_COOKIE >> 8) & 0xFF
+        _BUFF[239] = MAGIC_COOKIE & 0xFF
 
         # Option - DHCP Message Type
         _BUFF[240] = 53
@@ -188,7 +189,7 @@ class DHCP:
         _BUFF[245] = 0x01
         # Client MAC Address
         for mac in range(0, len(self._mac_address)):
-            _BUFF[246+mac] = self._mac_address[mac]
+            _BUFF[246 + mac] = self._mac_address[mac]
 
         # Option - Host Name
         _BUFF[252] = 12
@@ -196,7 +197,7 @@ class DHCP:
         _BUFF[254:260] = b"WIZnet"
 
         for mac in range(0, 5):
-            _BUFF[260+mac] = self._mac_address[mac]
+            _BUFF[260 + mac] = self._mac_address[mac]
 
         if state == DHCP_REQUEST:
             # Set the parsed local IP addr
@@ -228,7 +229,9 @@ class DHCP:
         # Send DHCP packet
         self._sock.send(_BUFF)
 
-    def parse_dhcp_response(self, response_timeout): # pylint: disable=too-many-branches, too-many-statements
+    def parse_dhcp_response(
+        self, response_timeout
+    ):  # pylint: disable=too-many-branches, too-many-statements
         """Parse DHCP response from DHCP server.
         Returns DHCP packet type.
 
@@ -248,7 +251,9 @@ class DHCP:
 
         # -- Parse Packet, FIXED -- #
         # Validate OP
-        assert _BUFF[0] == DHCP_BOOT_REPLY, "Malformed Packet - \
+        assert (
+            _BUFF[0] == DHCP_BOOT_REPLY
+        ), "Malformed Packet - \
             DHCP message OP is not expected BOOT Reply."
 
         xid = _BUFF[4:8]
@@ -260,7 +265,7 @@ class DHCP:
         if _BUFF[28:34] == 0:
             return 0, 0
 
-        if int.from_bytes(_BUFF[235:240], 'l') != MAGIC_COOKIE:
+        if int.from_bytes(_BUFF[235:240], "l") != MAGIC_COOKIE:
             return 0, 0
 
         # -- Parse Packet, VARIABLE -- #
@@ -276,43 +281,43 @@ class DHCP:
                 ptr += 1
                 opt_len = _BUFF[ptr]
                 ptr += 1
-                self.subnet_mask = _BUFF[ptr:ptr+opt_len]
+                self.subnet_mask = _BUFF[ptr : ptr + opt_len]
                 ptr += opt_len
             elif _BUFF[ptr] == DHCP_SERVER_ID:
                 ptr += 1
                 opt_len = _BUFF[ptr]
                 ptr += 1
-                self.dhcp_server_ip = _BUFF[ptr:ptr+opt_len]
+                self.dhcp_server_ip = _BUFF[ptr : ptr + opt_len]
                 ptr += opt_len
             elif _BUFF[ptr] == LEASE_TIME:
                 ptr += 1
                 opt_len = _BUFF[ptr]
                 ptr += 1
-                self._lease_time = int.from_bytes(_BUFF[ptr:ptr+opt_len], 'l')
+                self._lease_time = int.from_bytes(_BUFF[ptr : ptr + opt_len], "l")
                 ptr += opt_len
             elif _BUFF[ptr] == ROUTERS_ON_SUBNET:
                 ptr += 1
                 opt_len = _BUFF[ptr]
                 ptr += 1
-                self.gateway_ip = _BUFF[ptr:ptr+opt_len]
+                self.gateway_ip = _BUFF[ptr : ptr + opt_len]
                 ptr += opt_len
             elif _BUFF[ptr] == DNS_SERVERS:
                 ptr += 1
                 opt_len = _BUFF[ptr]
                 ptr += 1
-                self.dns_server_ip = _BUFF[ptr:ptr+4]
-                ptr += opt_len # still increment even though we only read 1 addr.
+                self.dns_server_ip = _BUFF[ptr : ptr + 4]
+                ptr += opt_len  # still increment even though we only read 1 addr.
             elif _BUFF[ptr] == T1_VAL:
                 ptr += 1
                 opt_len = _BUFF[ptr]
                 ptr += 1
-                self._t1 = int.from_bytes(_BUFF[ptr:ptr+opt_len], 'l')
+                self._t1 = int.from_bytes(_BUFF[ptr : ptr + opt_len], "l")
                 ptr += opt_len
             elif _BUFF[ptr] == T2_VAL:
                 ptr += 1
                 opt_len = _BUFF[ptr]
                 ptr += 1
-                self._t2 = int.from_bytes(_BUFF[ptr:ptr+opt_len], 'l')
+                self._t2 = int.from_bytes(_BUFF[ptr : ptr + opt_len], "l")
                 ptr += opt_len
             elif _BUFF[ptr] == 0:
                 break
@@ -325,18 +330,26 @@ class DHCP:
                 ptr += opt_len
 
         if self._debug:
-            print("Msg Type: {}\nSubnet Mask: {}\nDHCP Server ID:{}\nDNS Server IP:{}\
-                  \nGateway IP:{}\nT1:{}\nT2:{}\nLease Time:{}".format(msg_type, self.subnet_mask,
-                                                                       self.dhcp_server_ip,
-                                                                       self.dns_server_ip,
-                                                                       self.gateway_ip,
-                                                                       self._t1, self._t2,
-                                                                       self._lease_time))
+            print(
+                "Msg Type: {}\nSubnet Mask: {}\nDHCP Server ID:{}\nDNS Server IP:{}\
+                  \nGateway IP:{}\nT1:{}\nT2:{}\nLease Time:{}".format(
+                    msg_type,
+                    self.subnet_mask,
+                    self.dhcp_server_ip,
+                    self.dns_server_ip,
+                    self.gateway_ip,
+                    self._t1,
+                    self._t2,
+                    self._lease_time,
+                )
+            )
 
         gc.collect()
         return msg_type, xid
 
-    def request_dhcp_lease(self): # pylint: disable=too-many-branches, too-many-statements
+    def request_dhcp_lease(
+        self,
+    ):  # pylint: disable=too-many-branches, too-many-statements
         """Request to renew or acquire a DHCP lease.
 
         """
@@ -353,8 +366,9 @@ class DHCP:
                 self._sock.connect(((BROADCAST_SERVER_ADDR), DHCP_SERVER_PORT))
                 if self._debug:
                     print("* DHCP: Discover")
-                self.send_dhcp_message(STATE_DHCP_DISCOVER,
-                                       ((time.monotonic() - start_time) / 1000))
+                self.send_dhcp_message(
+                    STATE_DHCP_DISCOVER, ((time.monotonic() - start_time) / 1000)
+                )
                 self._dhcp_state = STATE_DHCP_DISCOVER
             elif self._dhcp_state == STATE_DHCP_DISCOVER:
                 if self._debug:
@@ -363,10 +377,12 @@ class DHCP:
                 if msg_type == DHCP_OFFER:
                     # use the _transaction_id the offer returned,
                     # rather than the current one
-                    self._transaction_id = self._transaction_id.from_bytes(xid, 'l')
+                    self._transaction_id = self._transaction_id.from_bytes(xid, "l")
                     if self._debug:
                         print("* DHCP: Request")
-                    self.send_dhcp_message(DHCP_REQUEST, ((time.monotonic() - start_time) / 1000))
+                    self.send_dhcp_message(
+                        DHCP_REQUEST, ((time.monotonic() - start_time) / 1000)
+                    )
                     self._dhcp_state = STATE_DHCP_REQUEST
                 else:
                     print("* Received DHCP Message is not OFFER")
@@ -396,7 +412,7 @@ class DHCP:
                     msg_type = 0
                     self._dhcp_state = STATE_DHCP_START
 
-            if (result != 1 and ((time.monotonic() - start_time > self._timeout))):
+            if result != 1 and ((time.monotonic() - start_time > self._timeout)):
                 break
 
         self._transaction_id += 1

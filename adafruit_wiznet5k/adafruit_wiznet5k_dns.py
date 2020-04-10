@@ -38,29 +38,31 @@ from adafruit_wiznet5k.adafruit_wiznet5k_socket import htons
 
 # pylint: disable=bad-whitespace
 
-QUERY_FLAG             = const(0x00)
-OPCODE_STANDARD_QUERY  = const(0x00)
-RECURSION_DESIRED_FLAG = 1<<8
+QUERY_FLAG = const(0x00)
+OPCODE_STANDARD_QUERY = const(0x00)
+RECURSION_DESIRED_FLAG = 1 << 8
 
-TYPE_A   = const(0x0001)
+TYPE_A = const(0x0001)
 CLASS_IN = const(0x0001)
 DATA_LEN = const(0x0004)
 
 # Return codes for gethostbyname
-SUCCESS          = const(1)
-TIMED_OUT        = const(-1)
-INVALID_SERVER   = const(-2)
-TRUNCATED        = const(-3)
+SUCCESS = const(1)
+TIMED_OUT = const(-1)
+INVALID_SERVER = const(-2)
+TRUNCATED = const(-3)
 INVALID_RESPONSE = const(-4)
 
-DNS_PORT         = const(0x35) # port used for DNS request
+DNS_PORT = const(0x35)  # port used for DNS request
 # pylint: enable=bad-whitespace
+
 
 class DNS:
     """W5K DNS implementation.
 
     :param iface: Network interface
     """
+
     def __init__(self, iface, dns_address, debug=False):
         self._debug = debug
         self._iface = iface
@@ -70,7 +72,7 @@ class DNS:
 
         self._dns_server = dns_address
         self._host = 0
-        self._request_id = 0 # request identifier
+        self._request_id = 0  # request identifier
         self._pkt_buf = bytearray()
 
     def gethostbyname(self, hostname):
@@ -104,7 +106,9 @@ class DNS:
         self._sock.close()
         return addr
 
-    def _parse_dns_response(self): # pylint: disable=too-many-return-statements, too-many-branches, too-many-statements, too-many-locals
+    def _parse_dns_response(
+        self,
+    ):  # pylint: disable=too-many-return-statements, too-many-branches, too-many-statements, too-many-locals
         """Receives and parses DNS query response.
         Returns desired hostname address if obtained, -1 otherwise.
 
@@ -126,26 +130,30 @@ class DNS:
             print("DNS Packet Received: ", self._pkt_buf)
 
         # Validate request identifier
-        xid = int.from_bytes(self._pkt_buf[0:2], 'l')
+        xid = int.from_bytes(self._pkt_buf[0:2], "l")
         if not xid == self._request_id:
             if self._debug:
-                print("* DNS ERROR: Received request identifer {} \
-                      does not match expected {}".format(xid, self._request_id))
+                print(
+                    "* DNS ERROR: Received request identifer {} \
+                      does not match expected {}".format(
+                        xid, self._request_id
+                    )
+                )
             return -1
         # Validate flags
-        flags = int.from_bytes(self._pkt_buf[2:4], 'l')
+        flags = int.from_bytes(self._pkt_buf[2:4], "l")
         if not flags == 0x8180:
             if self._debug:
                 print("* DNS ERROR: Invalid flags, ", flags)
             return -1
         # Number of questions
-        qr_count = int.from_bytes(self._pkt_buf[4:6], 'l')
+        qr_count = int.from_bytes(self._pkt_buf[4:6], "l")
         if not qr_count >= 1:
             if self._debug:
                 print("* DNS ERROR: Question count >=1, ", qr_count)
             return -1
         # Number of answers
-        an_count = int.from_bytes(self._pkt_buf[6:8], 'l')
+        an_count = int.from_bytes(self._pkt_buf[6:8], "l")
         if self._debug:
             print("* DNS Answer Count: ", an_count)
         if not an_count >= 1:
@@ -159,13 +167,13 @@ class DNS:
             name_len = self._pkt_buf[ptr]
             if name_len == 0x00:
                 # we reached the end of this name
-                ptr += 1 # inc. pointer by 0x00
+                ptr += 1  # inc. pointer by 0x00
                 break
             # advance pointer
             ptr += name_len + 1
 
         # Validate Query is Type A
-        q_type = int.from_bytes(self._pkt_buf[ptr:ptr+2], 'l')
+        q_type = int.from_bytes(self._pkt_buf[ptr : ptr + 2], "l")
         if not q_type == TYPE_A:
             if self._debug:
                 print("* DNS ERROR: Incorrect Query Type: ", q_type)
@@ -173,7 +181,7 @@ class DNS:
         ptr += 2
 
         # Validate Query is Type A
-        q_class = int.from_bytes(self._pkt_buf[ptr:ptr+2], 'l')
+        q_class = int.from_bytes(self._pkt_buf[ptr : ptr + 2], "l")
         if not q_class == TYPE_A:
             if self._debug:
                 print("* DNS ERROR: Incorrect Query Class: ", q_class)
@@ -181,16 +189,16 @@ class DNS:
         ptr += 2
 
         # Let's take the first type-a answer
-        if self._pkt_buf[ptr] != 0xc0:
+        if self._pkt_buf[ptr] != 0xC0:
             return -1
         ptr += 1
 
-        if self._pkt_buf[ptr] != 0xc:
+        if self._pkt_buf[ptr] != 0xC:
             return -1
         ptr += 1
 
         # Validate Answer Type A
-        ans_type = int.from_bytes(self._pkt_buf[ptr:ptr+2], 'l')
+        ans_type = int.from_bytes(self._pkt_buf[ptr : ptr + 2], "l")
         if not ans_type == TYPE_A:
             if self._debug:
                 print("* DNS ERROR: Incorrect Answer Type: ", ans_type)
@@ -198,7 +206,7 @@ class DNS:
         ptr += 2
 
         # Validate Answer Class IN
-        ans_class = int.from_bytes(self._pkt_buf[ptr:ptr+2], 'l')
+        ans_class = int.from_bytes(self._pkt_buf[ptr : ptr + 2], "l")
         if not ans_class == TYPE_A:
             if self._debug:
                 print("* DNS ERROR: Incorrect Answer Class: ", ans_class)
@@ -209,14 +217,14 @@ class DNS:
         ptr += 4
 
         # Validate addr is IPv4
-        data_len = int.from_bytes(self._pkt_buf[ptr:ptr+2], 'l')
+        data_len = int.from_bytes(self._pkt_buf[ptr : ptr + 2], "l")
         if not data_len == DATA_LEN:
             if self._debug:
                 print("* DNS ERROR: Unexpected Data Length: ", data_len)
             return -1
         ptr += 2
         # Return address
-        return self._pkt_buf[ptr:ptr+4]
+        return self._pkt_buf[ptr : ptr + 4]
 
     def _build_dns_header(self):
         """Builds DNS header."""
@@ -240,13 +248,13 @@ class DNS:
         # NSCOUNT
         self._pkt_buf.append(0x00)
         self._pkt_buf.append(0x00)
-        #ARCOUNT
+        # ARCOUNT
         self._pkt_buf.append(0x00)
         self._pkt_buf.append(0x00)
 
     def _build_dns_question(self):
         """Build DNS question"""
-        host = self._host.decode('utf-8')
+        host = self._host.decode("utf-8")
         host = host.split(".")
         # write out each section of host
         for i, _ in enumerate(host):
