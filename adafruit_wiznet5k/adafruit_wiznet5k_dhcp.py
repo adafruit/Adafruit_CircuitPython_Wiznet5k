@@ -102,16 +102,15 @@ class DHCP:
     """
 
     # pylint: disable=too-many-arguments, too-many-instance-attributes, invalid-name
-    def __init__(self, eth, mac_address, timeout=1, timeout_response=1, debug=False):
+    def __init__(self, eth, mac_address, response_timeout=3, debug=False):
         self._debug = debug
-        self._timeout = timeout
-        self._response_timeout = timeout_response
+        self._response_timeout = response_timeout
         self._mac_address = mac_address
 
         # Initalize a new UDP socket for DHCP
         socket.set_interface(eth)
         self._sock = socket.socket(type=socket.SOCK_DGRAM)
-        self._sock.settimeout(timeout)
+        self._sock.settimeout(response_timeout)
 
         # DHCP state machine
         self._dhcp_state = STATE_DHCP_START
@@ -373,7 +372,7 @@ class DHCP:
             elif self._dhcp_state == STATE_DHCP_DISCOVER:
                 if self._debug:
                     print("* DHCP: Parsing OFFER")
-                msg_type, xid = self.parse_dhcp_response(self._timeout)
+                msg_type, xid = self.parse_dhcp_response(self._response_timeout)
                 if msg_type == DHCP_OFFER:
                     # use the _transaction_id the offer returned,
                     # rather than the current one
@@ -389,7 +388,7 @@ class DHCP:
             elif STATE_DHCP_REQUEST:
                 if self._debug:
                     print("* DHCP: Parsing ACK")
-                msg_type, xid = self.parse_dhcp_response(self._timeout)
+                msg_type, xid = self.parse_dhcp_response(self._response_timeout)
                 if msg_type == DHCP_ACK:
                     self._dhcp_state = STATE_DHCP_LEASED
                     result = 1
@@ -412,7 +411,7 @@ class DHCP:
                     msg_type = 0
                     self._dhcp_state = STATE_DHCP_START
 
-            if result != 1 and ((time.monotonic() - start_time > self._timeout)):
+            if result != 1 and ((time.monotonic() - start_time > self._response_timeout)):
                 break
 
         self._transaction_id += 1

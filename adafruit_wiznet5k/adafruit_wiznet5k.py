@@ -154,7 +154,8 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
 
     # pylint: disable=too-many-arguments
     def __init__(
-        self, spi_bus, cs, reset=None, is_dhcp=True, mac=DEFAULT_MAC, debug=False
+        self, spi_bus, cs, reset=None, is_dhcp=True, mac=DEFAULT_MAC, debug=False,
+        dhcp_timeout=3
     ):
         self._debug = debug
         self._chip_type = None
@@ -182,10 +183,10 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
         self._dns = 0
         # Set DHCP
         if is_dhcp:
-            ret = self.set_dhcp()
+            ret = self.set_dhcp(dhcp_timeout)
             assert ret == 0, "Failed to configure DHCP Server!"
 
-    def set_dhcp(self, response_timeout=1):
+    def set_dhcp(self, response_timeout=3):
         """Initializes the DHCP client and attempts to retrieve
         and set network configuration from the DHCP server.
         Returns True if DHCP configured, False otherwise.
