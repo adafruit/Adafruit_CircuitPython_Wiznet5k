@@ -95,14 +95,14 @@ class DHCP:
     """W5k DHCP Client implementation.
     :param eth: Wiznet 5k object
     :param list mac_address: Hardware MAC.
-    :param int timeout: Packet parsing timeout.
-    :param int timeout_response: DHCP Response timeout.
+    :param str hostname: The desired hostname, with optional {} to fill in MAC.
+    :param int response_timeout: DHCP Response timeout.
     :param bool debug: Enable debugging output.
 
     """
 
     # pylint: disable=too-many-arguments, too-many-instance-attributes, invalid-name
-    def __init__(self, eth, mac_address, response_timeout=3, debug=False):
+    def __init__(self, eth, mac_address, hostname=None, response_timeout=3, debug=False):
         self._debug = debug
         self._response_timeout = response_timeout
         self._mac_address = mac_address
@@ -123,6 +123,7 @@ class DHCP:
         self.gateway_ip = 0
         self.subnet_mask = 0
         self.dns_server_ip = 0
+
         # Lease configuration
         self._lease_time = 0
         self._last_check_lease_ms = 0
@@ -130,6 +131,11 @@ class DHCP:
         self._rebind_in_sec = 0
         self._t1 = 0
         self._t2 = 0
+
+        # Host name
+        mac_string = "".join("{:02X}".format(o) for o in mac_address)
+        self._hostname = bytes((hostname or "WIZnet{}")
+                        .split('.')[0].format(mac_string)[:42], "utf-8")
 
     def send_dhcp_message(self, state, time_elapsed):
         """Assemble and send a DHCP message packet to a socket.
@@ -192,38 +198,37 @@ class DHCP:
 
         # Option - Host Name
         _BUFF[252] = 12
-        _BUFF[253] = len(b"Wiznet") + 6
-        _BUFF[254:260] = b"WIZnet"
-
-        for mac in range(0, 5):
-            _BUFF[260 + mac] = self._mac_address[mac]
+        hostname_len = len(self._hostname)
+        after_hostname = 254 + hostname_len
+        _BUFF[253] = hostname_len
+        _BUFF[254:after_hostname] = self._hostname
 
         if state == DHCP_REQUEST:
             # Set the parsed local IP addr
-            _BUFF[266] = 50
-            _BUFF[267] = 0x04
+            _BUFF[after_hostname] = 50
+            _BUFF[after_hostname+1] = 0x04
 
-            _BUFF[268:272] = self.local_ip
+            _BUFF[after_hostname+2:after_hostname+6] = self.local_ip
             # Set the parsed dhcp server ip addr
-            _BUFF[272] = 54
-            _BUFF[273] = 0x04
-            _BUFF[274:278] = self.dhcp_server_ip
+            _BUFF[after_hostname+6] = 54
+            _BUFF[after_hostname+7] = 0x04
+            _BUFF[after_hostname+8:after_hostname+12] = self.dhcp_server_ip
 
-        _BUFF[278] = 55
-        _BUFF[279] = 0x06
+        _BUFF[after_hostname+12] = 55
+        _BUFF[after_hostname+13] = 0x06
         # subnet mask
-        _BUFF[280] = 1
+        _BUFF[after_hostname+14] = 1
         # routers on subnet
-        _BUFF[281] = 3
+        _BUFF[after_hostname+15] = 3
         # DNS
-        _BUFF[282] = 6
+        _BUFF[after_hostname+16] = 6
         # domain name
-        _BUFF[283] = 15
+        _BUFF[after_hostname+17] = 15
         # renewal (T1) value
-        _BUFF[284] = 58
+        _BUFF[after_hostname+18] = 58
         # rebinding (T2) value
-        _BUFF[285] = 59
-        _BUFF[286] = 255
+        _BUFF[after_hostname+19] = 59
+        _BUFF[after_hostname+20] = 255
 
         # Send DHCP packet
         self._sock.send(_BUFF)
