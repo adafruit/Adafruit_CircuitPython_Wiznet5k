@@ -156,8 +156,15 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
 
     # pylint: disable=too-many-arguments
     def __init__(
-        self, spi_bus, cs, reset=None, is_dhcp=True, mac=DEFAULT_MAC,
-        hostname=None, dhcp_timeout=3, debug=False
+        self,
+        spi_bus,
+        cs,
+        reset=None,
+        is_dhcp=True,
+        mac=DEFAULT_MAC,
+        hostname=None,
+        dhcp_timeout=3,
+        debug=False,
     ):
         self._debug = debug
         self._chip_type = None

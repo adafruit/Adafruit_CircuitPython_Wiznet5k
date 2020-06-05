@@ -102,7 +102,9 @@ class DHCP:
     """
 
     # pylint: disable=too-many-arguments, too-many-instance-attributes, invalid-name
-    def __init__(self, eth, mac_address, hostname=None, response_timeout=3, debug=False):
+    def __init__(
+        self, eth, mac_address, hostname=None, response_timeout=3, debug=False
+    ):
         self._debug = debug
         self._response_timeout = response_timeout
         self._mac_address = mac_address
@@ -134,8 +136,9 @@ class DHCP:
 
         # Host name
         mac_string = "".join("{:02X}".format(o) for o in mac_address)
-        self._hostname = bytes((hostname or "WIZnet{}")
-                        .split('.')[0].format(mac_string)[:42], "utf-8")
+        self._hostname = bytes(
+            (hostname or "WIZnet{}").split(".")[0].format(mac_string)[:42], "utf-8"
+        )
 
     def send_dhcp_message(self, state, time_elapsed):
         """Assemble and send a DHCP message packet to a socket.
@@ -206,29 +209,29 @@ class DHCP:
         if state == DHCP_REQUEST:
             # Set the parsed local IP addr
             _BUFF[after_hostname] = 50
-            _BUFF[after_hostname+1] = 0x04
+            _BUFF[after_hostname + 1] = 0x04
 
-            _BUFF[after_hostname+2:after_hostname+6] = self.local_ip
+            _BUFF[after_hostname + 2 : after_hostname + 6] = self.local_ip
             # Set the parsed dhcp server ip addr
-            _BUFF[after_hostname+6] = 54
-            _BUFF[after_hostname+7] = 0x04
-            _BUFF[after_hostname+8:after_hostname+12] = self.dhcp_server_ip
+            _BUFF[after_hostname + 6] = 54
+            _BUFF[after_hostname + 7] = 0x04
+            _BUFF[after_hostname + 8 : after_hostname + 12] = self.dhcp_server_ip
 
-        _BUFF[after_hostname+12] = 55
-        _BUFF[after_hostname+13] = 0x06
+        _BUFF[after_hostname + 12] = 55
+        _BUFF[after_hostname + 13] = 0x06
         # subnet mask
-        _BUFF[after_hostname+14] = 1
+        _BUFF[after_hostname + 14] = 1
         # routers on subnet
-        _BUFF[after_hostname+15] = 3
+        _BUFF[after_hostname + 15] = 3
         # DNS
-        _BUFF[after_hostname+16] = 6
+        _BUFF[after_hostname + 16] = 6
         # domain name
-        _BUFF[after_hostname+17] = 15
+        _BUFF[after_hostname + 17] = 15
         # renewal (T1) value
-        _BUFF[after_hostname+18] = 58
+        _BUFF[after_hostname + 18] = 58
         # rebinding (T2) value
-        _BUFF[after_hostname+19] = 59
-        _BUFF[after_hostname+20] = 255
+        _BUFF[after_hostname + 19] = 59
+        _BUFF[after_hostname + 20] = 255
 
         # Send DHCP packet
         self._sock.send(_BUFF)
@@ -416,7 +419,9 @@ class DHCP:
                     msg_type = 0
                     self._dhcp_state = STATE_DHCP_START
 
-            if result != 1 and ((time.monotonic() - start_time > self._response_timeout)):
+            if result != 1 and (
+                (time.monotonic() - start_time > self._response_timeout)
+            ):
                 break
 
         self._transaction_id += 1

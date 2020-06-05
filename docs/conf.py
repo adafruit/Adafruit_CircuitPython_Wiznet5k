@@ -147,7 +147,7 @@ latex_documents = [
         "AdafruitWiznet5k Library Documentation",
         author,
         "manual",
-    ),
+    )
 ]
 
 # -- Options for manual page output ---------------------------------------
@@ -178,5 +178,5 @@ texinfo_documents = [
         "AdafruitWiznet5kLibrary",
         "One line description of project.",
         "Miscellaneous",
-    ),
+    )
 ]
