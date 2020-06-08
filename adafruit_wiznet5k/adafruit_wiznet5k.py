@@ -142,8 +142,10 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
     :param ~busio.SPI spi_bus: The SPI bus the Wiznet module is connected to.
     :param ~digitalio.DigitalInOut cs: Chip select pin.
     :param ~digitalio.DigitalInOut rst: Optional reset pin.
-    :param bool dhcp: Whether to start DHCP automatically or not.
-    :param str mac: The Wiznet's MAC Address.
+    :param bool is_dhcp: Whether to start DHCP automatically or not.
+    :param list mac: The Wiznet's MAC Address.
+    :param str hostname: The desired hostname, with optional {} to fill in MAC.
+    :param int dhcp_timeout: Timeout in seconds for DHCP response.
     :param bool debug: Enable debugging output.
 
     """
@@ -154,7 +156,15 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
 
     # pylint: disable=too-many-arguments
     def __init__(
-        self, spi_bus, cs, reset=None, is_dhcp=True, mac=DEFAULT_MAC, debug=False
+        self,
+        spi_bus,
+        cs,
+        reset=None,
+        is_dhcp=True,
+        mac=DEFAULT_MAC,
+        hostname=None,
+        dhcp_timeout=3,
+        debug=False,
     ):
         self._debug = debug
         self._chip_type = None
@@ -182,13 +192,14 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
         self._dns = 0
         # Set DHCP
         if is_dhcp:
-            ret = self.set_dhcp()
+            ret = self.set_dhcp(hostname, dhcp_timeout)
             assert ret == 0, "Failed to configure DHCP Server!"
 
-    def set_dhcp(self, response_timeout=1):
+    def set_dhcp(self, hostname=None, response_timeout=3):
         """Initializes the DHCP client and attempts to retrieve
         and set network configuration from the DHCP server.
         Returns True if DHCP configured, False otherwise.
+        :param str hostname: The desired hostname, with optional {} to fill in MAC.
         :param int response_timeout: Time to wait for server to return packet, in seconds.
 
         """
@@ -197,7 +208,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
         self._src_port = 68
         # Return IP assigned by DHCP
         _dhcp_client = dhcp.DHCP(
-            self, self.mac_address, response_timeout, debug=self._debug
+            self, self.mac_address, hostname, response_timeout, debug=self._debug
         )
         ret = _dhcp_client.request_dhcp_lease()
         if ret == 1:
