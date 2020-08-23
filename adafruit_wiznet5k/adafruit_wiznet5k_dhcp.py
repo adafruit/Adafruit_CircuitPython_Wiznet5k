@@ -36,7 +36,6 @@ from micropython import const
 import adafruit_wiznet5k.adafruit_wiznet5k_socket as socket
 from adafruit_wiznet5k.adafruit_wiznet5k_socket import htonl, htons
 
-# pylint: disable=bad-whitespace
 
 # DHCP State Machine
 STATE_DHCP_START = const(0x00)
@@ -87,7 +86,6 @@ LEASE_TIME = 51
 OPT_END = 255
 
 
-# pylint: enable=bad-whitespace
 _BUFF = bytearray(317)
 
 
