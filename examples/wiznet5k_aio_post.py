@@ -2,9 +2,9 @@ import time
 import board
 import busio
 from digitalio import DigitalInOut
+import adafruit_requests as requests
 from adafruit_wiznet5k.adafruit_wiznet5k import WIZNET5K
 import adafruit_wiznet5k.adafruit_wiznet5k_socket as socket
-import adafruit_requests as requests
 
 # Get Adafruit.io details from a secrets.py file
 try:
