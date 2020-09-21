@@ -36,7 +36,6 @@ from micropython import const
 import adafruit_wiznet5k.adafruit_wiznet5k_socket as socket
 from adafruit_wiznet5k.adafruit_wiznet5k_socket import htons
 
-# pylint: disable=bad-whitespace
 
 QUERY_FLAG = const(0x00)
 OPCODE_STANDARD_QUERY = const(0x00)
@@ -54,7 +53,6 @@ TRUNCATED = const(-3)
 INVALID_RESPONSE = const(-4)
 
 DNS_PORT = const(0x35)  # port used for DNS request
-# pylint: enable=bad-whitespace
 
 
 class DNS:

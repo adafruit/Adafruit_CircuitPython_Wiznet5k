@@ -53,7 +53,6 @@ import adafruit_wiznet5k.adafruit_wiznet5k_dns as dns
 __version__ = "0.0.0-auto.0"
 __repo__ = "https://github.com/adafruit/Adafruit_CircuitPython_Wiznet5k.git"
 
-# pylint: disable=bad-whitespace
 
 # Wiznet5k Registers
 REG_MR = const(0x0000)  # Mode
@@ -124,7 +123,6 @@ SNMR_IPRAW = const(0x03)
 SNMR_MACRAW = const(0x04)
 SNMR_PPPOE = const(0x05)
 
-# pylint: enable=bad-whitespace
 MAX_PACKET = const(4000)
 LOCAL_PORT = const(0x400)
 # Default hardware MAC address

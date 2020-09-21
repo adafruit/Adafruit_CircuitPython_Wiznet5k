@@ -3,12 +3,12 @@ import board
 import busio
 from digitalio import DigitalInOut
 
-from adafruit_wiznet5k.adafruit_wiznet5k import WIZNET5K
-import adafruit_wiznet5k.adafruit_wiznet5k_socket as socket
 import adafruit_requests as requests
 
 import neopixel
 import adafruit_fancyled.adafruit_fancyled as fancy
+from adafruit_wiznet5k.adafruit_wiznet5k import WIZNET5K
+import adafruit_wiznet5k.adafruit_wiznet5k_socket as socket
 
 cs = DigitalInOut(board.D10)
 spi_bus = busio.SPI(board.SCK, MOSI=board.MOSI, MISO=board.MISO)
@@ -51,7 +51,7 @@ while True:
             raise AssertionError(
                 "Failed to resolve hostname, \
                                   please check your router's DNS configuration."
-            )
+            ) from error
         continue
     if not value:
         continue
