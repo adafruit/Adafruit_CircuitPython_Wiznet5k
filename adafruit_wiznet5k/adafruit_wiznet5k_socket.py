@@ -75,6 +75,8 @@ def getaddrinfo(host, port, family=0, socktype=0, proto=0, flags=0):
     """
     if not isinstance(port, int):
         raise RuntimeError("Port must be an integer")
+    if is_ipv4(host):
+        return [(AF_INET, socktype, proto, "", (host, port))]
     return [(AF_INET, socktype, proto, "", (gethostbyname(host), port))]
 
 
@@ -86,6 +88,19 @@ def gethostbyname(hostname):
     addr = _the_interface.get_host_by_name(hostname)
     addr = "{}.{}.{}.{}".format(addr[0], addr[1], addr[2], addr[3])
     return addr
+
+
+def is_ipv4(host):
+    """Checks if a host string is an IPv4 address.
+    :param str host: host's name or ip
+    """
+    octets = host.split(".", 3)
+    if len(octets) != 4 or not "".join(octets).isdigit():
+        return False
+    for octet in octets:
+        if int(octet) > 255:
+            return False
+    return True
 
 
 # pylint: disable=invalid-name
@@ -275,9 +290,7 @@ class socket:
         SOCKETS.remove(self.socknum)
 
     def available(self):
-        """Returns how many bytes of data are available to be read from the socket.
-
-        """
+        """Returns how many bytes of data are available to be read from the socket."""
         return _the_interface.socket_available(self.socknum, self._sock_type)
 
     def settimeout(self, value):
