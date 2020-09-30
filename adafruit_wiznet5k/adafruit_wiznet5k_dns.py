@@ -140,7 +140,7 @@ class DNS:
             return -1
         # Validate flags
         flags = int.from_bytes(self._pkt_buf[2:4], "l")
-        if not (flags == 0x8180 or flags == 0x8580):
+        if not flags in (0x8180, 0x8580):
             if self._debug:
                 print("* DNS ERROR: Invalid flags, ", flags)
             return -1
