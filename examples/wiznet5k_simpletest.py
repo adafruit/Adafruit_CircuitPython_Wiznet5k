@@ -10,7 +10,10 @@ print("Wiznet5k WebClient Test")
 TEXT_URL = "http://wifitest.adafruit.com/testwifi/index.html"
 JSON_URL = "http://api.coindesk.com/v1/bpi/currentprice/USD.json"
 
+# For Adafruit Ethernet FeatherWing
 cs = digitalio.DigitalInOut(board.D10)
+# For Particle Ethernet FeatherWing
+# cs = digitalio.DigitalInOut(board.D5)
 spi_bus = busio.SPI(board.SCK, MOSI=board.MOSI, MISO=board.MISO)
 
 # Initialize ethernet interface with DHCP
