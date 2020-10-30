@@ -355,9 +355,7 @@ class DHCP:
     def request_dhcp_lease(
         self,
     ):  # pylint: disable=too-many-branches, too-many-statements
-        """Request to renew or acquire a DHCP lease.
-
-        """
+        """Request to renew or acquire a DHCP lease."""
         # select an initial transaction id
         self._transaction_id = randrange(1, 2000)
 

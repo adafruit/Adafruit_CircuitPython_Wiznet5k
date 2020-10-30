@@ -344,9 +344,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
 
     @property
     def remote_port(self):
-        """Returns the port of the host who sent the current incoming packet.
-
-        """
+        """Returns the port of the host who sent the current incoming packet."""
         return self.remote_port
 
     @property
@@ -374,9 +372,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
         self._dns = dns_server
 
     def _w5100_init(self):
-        """Initializes and detects a wiznet5k module.
-
-        """
+        """Initializes and detects a wiznet5k module."""
         time.sleep(1)
         self._cs.switch_to_output()
         self._cs.value = 1
@@ -393,9 +389,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
         return 1
 
     def detect_w5500(self):
-        """Detects W5500 chip.
-
-        """
+        """Detects W5500 chip."""
         assert self.sw_reset() == 0, "Chip not reset properly!"
         self._write_mr(0x08)
         assert self._read_mr()[0] == 0x08, "Expected 0x08."
@@ -425,9 +419,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
         return 0
 
     def _read_mr(self):
-        """Reads from the Mode Register (MR).
-
-        """
+        """Reads from the Mode Register (MR)."""
         res = self.read(REG_MR, 0x00)
         return res
 
@@ -689,8 +681,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
         return ret, resp
 
     def read_udp(self, socket_num, length):
-        """Read UDP socket's remaining bytes.
-        """
+        """Read UDP socket's remaining bytes."""
         if UDP_SOCK["bytes_remaining"] > 0:
             if UDP_SOCK["bytes_remaining"] <= length:
                 ret, resp = self.socket_read(socket_num, UDP_SOCK["bytes_remaining"])
@@ -702,9 +693,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
         return -1
 
     def socket_write(self, socket_num, buffer):
-        """Writes a bytearray to a provided socket.
-
-        """
+        """Writes a bytearray to a provided socket."""
         assert self.link_status, "Ethernet cable disconnected!"
         assert socket_num <= self.max_sockets, "Provided socket exceeds max_sockets."
         status = 0
@@ -754,9 +743,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
     # Socket-Register Methods
 
     def _get_rx_rcv_size(self, sock):
-        """Get size of recieved and saved in socket buffer.
-
-        """
+        """Get size of recieved and saved in socket buffer."""
         val = 0
         val_1 = self._read_snrx_rsr(sock)
         while val != val_1:
@@ -766,9 +753,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
         return val
 
     def _get_tx_free_size(self, sock):
-        """Get free size of sock's tx buffer block.
-
-        """
+        """Get free size of sock's tx buffer block."""
         val = 0
         val_1 = 0
         while val != val_1:
@@ -806,39 +791,29 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
         return data
 
     def _write_sndipr(self, sock, ip_addr):
-        """Writes to socket destination IP Address.
-
-        """
+        """Writes to socket destination IP Address."""
         for octet in range(0, 4):
             self._write_socket(sock, REG_SNDIPR + octet, ip_addr[octet])
 
     def _write_sndport(self, sock, port):
-        """Writes to socket destination port.
-
-        """
+        """Writes to socket destination port."""
         self._write_socket(sock, REG_SNDPORT, port >> 8)
         self._write_socket(sock, REG_SNDPORT + 1, port & 0xFF)
 
     def _read_snsr(self, sock):
-        """Reads Socket n Status Register.
-
-        """
+        """Reads Socket n Status Register."""
         return self._read_socket(sock, REG_SNSR)
 
     def _write_snmr(self, sock, protocol):
-        """Write to Socket n Mode Register.
-
-        """
+        """Write to Socket n Mode Register."""
         self._write_socket(sock, REG_SNMR, protocol)
 
     def _write_snir(self, sock, data):
-        """Write to Socket n Interrupt Register.
-        """
+        """Write to Socket n Interrupt Register."""
         self._write_socket(sock, REG_SNIR, data)
 
     def _write_sock_port(self, sock, port):
-        """Write to the socket port number.
-        """
+        """Write to the socket port number."""
         self._write_socket(sock, REG_SNPORT, port >> 8)
         self._write_socket(sock, REG_SNPORT + 1, port & 0xFF)
 
@@ -852,8 +827,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
         return self._read_socket(sock, REG_SNMR)
 
     def _write_socket(self, sock, address, data, length=None):
-        """Write to a W5k socket register.
-        """
+        """Write to a W5k socket register."""
         base = self._ch_base_msb << 8
         cntl_byte = (sock << 5) + 0x0C
         if length is None:
@@ -861,7 +835,6 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
         return self.write(base + sock * CH_SIZE + address, cntl_byte, data)
 
     def _read_socket(self, sock, address):
-        """Read a W5k socket register.
-        """
+        """Read a W5k socket register."""
         cntl_byte = (sock << 5) + 0x08
         return self.read(address, cntl_byte)
