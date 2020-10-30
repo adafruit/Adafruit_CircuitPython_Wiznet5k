@@ -12,7 +12,7 @@ JSON_URL = "http://api.coindesk.com/v1/bpi/currentprice/USD.json"
 
 # For Adafruit Ethernet FeatherWing
 cs = digitalio.DigitalInOut(board.D10)
-# For Particle Ethernet Shield
+# For Particle Ethernet FeatherWing
 # cs = digitalio.DigitalInOut(board.D5)
 spi_bus = busio.SPI(board.SCK, MOSI=board.MOSI, MISO=board.MISO)
 
