@@ -494,7 +494,6 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
 
         res = self._get_rx_rcv_size(socket_num)
 
-        res = int.from_bytes(res, "b")
         if sock_type == SNMR_TCP:
             return res
         if res > 0:
@@ -574,11 +573,9 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
 
         sock = 0
         for _sock in range(self.max_sockets):
-            status = self.socket_status(_sock)
-            if (
-                status[0] == SNSR_SOCK_CLOSED
-                or status[0] == SNSR_SOCK_FIN_WAIT
-                or status[0] == SNSR_SOCK_CLOSE_WAIT
+            status = self.socket_status(_sock)[0]
+            if (status in
+                (SNSR_SOCK_CLOSED, SNSR_SOCK_FIN_WAIT, SNSR_SOCK_CLOSE_WAIT)
             ):
                 sock = _sock
                 break
@@ -670,7 +667,6 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
 
         # Check if there is data available on the socket
         ret = self._get_rx_rcv_size(socket_num)
-        ret = int.from_bytes(ret, "b")
         if self._debug:
             print("Bytes avail. on sock: ", ret)
         if ret == 0:
@@ -737,7 +733,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
         free_size = self._get_tx_free_size(socket_num)
         while free_size < ret:
             free_size = self._get_tx_free_size(socket_num)
-            status = self.socket_status(socket_num)
+            status = self.socket_status(socket_num)[0]
             if status not in (SNSR_SOCK_ESTABLISHED, SNSR_SOCK_CLOSE_WAIT):
                 ret = 0
                 break
@@ -761,7 +757,9 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
         while (
             self._read_socket(socket_num, REG_SNIR)[0] & SNIR_SEND_OK
         ) != SNIR_SEND_OK:
-            if self.socket_status(socket_num) == SNSR_SOCK_CLOSED:
+            if (self.socket_status(socket_num)[0] in
+                (SNSR_SOCK_CLOSED, SNSR_SOCK_FIN_WAIT, SNSR_SOCK_CLOSE_WAIT)
+            ):
                 # self.socket_close(socket_num)
                 return 0
             time.sleep(0.01)
@@ -779,17 +777,17 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
             val_1 = self._read_snrx_rsr(sock)
             if val_1 != 0:
                 val = self._read_snrx_rsr(sock)
-        return val
+        return int.from_bytes(val, "b")
 
     def _get_tx_free_size(self, sock):
         """Get free size of sock's tx buffer block."""
         val = 0
-        val_1 = 0
+        val_1 = self._read_sntx_fsr(sock)
         while val != val_1:
             val_1 = self._read_sntx_fsr(sock)
             if val_1 != 0:
                 val = self._read_sntx_fsr(sock)
-        return val
+        return int.from_bytes(val, "b")
 
     def _read_snrx_rd(self, sock):
         self._pbuff[0] = self._read_socket(sock, REG_SNRX_RD)[0]
