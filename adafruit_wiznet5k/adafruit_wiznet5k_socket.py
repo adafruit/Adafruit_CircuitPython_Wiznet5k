@@ -120,6 +120,7 @@ class socket:
         self._sock_type = type
         self._buffer = b""
         self._timeout = 0
+        self._listen_port = None
 
         self._socknum = _the_interface.get_socket()
 
@@ -134,8 +135,7 @@ class socket:
         if self.socknum >= _the_interface.max_sockets:
             return False
         status = _the_interface.socket_status(self.socknum)[0]
-        if (status == adafruit_wiznet5k.SNSR_SOCK_CLOSE_WAIT
-                and self.available() == 0):
+        if status == adafruit_wiznet5k.SNSR_SOCK_CLOSE_WAIT and self.available() == 0:
             result = False
         else:
             result = status not in (
@@ -162,11 +162,18 @@ class socket:
         self._buffer = bytearray(self._buffer)
         return self._buffer
 
-    def listen(self, port):
-        """Listen on the specified port.
-        :param int port: The port to listen on.
+    def bind(self, address):
+        """Bind the socket to the listen port, we ignore the host.
+        :param tuple address: local socket as a (host, port) tuple, host is ignored.
         """
-        _the_interface.socket_listen(self.socknum, port)
+        _, self._listen_port = address
+
+    def listen(self, backlog=None):
+        """Listen on the port specified by bind.
+        :param backlog: For compatibility but ignored.
+        """
+        assert self._listen_port is not None, "Use bind to set the port before listen!"
+        _the_interface.socket_listen(self.socknum, self._listen_port)
         self._buffer = b""
 
     def connect(self, address, conntype=None):
@@ -211,11 +218,11 @@ class socket:
                     avail = _the_interface.udp_remaining()
                 if avail:
                     if self._sock_type == SOCK_STREAM:
-                        self._buffer += _the_interface.socket_read(
-                                                  self.socknum, avail)[1]
+                        self._buffer += _the_interface.socket_read(self.socknum, avail)[
+                            1
+                        ]
                     elif self._sock_type == SOCK_DGRAM:
-                        self._buffer += _the_interface.read_udp(
-                                                  self.socknum, avail)[1]
+                        self._buffer += _the_interface.read_udp(self.socknum, avail)[1]
                 else:
                     break
             gc.collect()
@@ -237,10 +244,10 @@ class socket:
                 stamp = time.monotonic()
                 if self._sock_type == SOCK_STREAM:
                     recv = _the_interface.socket_read(
-                                self.socknum, min(to_read, avail))[1]
+                        self.socknum, min(to_read, avail)
+                    )[1]
                 elif self._sock_type == SOCK_DGRAM:
-                    recv = _the_interface.read_udp(
-                                self.socknum, min(to_read, avail))[1]
+                    recv = _the_interface.read_udp(self.socknum, min(to_read, avail))[1]
                 recv = bytes(recv)
                 received.append(recv)
                 to_read -= len(recv)
@@ -269,14 +276,16 @@ class socket:
             if self._sock_type == SOCK_STREAM:
                 avail = self.available()
                 if avail:
-                    self._buffer += _the_interface.socket_read(
-                                                  self.socknum, avail)[1]
+                    self._buffer += _the_interface.socket_read(self.socknum, avail)[1]
             elif self._sock_type == SOCK_DGRAM:
                 avail = _the_interface.udp_remaining()
                 if avail:
                     self._buffer += _the_interface.read_udp(self.socknum, avail)
-            if not avail and self._timeout > 0 and \
-                    time.monotonic() - stamp > self._timeout:
+            if (
+                not avail
+                and self._timeout > 0
+                and time.monotonic() - stamp > self._timeout
+            ):
                 self.close()
                 raise RuntimeError("Didn't receive response, failing out...")
         firstline, self._buffer = self._buffer.split(b"\r\n", 1)

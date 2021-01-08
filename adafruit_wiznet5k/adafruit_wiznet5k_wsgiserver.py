@@ -69,7 +69,8 @@ class WSGIServer:
         """
         for _ in range(MAX_SOCK_NUM):
             new_sock = socket.socket()
-            new_sock.listen(self.port)
+            new_sock.bind((None, self.port))
+            new_sock.listen()
             self._client_sock.append(new_sock)
         if self._debug:
             ip = _the_interface.pretty_ip(_the_interface.ip_address)
@@ -89,7 +90,8 @@ class WSGIServer:
                 self.finish_response(result, sock)
                 self._client_sock.remove(sock)
                 new_sock = socket.socket()
-                new_sock.listen(self.port)
+                new_sock.bind((None, self.port))
+                new_sock.listen()
                 add_sock.append(new_sock)
         self._client_sock.extend(add_sock)
 

@@ -574,9 +574,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
         sock = 0
         for _sock in range(self.max_sockets):
             status = self.socket_status(_sock)[0]
-            if (status in
-                (SNSR_SOCK_CLOSED, SNSR_SOCK_FIN_WAIT, SNSR_SOCK_CLOSE_WAIT)
-            ):
+            if status in (SNSR_SOCK_CLOSED, SNSR_SOCK_FIN_WAIT, SNSR_SOCK_CLOSE_WAIT):
                 sock = _sock
                 break
 
@@ -592,7 +590,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
         assert self.link_status, "Ethernet cable disconnected!"
         if self._debug:
             print(
-                    "* Listening on port={}, ip={}".format(
+                "* Listening on port={}, ip={}".format(
                     port, self.pretty_ip(self.ip_address)
                 )
             )
@@ -609,7 +607,6 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
             status = self._read_snsr(socket_num)
             if status[0] == SNSR_SOCK_CLOSED:
                 raise RuntimeError("Listening socket closed.")
-
 
     def socket_open(self, socket_num, conn_mode=SNMR_TCP):
         """Opens a TCP or UDP socket. By default, we use
@@ -757,8 +754,10 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
         while (
             self._read_socket(socket_num, REG_SNIR)[0] & SNIR_SEND_OK
         ) != SNIR_SEND_OK:
-            if (self.socket_status(socket_num)[0] in
-                (SNSR_SOCK_CLOSED, SNSR_SOCK_FIN_WAIT, SNSR_SOCK_CLOSE_WAIT)
+            if self.socket_status(socket_num)[0] in (
+                SNSR_SOCK_CLOSED,
+                SNSR_SOCK_FIN_WAIT,
+                SNSR_SOCK_CLOSE_WAIT,
             ):
                 # self.socket_close(socket_num)
                 return 0
