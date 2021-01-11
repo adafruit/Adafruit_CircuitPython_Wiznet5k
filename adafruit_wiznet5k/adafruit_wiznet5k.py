@@ -132,6 +132,7 @@ DEFAULT_MAC = (0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED)
 
 # Maximum number of sockets to support, differs between chip versions.
 W5200_W5500_MAX_SOCK_NUM = const(0x08)
+SOCKET_INVALID = const(255)
 
 # UDP socket struct.
 UDP_SOCK = {"bytes_remaining": 0, "remote_ip": 0, "remote_port": 0}
@@ -163,7 +164,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
         is_dhcp=True,
         mac=DEFAULT_MAC,
         hostname=None,
-        dhcp_timeout=3,
+        dhcp_timeout=30,
         debug=False,
     ):
         self._debug = debug
@@ -571,10 +572,16 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
         if self._debug:
             print("*** Get socket")
 
-        sock = 0
+        sock = SOCKET_INVALID
         for _sock in range(self.max_sockets):
             status = self.socket_status(_sock)[0]
-            if status in (SNSR_SOCK_CLOSED, SNSR_SOCK_FIN_WAIT, SNSR_SOCK_CLOSE_WAIT):
+            if status in (
+                SNSR_SOCK_CLOSED,
+                SNSR_SOCK_TIME_WAIT,
+                SNSR_SOCK_FIN_WAIT,
+                SNSR_SOCK_CLOSE_WAIT,
+                SNSR_SOCK_CLOSING,
+            ):
                 sock = _sock
                 break
 
@@ -616,7 +623,13 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
         if self._debug:
             print("*** Opening socket %d" % socket_num)
         status = self._read_snsr(socket_num)[0]
-        if status in (SNSR_SOCK_CLOSED, SNSR_SOCK_FIN_WAIT, SNSR_SOCK_CLOSE_WAIT):
+        if status in (
+            SNSR_SOCK_CLOSED,
+            SNSR_SOCK_TIME_WAIT,
+            SNSR_SOCK_FIN_WAIT,
+            SNSR_SOCK_CLOSE_WAIT,
+            SNSR_SOCK_CLOSING,
+        ):
             if self._debug:
                 print("* Opening W5k Socket, protocol={}".format(conn_mode))
             time.sleep(0.00025)
@@ -714,7 +727,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
             return ret, resp
         return -1
 
-    def socket_write(self, socket_num, buffer):
+    def socket_write(self, socket_num, buffer, timeout=0):
         """Writes a bytearray to a provided socket."""
         assert self.link_status, "Ethernet cable disconnected!"
         assert socket_num <= self.max_sockets, "Provided socket exceeds max_sockets."
@@ -725,13 +738,16 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
             ret = SOCK_SIZE
         else:
             ret = len(buffer)
+        stamp = time.monotonic()
 
         # if buffer is available, start the transfer
         free_size = self._get_tx_free_size(socket_num)
         while free_size < ret:
             free_size = self._get_tx_free_size(socket_num)
             status = self.socket_status(socket_num)[0]
-            if status not in (SNSR_SOCK_ESTABLISHED, SNSR_SOCK_CLOSE_WAIT):
+            if status not in (SNSR_SOCK_ESTABLISHED, SNSR_SOCK_CLOSE_WAIT) or (
+                timeout and time.monotonic() - stamp > timeout
+            ):
                 ret = 0
                 break
 
@@ -756,9 +772,11 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
         ) != SNIR_SEND_OK:
             if self.socket_status(socket_num)[0] in (
                 SNSR_SOCK_CLOSED,
+                SNSR_SOCK_TIME_WAIT,
                 SNSR_SOCK_FIN_WAIT,
                 SNSR_SOCK_CLOSE_WAIT,
-            ):
+                SNSR_SOCK_CLOSING,
+            ) or (timeout and time.monotonic() - stamp > timeout):
                 # self.socket_close(socket_num)
                 return 0
             time.sleep(0.01)

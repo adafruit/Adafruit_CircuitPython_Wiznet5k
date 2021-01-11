@@ -63,7 +63,7 @@ SOCK_STREAM = const(0x21)  # TCP
 TCP_MODE = 80
 SOCK_DGRAM = const(0x02)  # UDP
 AF_INET = const(3)
-NO_SOCKET_AVAIL = const(255)
+SOCKET_INVALID = const(255)
 
 
 # pylint: disable=too-many-arguments, unused-argument
@@ -123,6 +123,8 @@ class socket:
         self._listen_port = None
 
         self._socknum = _the_interface.get_socket()
+        if self._socknum == SOCKET_INVALID:
+            raise RuntimeError("Failed to allocate socket.")
 
     @property
     def socknum(self):
@@ -201,7 +203,7 @@ class socket:
         :param bytearray data: Desired data to send to the socket.
 
         """
-        _the_interface.socket_write(self.socknum, data)
+        _the_interface.socket_write(self.socknum, data, self._timeout)
         gc.collect()
 
     def recv(self, bufsize=0):  # pylint: disable=too-many-branches

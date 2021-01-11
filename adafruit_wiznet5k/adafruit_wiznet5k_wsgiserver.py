@@ -43,8 +43,8 @@ def set_interface(iface):
     socket.set_interface(iface)
 
 
-# Maximum number of sockets for the web server, leave one for other things
-MAX_SOCK_NUM = const(7)
+# Maximum number of sockets for the web server (number of connections we can hold)
+MAX_SOCK_NUM = const(6)
 
 # pylint: disable=invalid-name
 class WSGIServer:
@@ -55,6 +55,7 @@ class WSGIServer:
     def __init__(self, port=80, debug=False, application=None):
         self.application = application
         self.port = port
+        self._timeout = 20
         self._client_sock = []
         self._debug = debug
 
@@ -69,6 +70,7 @@ class WSGIServer:
         """
         for _ in range(MAX_SOCK_NUM):
             new_sock = socket.socket()
+            new_sock.settimeout(self._timeout)
             new_sock.bind((None, self.port))
             new_sock.listen()
             self._client_sock.append(new_sock)
@@ -90,6 +92,7 @@ class WSGIServer:
                 self.finish_response(result, sock)
                 self._client_sock.remove(sock)
                 new_sock = socket.socket()
+                new_sock.settimeout(self._timeout)
                 new_sock.bind((None, self.port))
                 new_sock.listen()
                 add_sock.append(new_sock)
