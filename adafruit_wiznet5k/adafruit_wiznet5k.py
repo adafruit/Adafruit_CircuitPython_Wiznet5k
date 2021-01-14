@@ -1,29 +1,12 @@
-# The MIT License (MIT)
+# SPDX-FileCopyrightText: 2010 WIZnet
+# SPDX-FileCopyrightText: 2010 Arduino LLC
+# SPDX-FileCopyrightText: 2008 Bjoern Hartmann
+# SPDX-FileCopyrightText: 2018 Paul Stoffregen
+# SPDX-FileCopyrightText: 2020 Brent Rubell for Adafruit Industries
+# SPDX-FileCopyrightText: 2021 Patrick Van Oosterwijck
 #
-# Copyright (c) 2010 WIZnet
-# Copyright (c) 2010 Arduino LLC
-# Copyright (c) 2008 Bjoern Hartmann
-# Copyright 2018 Paul Stoffregen
-# Modified by Brent Rubell for Adafruit Industries, 2020
-# Copyright (c) 2021 Patrick Van Oosterwijck
-#
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in
-# all copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-# THE SOFTWARE.
+# SPDX-License-Identifier: MIT
+
 """
 `adafruit_wiznet5k`
 ================================================================================
@@ -770,13 +753,17 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
         while (
             self._read_socket(socket_num, REG_SNIR)[0] & SNIR_SEND_OK
         ) != SNIR_SEND_OK:
-            if self.socket_status(socket_num)[0] in (
-                SNSR_SOCK_CLOSED,
-                SNSR_SOCK_TIME_WAIT,
-                SNSR_SOCK_FIN_WAIT,
-                SNSR_SOCK_CLOSE_WAIT,
-                SNSR_SOCK_CLOSING,
-            ) or (timeout and time.monotonic() - stamp > timeout):
+            if (
+                self.socket_status(socket_num)[0]
+                in (
+                    SNSR_SOCK_CLOSED,
+                    SNSR_SOCK_TIME_WAIT,
+                    SNSR_SOCK_FIN_WAIT,
+                    SNSR_SOCK_CLOSE_WAIT,
+                    SNSR_SOCK_CLOSING,
+                )
+                or (timeout and time.monotonic() - stamp > timeout)
+            ):
                 # self.socket_close(socket_num)
                 return 0
             time.sleep(0.01)
