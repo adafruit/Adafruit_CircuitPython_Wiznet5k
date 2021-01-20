@@ -113,19 +113,16 @@ class socket:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.disconnect()
+        stamp = time.monotonic()
         while self.status == adafruit_wiznet5k.SNSR_SOCK_FIN_WAIT:
-            pass
+            if time.monotonic() - stamp > 1000:
+                raise RuntimeError("Failed to disconnect socket")
         self.close()
 
     @property
     def socknum(self):
         """Returns the socket object's socket number."""
         return self._socknum
-
-    @socknum.setter
-    def socknum(self, socknum):
-        """Sets the socket object's socket number."""
-        self._socknum = socknum
 
     @property
     def status(self):
@@ -186,9 +183,10 @@ class socket:
         self._buffer = b""
 
     def accept(self):
-        """Mimic python socket accept for compatibility. The socket where the
-        connection originated is returned while a new socket is allocated and begins
-        listening.
+        """Accept a connection. The socket must be bound to an address and listening for
+        connections. The return value is a pair (conn, address) where conn is a new
+        socket object usable to send and receive data on the connection, and address is
+        the address bound to the socket on the other end of the connection.
         """
         stamp = time.monotonic()
         while self.status not in (
@@ -205,12 +203,12 @@ class socket:
         current_socknum = self.socknum
         # Create a new socket object and swap socket nums so we can continue listening
         client_sock = socket()
-        client_sock.socknum = current_socknum
-        self.socknum = new_listen_socknum
+        client_sock._socknum = current_socknum  # pylint: disable=protected-access
+        self._socknum = new_listen_socknum  # pylint: disable=protected-access
         self.bind((None, self._listen_port))
         self.listen()
         while self.status != adafruit_wiznet5k.SNSR_SOCK_LISTEN:
-            print("Waiting for socket to listen")
+            raise RuntimeError("Failed to open new listening socket")
         return client_sock, addr
 
     def connect(self, address, conntype=None):
