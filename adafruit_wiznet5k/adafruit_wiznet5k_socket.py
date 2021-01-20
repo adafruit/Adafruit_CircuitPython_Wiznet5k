@@ -9,7 +9,7 @@
 
 A socket compatible interface with the Wiznet5k module.
 
-* Author(s): ladyada, Brent Rubell, Patrick Van Oosterwijck
+* Author(s): ladyada, Brent Rubell, Patrick Van Oosterwijck, Adam Cummick
 
 """
 import gc
@@ -108,10 +108,29 @@ class socket:
         if self._socknum == SOCKET_INVALID:
             raise RuntimeError("Failed to allocate socket.")
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.disconnect()
+        while self.status == adafruit_wiznet5k.SNSR_SOCK_FIN_WAIT:
+            pass
+        self.close()
+
     @property
     def socknum(self):
         """Returns the socket object's socket number."""
         return self._socknum
+
+    @socknum.setter
+    def socknum(self, socknum):
+        """Sets the socket object's socket number."""
+        self._socknum = socknum
+
+    @property
+    def status(self):
+        """Returns the status of the socket"""
+        return _the_interface.socket_status(self.socknum)[0]
 
     @property
     def connected(self):
@@ -147,10 +166,16 @@ class socket:
         return self._buffer
 
     def bind(self, address):
-        """Bind the socket to the listen port, we ignore the host.
-        :param tuple address: local socket as a (host, port) tuple, host is ignored.
+        """Bind the socket to the listen port, if host is specified the interface
+        will be reconfigured to that IP.
+        :param tuple address: local socket as a (host, port) tuple.
         """
-        _, self._listen_port = address
+        if address[0] is not None:
+            ip_address = _the_interface.unpretty_ip(address[0])
+            current_ip, subnet_mask, gw_addr, dns = _the_interface.ifconfig
+            if ip_address != current_ip:
+                _the_interface.ifconfig = (ip_address, subnet_mask, gw_addr, dns)
+        self._listen_port = address[1]
 
     def listen(self, backlog=None):
         """Listen on the port specified by bind.
@@ -159,6 +184,34 @@ class socket:
         assert self._listen_port is not None, "Use bind to set the port before listen!"
         _the_interface.socket_listen(self.socknum, self._listen_port)
         self._buffer = b""
+
+    def accept(self):
+        """Mimic python socket accept for compatibility. The socket where the
+        connection originated is returned while a new socket is allocated and begins
+        listening.
+        """
+        stamp = time.monotonic()
+        while self.status not in (
+            adafruit_wiznet5k.SNSR_SOCK_SYNRECV,
+            adafruit_wiznet5k.SNSR_SOCK_ESTABLISHED,
+        ):
+            if self._timeout > 0 and time.monotonic() - stamp > self._timeout:
+                return None
+            if self.status == adafruit_wiznet5k.SNSR_SOCK_CLOSED:
+                self.close()
+                self.listen()
+
+        new_listen_socknum, addr = _the_interface.socket_accept(self.socknum)
+        current_socknum = self.socknum
+        # Create a new socket object and swap socket nums so we can continue listening
+        client_sock = socket()
+        client_sock.socknum = current_socknum
+        self.socknum = new_listen_socknum
+        self.bind((None, self._listen_port))
+        self.listen()
+        while self.status != adafruit_wiznet5k.SNSR_SOCK_LISTEN:
+            print("Waiting for socket to listen")
+        return client_sock, addr
 
     def connect(self, address, conntype=None):
         """Connect to a remote socket at address. (The format of address depends

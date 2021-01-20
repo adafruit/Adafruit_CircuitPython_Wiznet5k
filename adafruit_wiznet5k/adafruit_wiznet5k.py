@@ -4,6 +4,7 @@
 # SPDX-FileCopyrightText: 2018 Paul Stoffregen
 # SPDX-FileCopyrightText: 2020 Brent Rubell for Adafruit Industries
 # SPDX-FileCopyrightText: 2021 Patrick Van Oosterwijck
+# SPDX-FileCopyrightText: 2021 Adam Cummick
 #
 # SPDX-License-Identifier: MIT
 
@@ -29,7 +30,6 @@ Implementation Notes
 from random import randint
 import time
 from micropython import const
-
 from adafruit_bus_device.spi_device import SPIDevice
 import adafruit_wiznet5k.adafruit_wiznet5k_dhcp as dhcp
 import adafruit_wiznet5k.adafruit_wiznet5k_dns as dns
@@ -328,10 +328,13 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
             return data[0] & 0x01
         return 0
 
-    @property
-    def remote_port(self):
+    def remote_port(self, socket_num):
         """Returns the port of the host who sent the current incoming packet."""
-        return self.remote_port
+        if socket_num >= self.max_sockets:
+            return self._pbuff
+        for octet in range(0, 2):
+            self._pbuff[octet] = self._read_socket(socket_num, REG_SNDPORT + octet)[0]
+        return int((self._pbuff[0] << 8) | self._pbuff[0])
 
     @property
     def ifconfig(self):
@@ -597,6 +600,20 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
             status = self._read_snsr(socket_num)
             if status[0] == SNSR_SOCK_CLOSED:
                 raise RuntimeError("Listening socket closed.")
+
+    def socket_accept(self, socket_num):
+        """Gets the dest IP and port from an incoming connection.
+        Returns the next socket number so listening can continue
+        :parm int socket_num: socket number
+        """
+        dest_ip = self.remote_ip(socket_num)
+        dest_port = self.remote_port(socket_num)
+        next_socknum = self.get_socket()
+        if self._debug:
+            print(
+                f"* Dest is ({dest_ip}, {dest_port}), Next listen socknum is #{next_socknum}"
+            )
+        return next_socknum, (dest_ip, dest_port)
 
     def socket_open(self, socket_num, conn_mode=SNMR_TCP):
         """Opens a TCP or UDP socket. By default, we use
