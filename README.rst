@@ -102,6 +102,69 @@ wifitest.adafruit.com.
 
     print("Done!")
 
+This example demonstrates a simple web server that allows setting the Neopixel color.
+
+.. code-block:: python
+
+    import board
+    import busio
+    import digitalio
+    import neopixel
+
+    from adafruit_wiznet5k.adafruit_wiznet5k import WIZNET5K
+    import adafruit_wiznet5k.adafruit_wiznet5k_wsgiserver as server
+    from adafruit_wsgi.wsgi_app import WSGIApp
+
+    print("Wiznet5k Web Server Test")
+
+    # Status LED
+    led = neopixel.NeoPixel(board.NEOPIXEL, 1)
+    led.brightness = 0.3
+    led[0] = (0, 0, 255)
+
+    # W5500 connections
+    cs = digitalio.DigitalInOut(board.D10)
+    spi_bus = busio.SPI(board.SCK, MOSI=board.MOSI, MISO=board.MISO)
+
+    # Initialize ethernet interface with DHCP and the MAC we have from the 24AA02E48
+    eth = WIZNET5K(spi_bus, cs)
+
+    # Here we create our application, registering the
+    # following functions to be called on specific HTTP GET requests routes
+
+    web_app = WSGIApp()
+
+
+    @web_app.route("/led/<r>/<g>/<b>")
+    def led_on(request, r, g, b):
+        print("led handler")
+        led.fill((int(r), int(g), int(b)))
+        return ("200 OK", [], ["led set!"])
+
+    @web_app.route("/")
+    def root(request):
+        print("root handler")
+        return ("200 OK", [], ["root document"])
+
+    @web_app.route("/large")
+    def large(request):
+        print("large handler")
+        return ("200 OK", [], ["*-.-" * 2000])
+
+
+    # Here we setup our server, passing in our web_app as the application
+    server.set_interface(eth)
+    wsgiServer = server.WSGIServer(80, application=web_app)
+
+    print("Open this IP in your browser: ", eth.pretty_ip(eth.ip_address))
+
+    # Start the server
+    wsgiServer.start()
+    while True:
+        # Our main loop where we have the server poll for incoming requests
+        wsgiServer.update_poll()
+        # Could do any other background tasks here, like reading sensors
+
 Contributing
 ============
 

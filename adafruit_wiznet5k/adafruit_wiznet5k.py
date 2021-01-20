@@ -3,6 +3,7 @@
 # SPDX-FileCopyrightText: 2008 Bjoern Hartmann
 # SPDX-FileCopyrightText: 2018 Paul Stoffregen
 # SPDX-FileCopyrightText: 2020 Brent Rubell for Adafruit Industries
+# SPDX-FileCopyrightText: 2021 Patrick Van Oosterwijck
 #
 # SPDX-License-Identifier: MIT
 
@@ -12,7 +13,8 @@
 
 Pure-Python interface for WIZNET 5k ethernet modules.
 
-* Author(s): WIZnet, Arduino LLC, Bjoern Hartmann, Paul Stoffregen, Brent Rubell
+* Author(s): WIZnet, Arduino LLC, Bjoern Hartmann, Paul Stoffregen, Brent Rubell,
+  Patrick Van Oosterwijck
 
 Implementation Notes
 --------------------
@@ -113,6 +115,7 @@ DEFAULT_MAC = (0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED)
 
 # Maximum number of sockets to support, differs between chip versions.
 W5200_W5500_MAX_SOCK_NUM = const(0x08)
+SOCKET_INVALID = const(255)
 
 # UDP socket struct.
 UDP_SOCK = {"bytes_remaining": 0, "remote_ip": 0, "remote_port": 0}
@@ -144,7 +147,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
         is_dhcp=True,
         mac=DEFAULT_MAC,
         hostname=None,
-        dhcp_timeout=3,
+        dhcp_timeout=30,
         debug=False,
     ):
         self._debug = debug
@@ -240,7 +243,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
             print("* Get host by name")
         if isinstance(hostname, str):
             hostname = bytes(hostname, "utf-8")
-        self._src_port = int(time.monotonic())
+        self._src_port = int(time.monotonic()) & 0xFFFF
         # Return IP assigned by DHCP
         _dns_client = dns.DNS(self, self._dns, debug=self._debug)
         ret = _dns_client.gethostbyname(hostname)
@@ -475,7 +478,6 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
 
         res = self._get_rx_rcv_size(socket_num)
 
-        res = int.from_bytes(res, "b")
         if sock_type == SNMR_TCP:
             return res
         if res > 0:
@@ -546,21 +548,22 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
             if self._debug:
                 print("waiting for sncr to clear...")
 
-    def get_socket(self, sockets):
+    def get_socket(self):
         """Requests, allocates and returns a socket from the W5k
         chip. Returned socket number may not exceed max_sockets.
-        :parm int socket_num: Desired socket number
         """
         if self._debug:
             print("*** Get socket")
 
-        sock = 0
-        for _sock in range(len(sockets), self.max_sockets):
-            status = self.socket_status(_sock)
-            if (
-                status[0] == SNSR_SOCK_CLOSED
-                or status[0] == SNSR_SOCK_FIN_WAIT
-                or status[0] == SNSR_SOCK_CLOSE_WAIT
+        sock = SOCKET_INVALID
+        for _sock in range(self.max_sockets):
+            status = self.socket_status(_sock)[0]
+            if status in (
+                SNSR_SOCK_CLOSED,
+                SNSR_SOCK_TIME_WAIT,
+                SNSR_SOCK_FIN_WAIT,
+                SNSR_SOCK_CLOSE_WAIT,
+                SNSR_SOCK_CLOSING,
             ):
                 sock = _sock
                 break
@@ -569,6 +572,32 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
             print("Allocated socket #{}".format(sock))
         return sock
 
+    def socket_listen(self, socket_num, port):
+        """Start listening on a socket (TCP mode only).
+        :parm int socket_num: socket number
+        :parm int port: port to listen on
+        """
+        assert self.link_status, "Ethernet cable disconnected!"
+        if self._debug:
+            print(
+                "* Listening on port={}, ip={}".format(
+                    port, self.pretty_ip(self.ip_address)
+                )
+            )
+        # Initialize a socket and set the mode
+        self._src_port = port
+        res = self.socket_open(socket_num, conn_mode=SNMR_TCP)
+        if res == 1:
+            raise RuntimeError("Failed to initalize the socket.")
+        # Send listen command
+        self._send_socket_cmd(socket_num, CMD_SOCK_LISTEN)
+        # Wait until ready
+        status = [SNSR_SOCK_CLOSED]
+        while status[0] != SNSR_SOCK_LISTEN:
+            status = self._read_snsr(socket_num)
+            if status[0] == SNSR_SOCK_CLOSED:
+                raise RuntimeError("Listening socket closed.")
+
     def socket_open(self, socket_num, conn_mode=SNMR_TCP):
         """Opens a TCP or UDP socket. By default, we use
         'conn_mode'=SNMR_TCP but we may also use SNMR_UDP.
@@ -576,7 +605,14 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
         assert self.link_status, "Ethernet cable disconnected!"
         if self._debug:
             print("*** Opening socket %d" % socket_num)
-        if self._read_snsr(socket_num)[0] == SNSR_SOCK_CLOSED:
+        status = self._read_snsr(socket_num)[0]
+        if status in (
+            SNSR_SOCK_CLOSED,
+            SNSR_SOCK_TIME_WAIT,
+            SNSR_SOCK_FIN_WAIT,
+            SNSR_SOCK_CLOSE_WAIT,
+            SNSR_SOCK_CLOSING,
+        ):
             if self._debug:
                 print("* Opening W5k Socket, protocol={}".format(conn_mode))
             time.sleep(0.00025)
@@ -624,7 +660,6 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
 
         # Check if there is data available on the socket
         ret = self._get_rx_rcv_size(socket_num)
-        ret = int.from_bytes(ret, "b")
         if self._debug:
             print("Bytes avail. on sock: ", ret)
         if ret == 0:
@@ -675,7 +710,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
             return ret, resp
         return -1
 
-    def socket_write(self, socket_num, buffer):
+    def socket_write(self, socket_num, buffer, timeout=0):
         """Writes a bytearray to a provided socket."""
         assert self.link_status, "Ethernet cable disconnected!"
         assert socket_num <= self.max_sockets, "Provided socket exceeds max_sockets."
@@ -686,13 +721,16 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
             ret = SOCK_SIZE
         else:
             ret = len(buffer)
+        stamp = time.monotonic()
 
         # if buffer is available, start the transfer
         free_size = self._get_tx_free_size(socket_num)
         while free_size < ret:
             free_size = self._get_tx_free_size(socket_num)
-            status = self.socket_status(socket_num)
-            if status not in (SNSR_SOCK_ESTABLISHED, SNSR_SOCK_CLOSE_WAIT):
+            status = self.socket_status(socket_num)[0]
+            if status not in (SNSR_SOCK_ESTABLISHED, SNSR_SOCK_CLOSE_WAIT) or (
+                timeout and time.monotonic() - stamp > timeout
+            ):
                 ret = 0
                 break
 
@@ -702,7 +740,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
         dst_addr = offset + (socket_num * 2048 + 0x8000)
 
         # update sn_tx_wr to the value + data size
-        ptr += len(buffer)
+        ptr = (ptr + len(buffer)) & 0xFFFF
         self._write_sntx_wr(socket_num, ptr)
 
         cntl_byte = 0x14 + (socket_num << 5)
@@ -715,7 +753,17 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
         while (
             self._read_socket(socket_num, REG_SNIR)[0] & SNIR_SEND_OK
         ) != SNIR_SEND_OK:
-            if self.socket_status(socket_num) == SNSR_SOCK_CLOSED:
+            if (
+                self.socket_status(socket_num)[0]
+                in (
+                    SNSR_SOCK_CLOSED,
+                    SNSR_SOCK_TIME_WAIT,
+                    SNSR_SOCK_FIN_WAIT,
+                    SNSR_SOCK_CLOSE_WAIT,
+                    SNSR_SOCK_CLOSING,
+                )
+                or (timeout and time.monotonic() - stamp > timeout)
+            ):
                 # self.socket_close(socket_num)
                 return 0
             time.sleep(0.01)
@@ -733,17 +781,17 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
             val_1 = self._read_snrx_rsr(sock)
             if val_1 != 0:
                 val = self._read_snrx_rsr(sock)
-        return val
+        return int.from_bytes(val, "b")
 
     def _get_tx_free_size(self, sock):
         """Get free size of sock's tx buffer block."""
         val = 0
-        val_1 = 0
+        val_1 = self._read_sntx_fsr(sock)
         while val != val_1:
             val_1 = self._read_sntx_fsr(sock)
             if val_1 != 0:
                 val = self._read_sntx_fsr(sock)
-        return val
+        return int.from_bytes(val, "b")
 
     def _read_snrx_rd(self, sock):
         self._pbuff[0] = self._read_socket(sock, REG_SNRX_RD)[0]
@@ -809,12 +857,10 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
     def _read_snmr(self, sock):
         return self._read_socket(sock, REG_SNMR)
 
-    def _write_socket(self, sock, address, data, length=None):
+    def _write_socket(self, sock, address, data):
         """Write to a W5k socket register."""
         base = self._ch_base_msb << 8
         cntl_byte = (sock << 5) + 0x0C
-        if length is None:
-            return self.write(base + sock * CH_SIZE + address, cntl_byte, data)
         return self.write(base + sock * CH_SIZE + address, cntl_byte, data)
 
     def _read_socket(self, sock, address):

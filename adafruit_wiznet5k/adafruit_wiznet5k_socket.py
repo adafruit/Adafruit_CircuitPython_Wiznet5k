@@ -9,7 +9,7 @@
 
 A socket compatible interface with the Wiznet5k module.
 
-* Author(s): ladyada, Brent Rubell
+* Author(s): ladyada, Brent Rubell, Patrick Van Oosterwijck
 
 """
 import gc
@@ -45,10 +45,8 @@ SOCK_STREAM = const(0x21)  # TCP
 TCP_MODE = 80
 SOCK_DGRAM = const(0x02)  # UDP
 AF_INET = const(3)
-NO_SOCKET_AVAIL = const(255)
+SOCKET_INVALID = const(255)
 
-# keep track of sockets we allocate
-SOCKETS = []
 
 # pylint: disable=too-many-arguments, unused-argument
 def getaddrinfo(host, port, family=0, socktype=0, proto=0, flags=0):
@@ -104,10 +102,11 @@ class socket:
         self._sock_type = type
         self._buffer = b""
         self._timeout = 0
+        self._listen_port = None
 
-        self._socknum = _the_interface.get_socket(SOCKETS)
-        SOCKETS.append(self._socknum)
-        self.settimeout(self._timeout)
+        self._socknum = _the_interface.get_socket()
+        if self._socknum == SOCKET_INVALID:
+            raise RuntimeError("Failed to allocate socket.")
 
     @property
     def socknum(self):
@@ -118,22 +117,19 @@ class socket:
     def connected(self):
         """Returns whether or not we are connected to the socket."""
         if self.socknum >= _the_interface.max_sockets:
-            return 0
+            return False
         status = _the_interface.socket_status(self.socknum)[0]
-        if (
-            status == adafruit_wiznet5k.SNSR_SOCK_CLOSE_WAIT
-            and self.available()[0] == 0
-        ):
+        if status == adafruit_wiznet5k.SNSR_SOCK_CLOSE_WAIT and self.available() == 0:
             result = False
-        result = status not in (
-            adafruit_wiznet5k.SNSR_SOCK_CLOSED,
-            adafruit_wiznet5k.SNSR_SOCK_LISTEN,
-            adafruit_wiznet5k.SNSR_SOCK_CLOSE_WAIT,
-            adafruit_wiznet5k.SNSR_SOCK_FIN_WAIT,
-        )
-        if not result:
+        else:
+            result = status not in (
+                adafruit_wiznet5k.SNSR_SOCK_CLOSED,
+                adafruit_wiznet5k.SNSR_SOCK_LISTEN,
+                adafruit_wiznet5k.SNSR_SOCK_TIME_WAIT,
+                adafruit_wiznet5k.SNSR_SOCK_FIN_WAIT,
+            )
+        if not result and status != adafruit_wiznet5k.SNSR_SOCK_LISTEN:
             self.close()
-            return result
         return result
 
     def getpeername(self):
@@ -149,6 +145,20 @@ class socket:
         self._buffer = [int(item) for item in ip_string.split(".")]
         self._buffer = bytearray(self._buffer)
         return self._buffer
+
+    def bind(self, address):
+        """Bind the socket to the listen port, we ignore the host.
+        :param tuple address: local socket as a (host, port) tuple, host is ignored.
+        """
+        _, self._listen_port = address
+
+    def listen(self, backlog=None):
+        """Listen on the port specified by bind.
+        :param backlog: For compatibility but ignored.
+        """
+        assert self._listen_port is not None, "Use bind to set the port before listen!"
+        _the_interface.socket_listen(self.socknum, self._listen_port)
+        self._buffer = b""
 
     def connect(self, address, conntype=None):
         """Connect to a remote socket at address. (The format of address depends
@@ -175,7 +185,7 @@ class socket:
         :param bytearray data: Desired data to send to the socket.
 
         """
-        _the_interface.socket_write(self.socknum, data)
+        _the_interface.socket_write(self.socknum, data, self._timeout)
         gc.collect()
 
     def recv(self, bufsize=0):  # pylint: disable=too-many-branches
@@ -255,7 +265,11 @@ class socket:
                 avail = _the_interface.udp_remaining()
                 if avail:
                     self._buffer += _the_interface.read_udp(self.socknum, avail)
-            elif self._timeout > 0 and time.monotonic() - stamp > self._timeout:
+            if (
+                not avail
+                and self._timeout > 0
+                and time.monotonic() - stamp > self._timeout
+            ):
                 self.close()
                 raise RuntimeError("Didn't receive response, failing out...")
         firstline, self._buffer = self._buffer.split(b"\r\n", 1)
@@ -270,7 +284,6 @@ class socket:
     def close(self):
         """Closes the socket."""
         _the_interface.socket_close(self.socknum)
-        SOCKETS.remove(self.socknum)
 
     def available(self):
         """Returns how many bytes of data are available to be read from the socket."""

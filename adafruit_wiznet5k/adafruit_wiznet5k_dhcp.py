@@ -84,7 +84,7 @@ class DHCP:
 
     # pylint: disable=too-many-arguments, too-many-instance-attributes, invalid-name
     def __init__(
-        self, eth, mac_address, hostname=None, response_timeout=3, debug=False
+        self, eth, mac_address, hostname=None, response_timeout=30, debug=False
     ):
         self._debug = debug
         self._response_timeout = response_timeout
