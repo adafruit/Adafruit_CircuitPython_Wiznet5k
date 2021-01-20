@@ -24,7 +24,7 @@ eth = WIZNET5K(spi_bus, cs, is_dhcp=False)
 socket.set_interface(eth)
 server = socket.socket()  # Allocate socket for the server
 server_ip = "192.168.10.1"  # IP address of server
-server_port = 50007  # Port to listen on 
+server_port = 50007  # Port to listen on
 server.bind((server_ip, server_port))  # Bind to IP and Port
 server.listen()  # Begin listening for incoming clients
 
