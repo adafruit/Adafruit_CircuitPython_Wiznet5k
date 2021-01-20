@@ -612,7 +612,9 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
         next_socknum = self.get_socket()
         if self._debug:
             print(
-                f"* Dest is ({dest_ip}, {dest_port}), Next listen socknum is #{next_socknum}"
+                "* Dest is ({}, {}), Next listen socknum is #{}".format(
+                    dest_ip, dest_port, next_socknum
+                )
             )
         return next_socknum, (dest_ip, dest_port)
 
