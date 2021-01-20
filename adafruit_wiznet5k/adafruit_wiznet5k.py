@@ -30,6 +30,7 @@ Implementation Notes
 from random import randint
 import time
 from micropython import const
+
 from adafruit_bus_device.spi_device import SPIDevice
 import adafruit_wiznet5k.adafruit_wiznet5k_dhcp as dhcp
 import adafruit_wiznet5k.adafruit_wiznet5k_dns as dns
