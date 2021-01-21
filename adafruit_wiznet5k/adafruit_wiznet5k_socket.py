@@ -118,6 +118,10 @@ class socket:
             if time.monotonic() - stamp > 1000:
                 raise RuntimeError("Failed to disconnect socket")
         self.close()
+        stamp = time.monotonic()
+        while self.status != adafruit_wiznet5k.SNSR_SOCK_CLOSED:
+            if time.monotonic() - stamp > 1000:
+                raise RuntimeError("Failed to close socket")
 
     @property
     def socknum(self):
