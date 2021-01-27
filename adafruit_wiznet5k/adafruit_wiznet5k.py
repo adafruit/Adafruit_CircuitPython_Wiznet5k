@@ -760,13 +760,17 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
         while (
             self._read_socket(socket_num, REG_SNIR)[0] & SNIR_SEND_OK
         ) != SNIR_SEND_OK:
-            if self.socket_status(socket_num)[0] in (
-                SNSR_SOCK_CLOSED,
-                SNSR_SOCK_TIME_WAIT,
-                SNSR_SOCK_FIN_WAIT,
-                SNSR_SOCK_CLOSE_WAIT,
-                SNSR_SOCK_CLOSING,
-            ) or (timeout and time.monotonic() - stamp > timeout):
+            if (
+                self.socket_status(socket_num)[0]
+                in (
+                    SNSR_SOCK_CLOSED,
+                    SNSR_SOCK_TIME_WAIT,
+                    SNSR_SOCK_FIN_WAIT,
+                    SNSR_SOCK_CLOSE_WAIT,
+                    SNSR_SOCK_CLOSING,
+                )
+                or (timeout and time.monotonic() - stamp > timeout)
+            ):
                 # self.socket_close(socket_num)
                 return 0
             time.sleep(0.01)
