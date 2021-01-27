@@ -84,7 +84,7 @@ def is_ipv4(host):
     return True
 
 
-# pylint: disable=invalid-name
+# pylint: disable=invalid-name, too-many-public-methods
 class socket:
     """A simplified implementation of the Python 'socket' class
     for connecting to a Wiznet5k module.
@@ -112,11 +112,12 @@ class socket:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self.disconnect()
-        stamp = time.monotonic()
-        while self.status == adafruit_wiznet5k.SNSR_SOCK_FIN_WAIT:
-            if time.monotonic() - stamp > 1000:
-                raise RuntimeError("Failed to disconnect socket")
+        if self._sock_type == SOCK_STREAM:
+            self.disconnect()
+            stamp = time.monotonic()
+            while self.status == adafruit_wiznet5k.SNSR_SOCK_FIN_WAIT:
+                if time.monotonic() - stamp > 1000:
+                    raise RuntimeError("Failed to disconnect socket")
         self.close()
         stamp = time.monotonic()
         while self.status != adafruit_wiznet5k.SNSR_SOCK_CLOSED:
@@ -216,10 +217,8 @@ class socket:
         return client_sock, addr
 
     def connect(self, address, conntype=None):
-        """Connect to a remote socket at address. (The format of address depends
-        on the address family — see above.)
+        """Connect to a remote socket at address.
         :param tuple address: Remote socket as a (host, port) tuple.
-
         """
         assert (
             conntype != 0x03
@@ -227,7 +226,10 @@ class socket:
         host, port = address
 
         if hasattr(host, "split"):
-            host = tuple(map(int, host.split(".")))
+            try:
+                host = tuple(map(int, host.split(".")))
+            except ValueError:
+                host = _the_interface.get_host_by_name(host)
         if not _the_interface.socket_connect(
             self.socknum, host, port, conn_mode=self._sock_type
         ):
@@ -238,23 +240,29 @@ class socket:
         """Send data to the socket. The socket must be connected to
         a remote socket.
         :param bytearray data: Desired data to send to the socket.
-
         """
         _the_interface.socket_write(self.socknum, data, self._timeout)
         gc.collect()
 
-    def recv(self, bufsize=0):  # pylint: disable=too-many-branches
+    def sendto(self, data, address):
+        """Send data to the socket. The socket must be connected to
+        a remote socket.
+        :param bytearray data: Desired data to send to the socket.
+        :param tuple address: Remote socket as a (host, port) tuple.
+        """
+        self.connect(address)
+        return self.send(data)
+
+    def recv(self, bufsize=0, flags=0):  # pylint: disable=too-many-branches
         """Reads some bytes from the connected remote address.
         :param int bufsize: Maximum number of bytes to receive.
+        :param int flags: ignored, present for compatibility.
         """
         # print("Socket read", bufsize)
         if bufsize == 0:
             # read everything on the socket
             while True:
-                if self._sock_type == SOCK_STREAM:
-                    avail = self.available()
-                elif self._sock_type == SOCK_DGRAM:
-                    avail = _the_interface.udp_remaining()
+                avail = self.available()
                 if avail:
                     if self._sock_type == SOCK_STREAM:
                         self._buffer += _the_interface.socket_read(self.socknum, avail)[
@@ -275,10 +283,7 @@ class socket:
         received = []
         while to_read > 0:
             # print("Bytes to read:", to_read)
-            if self._sock_type == SOCK_STREAM:
-                avail = self.available()
-            elif self._sock_type == SOCK_DGRAM:
-                avail = _the_interface.udp_remaining()
+            avail = self.available()
             if avail:
                 stamp = time.monotonic()
                 if self._sock_type == SOCK_STREAM:
@@ -305,6 +310,49 @@ class socket:
         gc.collect()
         return ret
 
+    def recvfrom(self, bufsize=0, flags=0):
+        """Reads some bytes from the connected remote address.
+        :param int bufsize: Maximum number of bytes to receive.
+        :param int flags: ignored, present for compatibility.
+        :returns: a tuple (bytes, address) where address is a tuple (ip, port)
+        """
+        return (
+            self.recv(bufsize),
+            (
+                _the_interface.remote_ip(self.socknum),
+                _the_interface.remote_port(self.socknum),
+            ),
+        )
+
+    def recv_into(self, buf, nbytes=0, flags=0):
+        """Reads some bytes from the connected remote address info the provided buffer.
+        :param bytearray buf: Data buffer
+        :param nbytes: Maximum number of bytes to receive
+        :param int flags: ignored, present for compatibility.
+        :returns: the number of bytes received
+        """
+        if nbytes == 0:
+            nbytes = len(buf)
+        ret = self.recv(nbytes)
+        nbytes = len(ret)
+        buf[:nbytes] = ret
+        return nbytes
+
+    def recvfrom_into(self, buf, nbytes=0, flags=0):
+        """Reads some bytes from the connected remote address info the provided buffer.
+        :param bytearray buf: Data buffer
+        :param nbytes: Maximum number of bytes to receive
+        :param int flags: ignored, present for compatibility.
+        :returns a tuple (nbytes, address) where address is a tuple (ip, port)
+        """
+        return (
+            self.recv_into(buf, nbytes),
+            (
+                _the_interface.remote_ip(self.socknum),
+                _the_interface.remote_port(self.socknum),
+            ),
+        )
+
     def readline(self):
         """Attempt to return as many bytes as we can up to \
         but not including '\r\n'.
@@ -312,14 +360,12 @@ class socket:
         """
         stamp = time.monotonic()
         while b"\r\n" not in self._buffer:
-            if self._sock_type == SOCK_STREAM:
-                avail = self.available()
-                if avail:
+            avail = self.available()
+            if avail:
+                if self._sock_type == SOCK_STREAM:
                     self._buffer += _the_interface.socket_read(self.socknum, avail)[1]
-            elif self._sock_type == SOCK_DGRAM:
-                avail = _the_interface.udp_remaining()
-                if avail:
-                    self._buffer += _the_interface.read_udp(self.socknum, avail)
+                elif self._sock_type == SOCK_DGRAM:
+                    self._buffer += _the_interface.read_udp(self.socknum, avail)[1]
             if (
                 not avail
                 and self._timeout > 0

@@ -472,33 +472,20 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
             print("* socket_available called with protocol", sock_type)
         assert socket_num <= self.max_sockets, "Provided socket exceeds max_sockets."
 
-        if sock_type == 0x02:
-            # flush by reading remaining data from previous packet
-            while UDP_SOCK["bytes_remaining"] > 0 and self.socket_read(socket_num, 1):
-                if self._debug:
-                    print("Flushing {} bytes".format(UDP_SOCK["bytes_remaining"]))
-                if UDP_SOCK["bytes_remaining"] > 0:
-                    UDP_SOCK["bytes_remaining"] = UDP_SOCK["bytes_remaining"] - 1
-
         res = self._get_rx_rcv_size(socket_num)
 
         if sock_type == SNMR_TCP:
             return res
         if res > 0:
+            if UDP_SOCK["bytes_remaining"]:
+                return UDP_SOCK["bytes_remaining"]
             # parse the udp rx packet
-            ret = 0
             # read the first 8 header bytes
             ret, self._pbuff = self.socket_read(socket_num, 8)
             if ret > 0:
-                UDP_SOCK["remote_ip"] = self._pbuff
-                UDP_SOCK["remote_port"] = self._pbuff[4]
-                UDP_SOCK["remote_port"] = (UDP_SOCK["remote_port"] << 8) + self._pbuff[
-                    5
-                ]
-                UDP_SOCK["bytes_remaining"] = self._pbuff[6]
-                UDP_SOCK["bytes_remaining"] = (
-                    UDP_SOCK["bytes_remaining"] << 8
-                ) + self._pbuff[7]
+                UDP_SOCK["remote_ip"] = self._pbuff[:4]
+                UDP_SOCK["remote_port"] = (self._pbuff[4] << 8) + self._pbuff[5]
+                UDP_SOCK["bytes_remaining"] = (self._pbuff[6] << 8) + self._pbuff[7]
                 ret = UDP_SOCK["bytes_remaining"]
                 return ret
         return 0
@@ -773,17 +760,13 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
         while (
             self._read_socket(socket_num, REG_SNIR)[0] & SNIR_SEND_OK
         ) != SNIR_SEND_OK:
-            if (
-                self.socket_status(socket_num)[0]
-                in (
-                    SNSR_SOCK_CLOSED,
-                    SNSR_SOCK_TIME_WAIT,
-                    SNSR_SOCK_FIN_WAIT,
-                    SNSR_SOCK_CLOSE_WAIT,
-                    SNSR_SOCK_CLOSING,
-                )
-                or (timeout and time.monotonic() - stamp > timeout)
-            ):
+            if self.socket_status(socket_num)[0] in (
+                SNSR_SOCK_CLOSED,
+                SNSR_SOCK_TIME_WAIT,
+                SNSR_SOCK_FIN_WAIT,
+                SNSR_SOCK_CLOSE_WAIT,
+                SNSR_SOCK_CLOSING,
+            ) or (timeout and time.monotonic() - stamp > timeout):
                 # self.socket_close(socket_num)
                 return 0
             time.sleep(0.01)
