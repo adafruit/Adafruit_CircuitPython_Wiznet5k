@@ -15,7 +15,7 @@ A socket compatible interface with the Wiznet5k module.
 import gc
 import time
 from micropython import const
-from adafruit_wiznet5k import adafruit_wiznet5k
+import adafruit_wiznet5k as wiznet5k
 
 _the_interface = None  # pylint: disable=invalid-name
 
@@ -115,12 +115,12 @@ class socket:
         if self._sock_type == SOCK_STREAM:
             self.disconnect()
             stamp = time.monotonic()
-            while self.status == adafruit_wiznet5k.SNSR_SOCK_FIN_WAIT:
+            while self.status == wiznet5k.adafruit_wiznet5k.SNSR_SOCK_FIN_WAIT:
                 if time.monotonic() - stamp > 1000:
                     raise RuntimeError("Failed to disconnect socket")
         self.close()
         stamp = time.monotonic()
-        while self.status != adafruit_wiznet5k.SNSR_SOCK_CLOSED:
+        while self.status != wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSED:
             if time.monotonic() - stamp > 1000:
                 raise RuntimeError("Failed to close socket")
 
@@ -140,16 +140,19 @@ class socket:
         if self.socknum >= _the_interface.max_sockets:
             return False
         status = _the_interface.socket_status(self.socknum)[0]
-        if status == adafruit_wiznet5k.SNSR_SOCK_CLOSE_WAIT and self.available() == 0:
+        if (
+            status == wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSE_WAIT
+            and self.available() == 0
+        ):
             result = False
         else:
             result = status not in (
-                adafruit_wiznet5k.SNSR_SOCK_CLOSED,
-                adafruit_wiznet5k.SNSR_SOCK_LISTEN,
-                adafruit_wiznet5k.SNSR_SOCK_TIME_WAIT,
-                adafruit_wiznet5k.SNSR_SOCK_FIN_WAIT,
+                wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSED,
+                wiznet5k.adafruit_wiznet5k.SNSR_SOCK_LISTEN,
+                wiznet5k.adafruit_wiznet5k.SNSR_SOCK_TIME_WAIT,
+                wiznet5k.adafruit_wiznet5k.SNSR_SOCK_FIN_WAIT,
             )
-        if not result and status != adafruit_wiznet5k.SNSR_SOCK_LISTEN:
+        if not result and status != wiznet5k.adafruit_wiznet5k.SNSR_SOCK_LISTEN:
             self.close()
         return result
 
@@ -195,12 +198,12 @@ class socket:
         """
         stamp = time.monotonic()
         while self.status not in (
-            adafruit_wiznet5k.SNSR_SOCK_SYNRECV,
-            adafruit_wiznet5k.SNSR_SOCK_ESTABLISHED,
+            wiznet5k.adafruit_wiznet5k.SNSR_SOCK_SYNRECV,
+            wiznet5k.adafruit_wiznet5k.SNSR_SOCK_ESTABLISHED,
         ):
             if self._timeout > 0 and time.monotonic() - stamp > self._timeout:
                 return None
-            if self.status == adafruit_wiznet5k.SNSR_SOCK_CLOSED:
+            if self.status == wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSED:
                 self.close()
                 self.listen()
 
@@ -212,7 +215,7 @@ class socket:
         self._socknum = new_listen_socknum  # pylint: disable=protected-access
         self.bind((None, self._listen_port))
         self.listen()
-        while self.status != adafruit_wiznet5k.SNSR_SOCK_LISTEN:
+        while self.status != wiznet5k.adafruit_wiznet5k.SNSR_SOCK_LISTEN:
             raise RuntimeError("Failed to open new listening socket")
         return client_sock, addr
 
