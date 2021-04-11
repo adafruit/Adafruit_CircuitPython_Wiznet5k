@@ -31,6 +31,8 @@ server.listen()  # Begin listening for incoming clients
 while True:
     conn, addr = server.accept()  # Wait for a connection from a client.
     with conn:
-        data = conn.recv()
-        print(data)
-        conn.send(data)  # Echo message back to client
+        while True:
+            data = conn.recv() 
+            if data: # Wait for receiving data
+                print(data)
+                conn.send(data)  # Echo message back to client
