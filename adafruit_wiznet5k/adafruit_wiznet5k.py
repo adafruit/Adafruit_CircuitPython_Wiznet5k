@@ -180,7 +180,8 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
         # to avoid the code during DHCP - assert self.link_status, "Ethernet cable disconnected!"
         while True:
             time.sleep(1)
-            print("My Link is:", self.link_status)
+            if self._debug:
+                        print("My Link is:", self.link_status)
             if self.link_status: break
 
         # Set DHCP
