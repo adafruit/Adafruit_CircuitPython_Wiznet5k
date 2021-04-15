@@ -365,11 +365,8 @@ class DHCP:
                     print("* DHCP: Parsing OFFER")
                 msg_type, xid = self.parse_dhcp_response(self._response_timeout)
                 if msg_type == DHCP_OFFER:
-                    # # use the _transaction_id the offer returned,
-                    # # rather than the current one
-                    # self._transaction_id = self._transaction_id.from_bytes(xid, "l")
                     if self._debug:
-                        print("* DHCP: Request")
+                        print("* DHCP: Request", xid)
                     self.send_dhcp_message(
                         DHCP_REQUEST, ((time.monotonic() - start_time) / 1000)
                     )
