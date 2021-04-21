@@ -127,9 +127,9 @@ class DHCP:
         :param float time_elapsed: Number of seconds elapsed since renewal.
 
         """
-        # before making send packet, shoule init _BUFF. 
+        # before making send packet, shoule init _BUFF.
         # if not, DHCP sometimes fails, wrong padding, garbage bytes, ...
-        _BUFF[:] = b'\x00' * len(_BUFF)
+        _BUFF[:] = b"\x00" * len(_BUFF)
 
         # OP
         _BUFF[0] = DHCP_BOOT_REQUEST

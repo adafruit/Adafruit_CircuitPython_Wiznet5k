@@ -196,7 +196,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
         # to avoid the code during DHCP - assert self.link_status, "Ethernet cable disconnected!"
         start_time = time.monotonic()
         while True:
-            if self.link_status or ((time.monotonic() - start_time) > 5) :
+            if self.link_status or ((time.monotonic() - start_time) > 5):
                 break
             time.sleep(1)
             if self._debug:
