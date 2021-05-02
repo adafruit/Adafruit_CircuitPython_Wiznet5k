@@ -563,7 +563,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
         self._send_socket_cmd(socket_num, CMD_SOCK_LISTEN)
         # Wait until ready
         status = [SNSR_SOCK_CLOSED]
-        while status[0] != SNSR_SOCK_LISTEN:
+        while status[0] not in (SNSR_SOCK_LISTEN, SNSR_SOCK_ESTABLISHED):
             status = self._read_snsr(socket_num)
             if status[0] == SNSR_SOCK_CLOSED:
                 raise RuntimeError("Listening socket closed.")
