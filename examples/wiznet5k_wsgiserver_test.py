@@ -62,14 +62,15 @@ cs = digitalio.DigitalInOut(board.D10)
 # Chip Select for Particle Ethernet FeatherWing
 # cs = digitalio.DigitalInOut(board.D5)
 
-# Initialize SPI and I2C bus
+# Initialize SPI bus
 spi_bus = busio.SPI(board.SCK, MOSI=board.MOSI, MISO=board.MISO)
-i2c = busio.I2C(board.SCL, board.SDA)
 
 try:
+    # Initialize the I2C bus to read the MAC
+    i2c = busio.I2C(board.SCL, board.SDA)
     # Read the MAC from the 24AA02E48 chip
     mac = get_mac(i2c)
-except OSError:
+except (RuntimeError, OSError):
     # Hard coded MAC if there is no 24AA02E48
     mac = b"\xFE\xED\xDE\xAD\xBE\xEF"
 
