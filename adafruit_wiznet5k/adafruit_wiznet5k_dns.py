@@ -70,6 +70,7 @@ class DNS:
         self._build_dns_question()
 
         # Send DNS request packet
+        self._sock.bind((None, DNS_PORT))
         self._sock.connect((self._dns_server, DNS_PORT))
         if self._debug:
             print("* DNS: Sending request packet...")

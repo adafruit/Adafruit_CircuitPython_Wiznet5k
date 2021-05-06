@@ -121,6 +121,9 @@ SOCKET_INVALID = const(255)
 # UDP socket struct.
 UDP_SOCK = {"bytes_remaining": 0, "remote_ip": 0, "remote_port": 0}
 
+# Source ports in use
+SRC_PORTS = [0] * W5200_W5500_MAX_SOCK_NUM
+
 
 class WIZNET5K:  # pylint: disable=too-many-public-methods
     """Interface for WIZNET5K module.
@@ -173,68 +176,47 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
         assert self._w5100_init() == 1, "Failed to initialize WIZnet module."
         # Set MAC address
         self.mac_address = mac
-        self._src_port = 0
+        self.src_port = 0
         self._dns = 0
         # Set DHCP
+        self._dhcp_client = None
         if is_dhcp:
             ret = self.set_dhcp(hostname, dhcp_timeout)
+            if ret != 0:
+                self._dhcp_client = None
             assert ret == 0, "Failed to configure DHCP Server!"
 
-    def set_dhcp(self, hostname=None, response_timeout=3):
+    def set_dhcp(self, hostname=None, response_timeout=30):
         """Initializes the DHCP client and attempts to retrieve
         and set network configuration from the DHCP server.
-        Returns True if DHCP configured, False otherwise.
+        Returns 0 if DHCP configured, -1 otherwise.
         :param str hostname: The desired hostname, with optional {} to fill in MAC.
         :param int response_timeout: Time to wait for server to return packet, in seconds.
 
         """
         if self._debug:
             print("* Initializing DHCP")
-        self._src_port = 68
         # Return IP assigned by DHCP
-        _dhcp_client = dhcp.DHCP(
+        self._dhcp_client = dhcp.DHCP(
             self, self.mac_address, hostname, response_timeout, debug=self._debug
         )
-        ret = _dhcp_client.request_dhcp_lease()
+        ret = self._dhcp_client.request_dhcp_lease()
         if ret == 1:
-            _ip = (
-                _dhcp_client.local_ip[0],
-                _dhcp_client.local_ip[1],
-                _dhcp_client.local_ip[2],
-                _dhcp_client.local_ip[3],
-            )
-
-            _subnet_mask = (
-                _dhcp_client.subnet_mask[0],
-                _dhcp_client.subnet_mask[1],
-                _dhcp_client.subnet_mask[2],
-                _dhcp_client.subnet_mask[3],
-            )
-
-            _gw_addr = (
-                _dhcp_client.gateway_ip[0],
-                _dhcp_client.gateway_ip[1],
-                _dhcp_client.gateway_ip[2],
-                _dhcp_client.gateway_ip[3],
-            )
-
-            self._dns = (
-                _dhcp_client.dns_server_ip[0],
-                _dhcp_client.dns_server_ip[1],
-                _dhcp_client.dns_server_ip[2],
-                _dhcp_client.dns_server_ip[3],
-            )
-            self.ifconfig = (_ip, _subnet_mask, _gw_addr, self._dns)
             if self._debug:
+                _ifconfig = self.ifconfig
                 print("* Found DHCP Server:")
                 print(
                     "IP: {}\nSubnet Mask: {}\nGW Addr: {}\nDNS Server: {}".format(
-                        _ip, _subnet_mask, _gw_addr, self._dns
+                        *_ifconfig
                     )
                 )
-            self._src_port = 0
             return 0
         return -1
+
+    def maintain_dhcp_lease(self):
+        """Maintain DHCP lease"""
+        if self._dhcp_client is not None:
+            self._dhcp_client.maintain_dhcp_lease()
 
     def get_host_by_name(self, hostname):
         """Convert a hostname to a packed 4-byte IP Address.
@@ -244,14 +226,12 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
             print("* Get host by name")
         if isinstance(hostname, str):
             hostname = bytes(hostname, "utf-8")
-        self._src_port = int(time.monotonic()) & 0xFFFF
         # Return IP assigned by DHCP
         _dns_client = dns.DNS(self, self._dns, debug=self._debug)
         ret = _dns_client.gethostbyname(hostname)
         if self._debug:
             print("* Resolved IP: ", ret)
         assert ret != -1, "Failed to resolve hostname!"
-        self._src_port = 0
         return ret
 
     @property
@@ -469,7 +449,11 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
         :param int sock_type: Socket type, defaults to TCP.
         """
         if self._debug:
-            print("* socket_available called with protocol", sock_type)
+            print(
+                "* socket_available called on socket {}, protocol {}".format(
+                    socket_num, sock_type
+                )
+            )
         assert socket_num <= self.max_sockets, "Provided socket exceeds max_sockets."
 
         res = self._get_rx_rcv_size(socket_num)
@@ -549,13 +533,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
         sock = SOCKET_INVALID
         for _sock in range(self.max_sockets):
             status = self.socket_status(_sock)[0]
-            if status in (
-                SNSR_SOCK_CLOSED,
-                SNSR_SOCK_TIME_WAIT,
-                SNSR_SOCK_FIN_WAIT,
-                SNSR_SOCK_CLOSE_WAIT,
-                SNSR_SOCK_CLOSING,
-            ):
+            if status == SNSR_SOCK_CLOSED:
                 sock = _sock
                 break
 
@@ -576,15 +554,16 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
                 )
             )
         # Initialize a socket and set the mode
-        self._src_port = port
+        self.src_port = port
         res = self.socket_open(socket_num, conn_mode=SNMR_TCP)
+        self.src_port = 0
         if res == 1:
             raise RuntimeError("Failed to initalize the socket.")
         # Send listen command
         self._send_socket_cmd(socket_num, CMD_SOCK_LISTEN)
         # Wait until ready
         status = [SNSR_SOCK_CLOSED]
-        while status[0] != SNSR_SOCK_LISTEN:
+        while status[0] not in (SNSR_SOCK_LISTEN, SNSR_SOCK_ESTABLISHED):
             status = self._read_snsr(socket_num)
             if status[0] == SNSR_SOCK_CLOSED:
                 raise RuntimeError("Listening socket closed.")
@@ -627,11 +606,15 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
             self._write_snmr(socket_num, conn_mode)
             self._write_snir(socket_num, 0xFF)
 
-            if self._src_port > 0:
+            if self.src_port > 0:
                 # write to socket source port
-                self._write_sock_port(socket_num, self._src_port)
+                self._write_sock_port(socket_num, self.src_port)
             else:
-                self._write_sock_port(socket_num, randint(49152, 65535))
+                s_port = randint(49152, 65535)
+                while s_port in SRC_PORTS:
+                    s_port = randint(49152, 65535)
+                self._write_sock_port(socket_num, s_port)
+                SRC_PORTS[socket_num] = s_port
 
             # open socket
             self._write_sncr(socket_num, CMD_SOCK_OPEN)
