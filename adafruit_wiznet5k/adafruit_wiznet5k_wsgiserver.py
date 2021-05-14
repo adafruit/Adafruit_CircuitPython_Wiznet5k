@@ -31,6 +31,7 @@ https://www.python.org/dev/peps/pep-0333/
 import io
 import gc
 from micropython import const
+import adafruit_wiznet5k as wiznet5k
 import adafruit_wiznet5k.adafruit_wiznet5k_socket as socket
 
 _the_interface = None  # pylint: disable=invalid-name
@@ -84,19 +85,25 @@ class WSGIServer:
         check for new incoming client requests. When a request comes in,
         the application callable will be invoked.
         """
-        add_sock = []
         for sock in self._client_sock:
             if sock.available():
                 environ = self._get_environ(sock)
                 result = self.application(environ, self._start_response)
                 self.finish_response(result, sock)
                 self._client_sock.remove(sock)
+                break
+        for sock in self._client_sock:
+            if sock.status == wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSED:
+                self._client_sock.remove(sock)
+        for _ in range(len(self._client_sock), MAX_SOCK_NUM):
+            try:
                 new_sock = socket.socket()
                 new_sock.settimeout(self._timeout)
                 new_sock.bind((None, self.port))
                 new_sock.listen()
-                add_sock.append(new_sock)
-        self._client_sock.extend(add_sock)
+                self._client_sock.append(new_sock)
+            except RuntimeError:
+                pass
 
     def finish_response(self, result, client):
         """

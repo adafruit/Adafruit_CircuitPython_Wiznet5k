@@ -233,9 +233,13 @@ class socket:
                 host = tuple(map(int, host.split(".")))
             except ValueError:
                 host = _the_interface.get_host_by_name(host)
-        if not _the_interface.socket_connect(
+        if self._listen_port is not None:
+            _the_interface.src_port = self._listen_port
+        result = _the_interface.socket_connect(
             self.socknum, host, port, conn_mode=self._sock_type
-        ):
+        )
+        _the_interface.src_port = 0
+        if not result:
             raise RuntimeError("Failed to connect to host", host)
         self._buffer = b""
 
@@ -261,7 +265,9 @@ class socket:
         :param int bufsize: Maximum number of bytes to receive.
         :param int flags: ignored, present for compatibility.
         """
-        # print("Socket read", bufsize)
+        if self.status == wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSED:
+            return b""
+
         if bufsize == 0:
             # read everything on the socket
             while True:
@@ -285,7 +291,6 @@ class socket:
         to_read = bufsize - len(self._buffer)
         received = []
         while to_read > 0:
-            # print("Bytes to read:", to_read)
             avail = self.available()
             if avail:
                 stamp = time.monotonic()

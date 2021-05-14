@@ -1,5 +1,6 @@
 # SPDX-FileCopyrightText: 2009 Jordan Terell (blog.jordanterrell.com)
 # SPDX-FileCopyrightText: 2020 Brent Rubell for Adafruit Industries
+# SPDX-FileCopyrightText: 2021 Patrick Van Oosterwijck @ Silicognition LLC
 #
 # SPDX-License-Identifier: MIT
 
@@ -14,7 +15,7 @@ Pure-Python implementation of Jordan Terrell's DHCP library v0.3
 """
 import gc
 import time
-from random import randrange
+from random import randint
 from micropython import const
 import adafruit_wiznet5k.adafruit_wiznet5k_socket as socket
 from adafruit_wiznet5k.adafruit_wiznet5k_socket import htonl, htons
@@ -27,6 +28,11 @@ STATE_DHCP_REQUEST = const(0x02)
 STATE_DHCP_LEASED = const(0x03)
 STATE_DHCP_REREQUEST = const(0x04)
 STATE_DHCP_RELEASE = const(0x05)
+STATE_DHCP_WAIT = const(0x06)
+STATE_DHCP_DISCONN = const(0x07)
+
+# DHCP wait time between attempts
+DHCP_WAIT_TIME = const(60)
 
 # DHCP Message Types
 DHCP_DISCOVER = const(1)
@@ -55,7 +61,7 @@ MAX_DHCP_OPT = const(0x10)
 DHCP_SERVER_PORT = const(67)
 # DHCP Lease Time, in seconds
 DEFAULT_LEASE_TIME = const(900)
-BROADCAST_SERVER_ADDR = "255.255.255.255"
+BROADCAST_SERVER_ADDR = (255, 255, 255, 255)
 
 # DHCP Response Options
 MSG_TYPE = 53
@@ -68,8 +74,8 @@ T2_VAL = 59
 LEASE_TIME = 51
 OPT_END = 255
 
-
-_BUFF = bytearray(317)
+# Packet buffer
+_BUFF = bytearray(318)
 
 
 class DHCP:
@@ -90,18 +96,19 @@ class DHCP:
         self._response_timeout = response_timeout
         self._mac_address = mac_address
 
-        # Initalize a new UDP socket for DHCP
+        # Set socket interface
         socket.set_interface(eth)
-        self._sock = socket.socket(type=socket.SOCK_DGRAM)
-        self._sock.settimeout(response_timeout)
+        self._eth = eth
+        self._sock = None
 
         # DHCP state machine
         self._dhcp_state = STATE_DHCP_START
         self._initial_xid = 0
         self._transaction_id = 0
+        self._start_time = 0
 
         # DHCP server configuration
-        self.dhcp_server_ip = 0
+        self.dhcp_server_ip = BROADCAST_SERVER_ADDR
         self.local_ip = 0
         self.gateway_ip = 0
         self.subnet_mask = 0
@@ -109,11 +116,14 @@ class DHCP:
 
         # Lease configuration
         self._lease_time = 0
-        self._last_check_lease_ms = 0
+        self._last_lease_time = 0
         self._renew_in_sec = 0
         self._rebind_in_sec = 0
         self._t1 = 0
         self._t2 = 0
+
+        # Select an initial transaction id
+        self._transaction_id = randint(1, 0x7FFFFFFF)
 
         # Host name
         mac_string = "".join("{:02X}".format(o) for o in mac_address)
@@ -121,16 +131,14 @@ class DHCP:
             (hostname or "WIZnet{}").split(".")[0].format(mac_string)[:42], "utf-8"
         )
 
-    def send_dhcp_message(self, state, time_elapsed):
+    # pylint: disable=too-many-statements
+    def send_dhcp_message(self, state, time_elapsed, renew=False):
         """Assemble and send a DHCP message packet to a socket.
         :param int state: DHCP Message state.
-        :param float time_elapsed: Number of seconds elapsed since renewal.
-
+        :param float time_elapsed: Number of seconds elapsed since DHCP process started
+        :param bool renew: Set True for renew and rebind
         """
-        # before making send packet, shoule init _BUFF.
-        # if not, DHCP sometimes fails, wrong padding, garbage bytes, ...
         _BUFF[:] = b"\x00" * len(_BUFF)
-
         # OP
         _BUFF[0] = DHCP_BOOT_REQUEST
         # HTYPE
@@ -155,8 +163,11 @@ class DHCP:
         _BUFF[10] = flags[1]
         _BUFF[11] = flags[0]
 
-        # NOTE: Skipping cidaddr/yiaddr/siaddr/giaddr
+        # NOTE: Skipping ciaddr/yiaddr/siaddr/giaddr
         # as they're already set to 0.0.0.0
+        # Except when renewing, then fill in ciaddr
+        if renew:
+            _BUFF[12:15] = bytes(self.local_ip)
 
         # chaddr
         _BUFF[28:34] = self._mac_address
@@ -191,16 +202,15 @@ class DHCP:
         _BUFF[253] = hostname_len
         _BUFF[254:after_hostname] = self._hostname
 
-        if state == DHCP_REQUEST:
+        if state == DHCP_REQUEST and not renew:
             # Set the parsed local IP addr
             _BUFF[after_hostname] = 50
             _BUFF[after_hostname + 1] = 0x04
-
-            _BUFF[after_hostname + 2 : after_hostname + 6] = self.local_ip
+            _BUFF[after_hostname + 2 : after_hostname + 6] = bytes(self.local_ip)
             # Set the parsed dhcp server ip addr
             _BUFF[after_hostname + 6] = 54
             _BUFF[after_hostname + 7] = 0x04
-            _BUFF[after_hostname + 8 : after_hostname + 12] = self.dhcp_server_ip
+            _BUFF[after_hostname + 8 : after_hostname + 12] = bytes(self.dhcp_server_ip)
 
         _BUFF[after_hostname + 12] = 55
         _BUFF[after_hostname + 13] = 0x06
@@ -221,21 +231,11 @@ class DHCP:
         # Send DHCP packet
         self._sock.send(_BUFF)
 
-    def parse_dhcp_response(
-        self, response_timeout
-    ):  # pylint: disable=too-many-branches, too-many-statements
+    # pylint: disable=too-many-branches, too-many-statements
+    def parse_dhcp_response(self):
         """Parse DHCP response from DHCP server.
         Returns DHCP packet type.
-
-        :param int response_timeout: Time to wait for server to return packet, in seconds.
         """
-        start_time = time.monotonic()
-        packet_sz = self._sock.available()
-        while packet_sz <= 0:
-            packet_sz = self._sock.available()
-            if (time.monotonic() - start_time) > response_timeout:
-                return (255, 0)
-            time.sleep(0.05)
         # store packet in buffer
         _BUFF = self._sock.recv()
         if self._debug:
@@ -253,7 +253,7 @@ class DHCP:
             print("f")
             return 0, 0
 
-        self.local_ip = _BUFF[16:20]
+        self.local_ip = tuple(_BUFF[16:20])
         if _BUFF[28:34] == 0:
             return 0, 0
 
@@ -273,13 +273,13 @@ class DHCP:
                 ptr += 1
                 opt_len = _BUFF[ptr]
                 ptr += 1
-                self.subnet_mask = _BUFF[ptr : ptr + opt_len]
+                self.subnet_mask = tuple(_BUFF[ptr : ptr + opt_len])
                 ptr += opt_len
             elif _BUFF[ptr] == DHCP_SERVER_ID:
                 ptr += 1
                 opt_len = _BUFF[ptr]
                 ptr += 1
-                self.dhcp_server_ip = _BUFF[ptr : ptr + opt_len]
+                self.dhcp_server_ip = tuple(_BUFF[ptr : ptr + opt_len])
                 ptr += opt_len
             elif _BUFF[ptr] == LEASE_TIME:
                 ptr += 1
@@ -291,13 +291,13 @@ class DHCP:
                 ptr += 1
                 opt_len = _BUFF[ptr]
                 ptr += 1
-                self.gateway_ip = _BUFF[ptr : ptr + opt_len]
+                self.gateway_ip = tuple(_BUFF[ptr : ptr + opt_len])
                 ptr += opt_len
             elif _BUFF[ptr] == DNS_SERVERS:
                 ptr += 1
                 opt_len = _BUFF[ptr]
                 ptr += 1
-                self.dns_server_ip = _BUFF[ptr : ptr + 4]
+                self.dns_server_ip = tuple(_BUFF[ptr : ptr + 4])
                 ptr += opt_len  # still increment even though we only read 1 addr.
             elif _BUFF[ptr] == T1_VAL:
                 ptr += 1
@@ -323,13 +323,14 @@ class DHCP:
 
         if self._debug:
             print(
-                "Msg Type: {}\nSubnet Mask: {}\nDHCP Server ID:{}\nDNS Server IP:{}\
-                  \nGateway IP:{}\nT1:{}\nT2:{}\nLease Time:{}".format(
+                "Msg Type: {}\nSubnet Mask: {}\nDHCP Server IP: {}\nDNS Server IP: {}\
+                  \nGateway IP: {}\nLocal IP: {}\nT1: {}\nT2: {}\nLease Time: {}".format(
                     msg_type,
                     self.subnet_mask,
                     self.dhcp_server_ip,
                     self.dns_server_ip,
                     self.gateway_ip,
+                    self.local_ip,
                     self._t1,
                     self._t2,
                     self._lease_time,
@@ -339,74 +340,158 @@ class DHCP:
         gc.collect()
         return msg_type, xid
 
-    def request_dhcp_lease(
-        self,
-    ):  # pylint: disable=too-many-branches, too-many-statements
-        """Request to renew or acquire a DHCP lease."""
-        # select an initial transaction id
-        self._transaction_id = randrange(1, 2000)
+    # pylint: disable=too-many-branches, too-many-statements
+    def _dhcp_state_machine(self):
+        """DHCP state machine without wait loops to enable cooperative multi tasking
+        This state machine is used both by the initial blocking lease request and
+        the non-blocking DHCP maintenance function"""
+        if self._eth.link_status:
+            if self._dhcp_state == STATE_DHCP_DISCONN:
+                self._dhcp_state = STATE_DHCP_START
+        else:
+            if self._dhcp_state != STATE_DHCP_DISCONN:
+                self._dhcp_state = STATE_DHCP_DISCONN
+                self.dhcp_server_ip = BROADCAST_SERVER_ADDR
+                self._last_lease_time = 0
+                reset_ip = (0, 0, 0, 0)
+                self._eth.ifconfig = (reset_ip, reset_ip, reset_ip, reset_ip)
+                if self._sock is not None:
+                    self._sock.close()
+                    self._sock = None
 
-        result = 0
-        msg_type = 0
-        start_time = time.monotonic()
-
-        while self._dhcp_state != STATE_DHCP_LEASED:
-            if self._dhcp_state == STATE_DHCP_START:
-                self._transaction_id += 1
-                self._sock.connect(((BROADCAST_SERVER_ADDR), DHCP_SERVER_PORT))
+        if self._dhcp_state == STATE_DHCP_START:
+            self._start_time = time.monotonic()
+            self._transaction_id = (self._transaction_id + 1) & 0x7FFFFFFF
+            try:
+                self._sock = socket.socket(type=socket.SOCK_DGRAM)
+            except RuntimeError:
                 if self._debug:
-                    print("* DHCP: Discover")
-                self.send_dhcp_message(
-                    STATE_DHCP_DISCOVER, ((time.monotonic() - start_time) / 1000)
-                )
-                self._dhcp_state = STATE_DHCP_DISCOVER
-            elif self._dhcp_state == STATE_DHCP_DISCOVER:
-                if self._debug:
-                    print("* DHCP: Parsing OFFER")
-                msg_type, xid = self.parse_dhcp_response(self._response_timeout)
-                if msg_type == DHCP_OFFER:
+                    print("* DHCP: Failed to allocate socket")
+                self._dhcp_state = STATE_DHCP_WAIT
+            else:
+                self._sock.settimeout(self._response_timeout)
+                self._sock.bind((None, 68))
+                self._sock.connect((self.dhcp_server_ip, DHCP_SERVER_PORT))
+                if self._last_lease_time == 0 or time.monotonic() > (
+                    self._last_lease_time + self._lease_time
+                ):
                     if self._debug:
-                        print("* DHCP: Request", xid)
+                        print("* DHCP: Send discover to {}".format(self.dhcp_server_ip))
                     self.send_dhcp_message(
-                        DHCP_REQUEST, ((time.monotonic() - start_time) / 1000)
+                        STATE_DHCP_DISCOVER, (time.monotonic() - self._start_time)
+                    )
+                    self._dhcp_state = STATE_DHCP_DISCOVER
+                else:
+                    if self._debug:
+                        print("* DHCP: Send request to {}".format(self.dhcp_server_ip))
+                    self.send_dhcp_message(
+                        DHCP_REQUEST, (time.monotonic() - self._start_time), True
                     )
                     self._dhcp_state = STATE_DHCP_REQUEST
+
+        elif self._dhcp_state == STATE_DHCP_DISCOVER:
+            if self._sock.available():
+                if self._debug:
+                    print("* DHCP: Parsing OFFER")
+                msg_type, xid = self.parse_dhcp_response()
+                if msg_type == DHCP_OFFER:
+                    # Check if transaction ID matches, otherwise it may be an offer
+                    # for another device
+                    if htonl(self._transaction_id) == int.from_bytes(xid, "l"):
+                        if self._debug:
+                            print(
+                                "* DHCP: Send request to {}".format(self.dhcp_server_ip)
+                            )
+                        self._transaction_id = (self._transaction_id + 1) & 0x7FFFFFFF
+                        self.send_dhcp_message(
+                            DHCP_REQUEST, (time.monotonic() - self._start_time)
+                        )
+                        self._dhcp_state = STATE_DHCP_REQUEST
+                    else:
+                        if self._debug:
+                            print("* DHCP: Received OFFER with non-matching xid")
                 else:
-                    print("* Received DHCP Message is not OFFER")
-            elif self._dhcp_state == STATE_DHCP_REQUEST:
+                    if self._debug:
+                        print("* DHCP: Received DHCP Message is not OFFER")
+
+        elif self._dhcp_state == STATE_DHCP_REQUEST:
+            if self._sock.available():
                 if self._debug:
                     print("* DHCP: Parsing ACK")
-                msg_type, xid = self.parse_dhcp_response(self._response_timeout)
-                if msg_type == DHCP_ACK:
-                    self._dhcp_state = STATE_DHCP_LEASED
-                    result = 1
-                    if self._lease_time == 0:
-                        self._lease_time = DEFAULT_LEASE_TIME
-                    if self._t1 == 0:
-                        # T1 is 50% of _lease_time
-                        self._t1 = self._lease_time >> 1
-                    if self._t2 == 0:
-                        # T2 is 87.5% of _lease_time
-                        self._t2 = self._lease_time - (self._lease_time >> 3)
-                    self._renew_in_sec = self._t1
-                    self._rebind_in_sec = self._t2
-                elif msg_type == DHCP_NAK:
-                    self._dhcp_state = STATE_DHCP_START
+                msg_type, xid = self.parse_dhcp_response()
+                # Check if transaction ID matches, otherwise it may be
+                # for another device
+                if htonl(self._transaction_id) == int.from_bytes(xid, "l"):
+                    if msg_type == DHCP_ACK:
+                        if self._debug:
+                            print("* DHCP: Successful lease")
+                        self._sock.close()
+                        self._sock = None
+                        self._dhcp_state = STATE_DHCP_LEASED
+                        self._last_lease_time = self._start_time
+                        if self._lease_time == 0:
+                            self._lease_time = DEFAULT_LEASE_TIME
+                        if self._t1 == 0:
+                            # T1 is 50% of _lease_time
+                            self._t1 = self._lease_time >> 1
+                        if self._t2 == 0:
+                            # T2 is 87.5% of _lease_time
+                            self._t2 = self._lease_time - (self._lease_time >> 3)
+                        self._renew_in_sec = self._t1
+                        self._rebind_in_sec = self._t2
+                        self._eth.ifconfig = (
+                            self.local_ip,
+                            self.subnet_mask,
+                            self.gateway_ip,
+                            self.dns_server_ip,
+                        )
+                        gc.collect()
+                    else:
+                        if self._debug:
+                            print("* DHCP: Received DHCP Message is not ACK")
                 else:
-                    print("* Received DHCP Message is not OFFER")
+                    if self._debug:
+                        print("* DHCP: Received non-matching xid")
 
-                if msg_type == 255:
-                    msg_type = 0
-                    self._dhcp_state = STATE_DHCP_START
+        elif self._dhcp_state == STATE_DHCP_WAIT:
+            if time.monotonic() > (self._start_time + DHCP_WAIT_TIME):
+                if self._debug:
+                    print("* DHCP: Begin retry")
+                self._dhcp_state = STATE_DHCP_START
+                if time.monotonic() > (self._last_lease_time + self._rebind_in_sec):
+                    self.dhcp_server_ip = BROADCAST_SERVER_ADDR
+                if time.monotonic() > (self._last_lease_time + self._lease_time):
+                    reset_ip = (0, 0, 0, 0)
+                    self._eth.ifconfig = (reset_ip, reset_ip, reset_ip, reset_ip)
 
-            if result != 1 and (
-                (time.monotonic() - start_time > self._response_timeout)
-            ):
-                break
+        elif self._dhcp_state == STATE_DHCP_LEASED:
+            if time.monotonic() > (self._last_lease_time + self._renew_in_sec):
+                self._dhcp_state = STATE_DHCP_START
+                if self._debug:
+                    print("* DHCP: Time to renew lease")
 
-        self._transaction_id += 1
-        self._last_check_lease_ms = time.monotonic()
-        # close the socket, we're done with it
-        self._sock.close()
-        gc.collect()
-        return result
+        if (
+            self._dhcp_state == STATE_DHCP_DISCOVER
+            or self._dhcp_state == STATE_DHCP_REQUEST
+        ) and time.monotonic() > (self._start_time + self._response_timeout):
+            self._dhcp_state = STATE_DHCP_WAIT
+            if self._sock is not None:
+                self._sock.close()
+                self._sock = None
+
+    def request_dhcp_lease(self):
+        """Request to renew or acquire a DHCP lease."""
+        if self._dhcp_state == STATE_DHCP_LEASED or self._dhcp_state == STATE_DHCP_WAIT:
+            self._dhcp_state = STATE_DHCP_START
+
+        while (
+            self._dhcp_state != STATE_DHCP_LEASED
+            and self._dhcp_state != STATE_DHCP_WAIT
+        ):
+            self._dhcp_state_machine()
+
+        return self._dhcp_state == STATE_DHCP_LEASED
+
+    def maintain_dhcp_lease(self):
+        """Maintain DHCP lease"""
+        self._dhcp_state_machine()

@@ -126,7 +126,7 @@ This example demonstrates a simple web server that allows setting the Neopixel c
     cs = digitalio.DigitalInOut(board.D10)
     spi_bus = busio.SPI(board.SCK, MOSI=board.MOSI, MISO=board.MISO)
 
-    # Initialize ethernet interface with DHCP and the MAC we have from the 24AA02E48
+    # Initialize Ethernet interface with DHCP
     eth = WIZNET5K(spi_bus, cs)
 
     # Here we create our application, registering the
@@ -134,21 +134,20 @@ This example demonstrates a simple web server that allows setting the Neopixel c
 
     web_app = WSGIApp()
 
-
     @web_app.route("/led/<r>/<g>/<b>")
     def led_on(request, r, g, b):
-        print("led handler")
+        print("LED handler")
         led.fill((int(r), int(g), int(b)))
-        return ("200 OK", [], ["led set!"])
+        return ("200 OK", [], ["LED set!"])
 
     @web_app.route("/")
     def root(request):
-        print("root handler")
-        return ("200 OK", [], ["root document"])
+        print("Root handler")
+        return ("200 OK", [], ["Root document"])
 
     @web_app.route("/large")
     def large(request):
-        print("large handler")
+        print("Large pattern handler")
         return ("200 OK", [], ["*-.-" * 2000])
 
 
@@ -163,6 +162,8 @@ This example demonstrates a simple web server that allows setting the Neopixel c
     while True:
         # Our main loop where we have the server poll for incoming requests
         wsgiServer.update_poll()
+        # Maintain DHCP lease
+        eth.maintain_dhcp_lease()
         # Could do any other background tasks here, like reading sensors
 
 Contributing
