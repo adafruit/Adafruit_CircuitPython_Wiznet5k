@@ -598,6 +598,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
             SNSR_SOCK_FIN_WAIT,
             SNSR_SOCK_CLOSE_WAIT,
             SNSR_SOCK_CLOSING,
+            SNSR_SOCK_UDP,
         ):
             if self._debug:
                 print("* Opening W5k Socket, protocol={}".format(conn_mode))
