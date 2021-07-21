@@ -554,7 +554,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
         return sock
 
     def socket_listen(self, socket_num, port, conn_mode=SNMR_TCP):
-        """Start listening on a socket (TCP mode only).
+        """Start listening on a socket (default TCP mode).
         :parm int socket_num: socket number
         :parm int port: port to listen on
         """
@@ -579,9 +579,6 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
             status = self._read_snsr(socket_num)
             if status[0] == SNSR_SOCK_CLOSED:
                 raise RuntimeError("Listening socket closed.")
-
-    def socket_listen_udp(self, socket_num, port):
-        self.socket_listen(socket_num, port, SNMR_UDP)
 
     def socket_accept(self, socket_num):
         """Gets the dest IP and port from an incoming connection.
