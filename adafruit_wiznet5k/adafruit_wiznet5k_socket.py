@@ -181,6 +181,11 @@ class socket:
             if ip_address != current_ip:
                 _the_interface.ifconfig = (ip_address, subnet_mask, gw_addr, dns)
         self._listen_port = address[1]
+        # For UDP servers we need to open the socket here because we won't call 
+        # listen
+        if self._sock_type == SOCK_DGRAM:
+            _the_interface.socket_listen_udp(self.socknum, self._listen_port)
+            self._buffer = b""
 
     def listen(self, backlog=None):
         """Listen on the port specified by bind.
