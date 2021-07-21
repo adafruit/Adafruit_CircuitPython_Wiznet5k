@@ -315,7 +315,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
 
     @property
     def link_status(self):
-        """"Returns if the PHY is connected."""
+        """ "Returns if the PHY is connected."""
         if self._chip_type == "w5500":
             data = self.read(REG_PHYCFGR, 0x00)
             return data[0] & 0x01
@@ -557,6 +557,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
         """Start listening on a socket (default TCP mode).
         :parm int socket_num: socket number
         :parm int port: port to listen on
+        :parm int conn_mode: connection mode SNMR_TCP (default) or SNMR_UDP
         """
         assert self.link_status, "Ethernet cable disconnected!"
         if self._debug:
