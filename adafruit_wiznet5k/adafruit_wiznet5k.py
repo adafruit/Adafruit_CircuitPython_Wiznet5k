@@ -315,7 +315,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
 
     @property
     def link_status(self):
-        """"Returns if the PHY is connected."""
+        """ "Returns if the PHY is connected."""
         if self._chip_type == "w5500":
             data = self.read(REG_PHYCFGR, 0x00)
             return data[0] & 0x01
@@ -553,10 +553,11 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
             print("Allocated socket #{}".format(sock))
         return sock
 
-    def socket_listen(self, socket_num, port):
-        """Start listening on a socket (TCP mode only).
+    def socket_listen(self, socket_num, port, conn_mode=SNMR_TCP):
+        """Start listening on a socket (default TCP mode).
         :parm int socket_num: socket number
         :parm int port: port to listen on
+        :parm int conn_mode: connection mode SNMR_TCP (default) or SNMR_UDP
         """
         assert self.link_status, "Ethernet cable disconnected!"
         if self._debug:
@@ -567,7 +568,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
             )
         # Initialize a socket and set the mode
         self.src_port = port
-        res = self.socket_open(socket_num, conn_mode=SNMR_TCP)
+        res = self.socket_open(socket_num, conn_mode=conn_mode)
         self.src_port = 0
         if res == 1:
             raise RuntimeError("Failed to initalize the socket.")
@@ -575,7 +576,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
         self._send_socket_cmd(socket_num, CMD_SOCK_LISTEN)
         # Wait until ready
         status = [SNSR_SOCK_CLOSED]
-        while status[0] not in (SNSR_SOCK_LISTEN, SNSR_SOCK_ESTABLISHED):
+        while status[0] not in (SNSR_SOCK_LISTEN, SNSR_SOCK_ESTABLISHED, SNSR_SOCK_UDP):
             status = self._read_snsr(socket_num)
             if status[0] == SNSR_SOCK_CLOSED:
                 raise RuntimeError("Listening socket closed.")
