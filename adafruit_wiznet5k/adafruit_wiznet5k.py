@@ -803,11 +803,11 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
         return self._pbuff[0] << 8 | self._pbuff[1]
 
     def _write_snrx_rd(self, sock, data):
-        self._write_socket(sock, REG_SNRX_RD, data >> 8)
+        self._write_socket(sock, REG_SNRX_RD, data >> 8 & 0xFF)
         self._write_socket(sock, REG_SNRX_RD + 1, data & 0xFF)
 
     def _write_sntx_wr(self, sock, data):
-        self._write_socket(sock, REG_SNTX_WR, data >> 8)
+        self._write_socket(sock, REG_SNTX_WR, data >> 8 & 0xFF)
         self._write_socket(sock, REG_SNTX_WR + 1, data & 0xFF)
 
     def _read_sntx_wr(self, sock):
