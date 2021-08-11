@@ -864,9 +864,8 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
 
     def _write_socket(self, sock, address, data):
         """Write to a W5k socket register."""
-        base = self._ch_base_msb << 8
         cntl_byte = (sock << 5) + 0x0C
-        return self.write(base + sock * CH_SIZE + address, cntl_byte, data)
+        return self.write(address, cntl_byte, data)
 
     def _read_socket(self, sock, address):
         """Read a W5k socket register."""
