@@ -106,7 +106,7 @@ def large(request):  # pylint: disable=unused-argument
 
 
 @web_app.route("/code")
-def large(request):  # pylint: disable=unused-argument
+def code(request):  # pylint: disable=unused-argument
     print("Static file code.py handler")
     return ("200 OK", [], get_static_file("code.py"))
 
