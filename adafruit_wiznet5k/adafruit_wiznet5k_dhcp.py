@@ -192,8 +192,8 @@ class DHCP:
         # HW Type - ETH
         _BUFF[245] = 0x01
         # Client MAC Address
-        for mac, val in enumerate(self._mac_address):
-            _BUFF[246 + mac] = val
+        for mac in range(0, len(self._mac_address)):
+            _BUFF[246 + mac] = self._mac_address[mac]
 
         # Option - Host Name
         _BUFF[252] = 12
@@ -471,13 +471,9 @@ class DHCP:
                     print("* DHCP: Time to renew lease")
 
         if (
-            self._dhcp_state
-            in (
-                STATE_DHCP_DISCOVER,
-                STATE_DHCP_REQUEST,
-            )
-            and time.monotonic() > (self._start_time + self._response_timeout)
-        ):
+            self._dhcp_state == STATE_DHCP_DISCOVER
+            or self._dhcp_state == STATE_DHCP_REQUEST
+        ) and time.monotonic() > (self._start_time + self._response_timeout):
             self._dhcp_state = STATE_DHCP_WAIT
             if self._sock is not None:
                 self._sock.close()
@@ -485,10 +481,13 @@ class DHCP:
 
     def request_dhcp_lease(self):
         """Request to renew or acquire a DHCP lease."""
-        if self._dhcp_state in (STATE_DHCP_LEASED, STATE_DHCP_WAIT):
+        if self._dhcp_state == STATE_DHCP_LEASED or self._dhcp_state == STATE_DHCP_WAIT:
             self._dhcp_state = STATE_DHCP_START
 
-        while self._dhcp_state not in (STATE_DHCP_LEASED, STATE_DHCP_WAIT):
+        while (
+            self._dhcp_state != STATE_DHCP_LEASED
+            and self._dhcp_state != STATE_DHCP_WAIT
+        ):
             self._dhcp_state_machine()
 
         return self._dhcp_state == STATE_DHCP_LEASED
