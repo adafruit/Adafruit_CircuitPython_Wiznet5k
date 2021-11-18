@@ -8,7 +8,7 @@
 
 Network Time Protocol (NTP) helper for CircuitPython
 
- * Author(s): irinakim
+ * Author(s): Brent Rubell, irinakim
 
 Implementation Notes
 --------------------
