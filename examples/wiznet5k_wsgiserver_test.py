@@ -20,36 +20,35 @@ import board
 import busio
 import digitalio
 import neopixel
-import time
 
 import adafruit_requests as requests
+from adafruit_wsgi.wsgi_app import WSGIApp
 from adafruit_wiznet5k.adafruit_wiznet5k import WIZNET5K
 import adafruit_wiznet5k.adafruit_wiznet5k_socket as socket
 import adafruit_wiznet5k.adafruit_wiznet5k_wsgiserver as server
-from adafruit_wsgi.wsgi_app import WSGIApp
 
 
 print("Wiznet5k Web Server Test")
 
 
-def get_mac(i2c):
+def get_mac(_i2c):
     "Read MAC from 24AA02E48 chip and return it"
-    mac = bytearray(6)
-    while not i2c.try_lock():
+    _mac = bytearray(6)
+    while not _i2c.try_lock():
         pass
-    i2c.writeto(0x50, bytearray((0xFA,)))
-    i2c.readfrom_into(0x50, mac, start=0, end=6)
-    i2c.unlock()
-    return mac
+    _i2c.writeto(0x50, bytearray((0xFA,)))
+    _i2c.readfrom_into(0x50, _mac, start=0, end=6)
+    _i2c.unlock()
+    return _mac
 
 
 def get_static_file(filename):
     "Static file generator"
     with open(filename, "rb") as f:
-        bytes = None
-        while bytes is None or len(bytes) == 2048:
-            bytes = f.read(2048)
-            yield bytes
+        _bytes = None
+        while _bytes is None or len(_bytes) == 2048:
+            _bytes = f.read(2048)
+            yield _bytes
 
 
 # Status LED
@@ -113,7 +112,7 @@ def code(request):  # pylint: disable=unused-argument
 
 
 @web_app.route("/btc")
-def btc(request):
+def btc(request):  # pylint: disable=unused-argument
     print("BTC handler")
     r = requests.get("http://api.coindesk.com/v1/bpi/currentprice/USD.json")
     result = r.text
