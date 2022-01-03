@@ -31,24 +31,24 @@ import adafruit_wiznet5k.adafruit_wiznet5k_wsgiserver as server
 print("Wiznet5k Web Server Test")
 
 
-def get_mac(_i2c):
+def get_mac(i2c_obj):
     "Read MAC from 24AA02E48 chip and return it"
-    _mac = bytearray(6)
-    while not _i2c.try_lock():
+    mac_addr = bytearray(6)
+    while not i2c_obj.try_lock():
         pass
-    _i2c.writeto(0x50, bytearray((0xFA,)))
-    _i2c.readfrom_into(0x50, _mac, start=0, end=6)
-    _i2c.unlock()
-    return _mac
+    i2c_obj.writeto(0x50, bytearray((0xFA,)))
+    i2c_obj.readfrom_into(0x50, mac_addr, start=0, end=6)
+    i2c_obj.unlock()
+    return mac_addr
 
 
 def get_static_file(filename):
     "Static file generator"
     with open(filename, "rb") as f:
-        _bytes = None
-        while _bytes is None or len(_bytes) == 2048:
-            _bytes = f.read(2048)
-            yield _bytes
+        b = None
+        while b is None or len(b) == 2048:
+            b = f.read(2048)
+            yield b
 
 
 # Status LED

@@ -166,6 +166,11 @@ This example demonstrates a simple web server that allows setting the Neopixel c
         eth.maintain_dhcp_lease()
         # Could do any other background tasks here, like reading sensors
 
+Documentation
+=============
+
+API documentation for this library can be found on `Read the Docs <https://circuitpython.readthedocs.io/projects/wiznet5k/en/latest/>`_.
+
 Contributing
 ============
 
