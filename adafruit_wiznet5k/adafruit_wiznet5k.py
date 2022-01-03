@@ -744,11 +744,12 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
         dst_addr = offset + (socket_num * 2048 + 0x8000)
 
         # update sn_tx_wr to the value + data size
-        ptr = (ptr + len(buffer)) & 0xFFFF
+        ptr = (ptr + ret) & 0xFFFF
         self._write_sntx_wr(socket_num, ptr)
 
         cntl_byte = 0x14 + (socket_num << 5)
-        self.write(dst_addr, cntl_byte, buffer)
+        txbuf = buffer[:ret]  # <- use ret
+        self.write(dst_addr, cntl_byte, txbuf)
 
         self._write_sncr(socket_num, CMD_SOCK_SEND)
         self._read_sncr(socket_num)
@@ -863,9 +864,8 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
 
     def _write_socket(self, sock, address, data):
         """Write to a W5k socket register."""
-        base = self._ch_base_msb << 8
         cntl_byte = (sock << 5) + 0x0C
-        return self.write(base + sock * CH_SIZE + address, cntl_byte, data)
+        return self.write(address, cntl_byte, data)
 
     def _read_socket(self, sock, address):
         """Read a W5k socket register."""
