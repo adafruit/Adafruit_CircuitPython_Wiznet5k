@@ -44,9 +44,6 @@ def set_interface(iface):
     socket.set_interface(iface)
 
 
-# Maximum number of sockets for the web server (number of connections we can hold)
-MAX_SOCK_NUM = const(6)
-
 # pylint: disable=invalid-name
 class WSGIServer:
     """
@@ -62,6 +59,12 @@ class WSGIServer:
 
         self._response_status = None
         self._response_headers = []
+        if _the_interface.chip == "w5100s":
+            self.MAX_SOCK_NUM = const(2)
+        else:
+            self.MAX_SOCK_NUM = const(6)
+        if self._debug:
+            print("Max sockets: ", self.MAX_SOCK_NUM)
 
     def start(self):
         """
@@ -69,7 +72,7 @@ class WSGIServer:
         Call update_poll in the main loop for the application callable to be
         invoked on receiving an incoming request.
         """
-        for _ in range(MAX_SOCK_NUM):
+        for _ in range(self.MAX_SOCK_NUM):
             new_sock = socket.socket()
             new_sock.settimeout(self._timeout)
             new_sock.bind((None, self.port))
@@ -95,7 +98,7 @@ class WSGIServer:
         for sock in self._client_sock:
             if sock.status == wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSED:
                 self._client_sock.remove(sock)
-        for _ in range(len(self._client_sock), MAX_SOCK_NUM):
+        for _ in range(len(self._client_sock), self.MAX_SOCK_NUM):
             try:
                 new_sock = socket.socket()
                 new_sock.settimeout(self._timeout)
