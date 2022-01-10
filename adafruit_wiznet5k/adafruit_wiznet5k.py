@@ -184,7 +184,8 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
         self._dns = 0
 
         # First, wait link status is on
-        # to avoid the code during DHCP, socket listen, connect ... - assert self.link_status, "Ethernet cable disconnected!"
+        # to avoid the code during DHCP, socket listen, connect ...
+        # assert self.link_status, "Ethernet cable disconnected!"
         start_time = time.monotonic()
         while True:
             if self.link_status or ((time.monotonic() - start_time) > 5):
@@ -255,7 +256,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
         """Returns max number of sockets supported by chip."""
         if self._chip_type == "w5500":
             return W5200_W5500_MAX_SOCK_NUM
-        elif self._chip_type == "w5100s":
+        if self._chip_type == "w5100s":
             return W5100_MAX_SOCK_NUM
         return -1
 
@@ -325,7 +326,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
         if self._chip_type == "w5500":
             data = self.read(REG_PHYCFGR, 0x00)
             return data[0] & 0x01
-        elif self._chip_type == "w5100s":
+        if self._chip_type == "w5100s":
             data = self.read(REG_PHYCFGR_W5100S, 0x00)
             return data[0] & 0x01
         return 0
@@ -389,15 +390,18 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
         assert self.sw_reset() == 0, "Chip not reset properly!"
         self._write_mr(0x08)
         # assert self._read_mr()[0] == 0x08, "Expected 0x08."
-        if self._read_mr()[0] != 0x08 : return -1
+        if self._read_mr()[0] != 0x08:
+            return -1
 
         self._write_mr(0x10)
         # assert self._read_mr()[0] == 0x10, "Expected 0x10."
-        if self._read_mr()[0] != 0x10 : return -1
+        if self._read_mr()[0] != 0x10:
+            return -1
 
         self._write_mr(0x00)
         # assert self._read_mr()[0] == 0x00, "Expected 0x00."
-        if self._read_mr()[0] != 0x00 : return -1
+        if self._read_mr()[0] != 0x00:
+            return -1
 
         if self.read(REG_VERSIONR_W5500, 0x00)[0] != 0x04:
             return -1
@@ -452,8 +456,8 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
                 bus_device.write(bytes([addr >> 8]))  # pylint: disable=no-member
                 bus_device.write(bytes([addr & 0xFF]))  # pylint: disable=no-member
                 bus_device.write(bytes([callback]))  # pylint: disable=no-member
-            else :
-            #if self._chip_type == "w5100s":
+            else:
+                # if self._chip_type == "w5100s":
                 bus_device.write(bytes([0x0F]))  # pylint: disable=no-member
                 bus_device.write(bytes([addr >> 8]))  # pylint: disable=no-member
                 bus_device.write(bytes([addr & 0xFF]))  # pylint: disable=no-member
@@ -478,8 +482,8 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
                 bus_device.write(bytes([addr >> 8]))  # pylint: disable=no-member
                 bus_device.write(bytes([addr & 0xFF]))  # pylint: disable=no-member
                 bus_device.write(bytes([callback]))  # pylint: disable=no-member
-            else :
-            #if self._chip_type == "w5100s":
+            else:
+                # if self._chip_type == "w5100s":
                 bus_device.write(bytes([0xF0]))  # pylint: disable=no-member
                 bus_device.write(bytes([addr >> 8]))  # pylint: disable=no-member
                 bus_device.write(bytes([addr & 0xFF]))  # pylint: disable=no-member
@@ -735,18 +739,18 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
                 ctrl_byte = 0x18 + (socket_num << 5)
 
                 resp = self.read(ptr, ctrl_byte, ret)
-            else :
-            #if self._chip_type == "w5100s":
+            else:
+                # if self._chip_type == "w5100s":
                 offset = ptr & SOCK_MASK
                 src_addr = offset + (socket_num * SOCK_SIZE + 0x6000)
-                if (offset + ret > SOCK_SIZE) :
+                if offset + ret > SOCK_SIZE:
                     size = SOCK_SIZE - offset
                     resp1 = self.read(src_addr, 0x00, size)
                     size = ret - size
-                    src_addr = (socket_num * SOCK_SIZE + 0x6000)
+                    src_addr = socket_num * SOCK_SIZE + 0x6000
                     resp2 = self.read(src_addr, 0x00, size)
                     resp = resp1 + resp2
-                else :
+                else:
                     resp = self.read(src_addr, 0x00, ret)
 
             #  After reading the received data, update Sn_RX_RD to the increased
@@ -800,24 +804,24 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
         offset = ptr & SOCK_MASK
         if self._chip_type == "w5500":
             dst_addr = offset + (socket_num * SOCK_SIZE + 0x8000)
-    
+
             txbuf = buffer[:ret]
             cntl_byte = 0x14 + (socket_num << 5)
             self.write(dst_addr, cntl_byte, txbuf)
-            
-        else :
-        #if self._chip_type == "w5100s":
+
+        else:
+            # if self._chip_type == "w5100s":
             dst_addr = offset + (socket_num * SOCK_SIZE + 0x4000)
-    
-            if (offset + ret > SOCK_SIZE) :
+
+            if offset + ret > SOCK_SIZE:
                 size = SOCK_SIZE - offset
                 txbuf = buffer[0:size]
                 self.write(dst_addr, 0x00, txbuf)
                 txbuf = buffer[size:ret]
                 size = ret - size
-                dst_addr = (socket_num * SOCK_SIZE + 0x4000)
+                dst_addr = socket_num * SOCK_SIZE + 0x4000
                 self.write(dst_addr, 0x00, txbuf)
-            else :
+            else:
                 txbuf = buffer[:ret]
                 self.write(dst_addr, 0x00, buffer[:ret])
 
@@ -945,17 +949,19 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
         if self._chip_type == "w5500":
             cntl_byte = (sock << 5) + 0x0C
             return self.write(address, cntl_byte, data)
-        else :
-        #if self._chip_type == "w5100s":
+        if self._chip_type == "w5100s":
             cntl_byte = 0
-            return self.write(self._ch_base_msb + sock * CH_SIZE + address, cntl_byte, data)
+            return self.write(
+                self._ch_base_msb + sock * CH_SIZE + address, cntl_byte, data
+            )
+        return None
 
     def _read_socket(self, sock, address):
         """Read a W5k socket register."""
         if self._chip_type == "w5500":
             cntl_byte = (sock << 5) + 0x08
             return self.read(address, cntl_byte)
-        else :
-        #if self._chip_type == "w5100s":
+        if self._chip_type == "w5100s":
             cntl_byte = 0
             return self.read(self._ch_base_msb + sock * CH_SIZE + address, cntl_byte)
+        return None

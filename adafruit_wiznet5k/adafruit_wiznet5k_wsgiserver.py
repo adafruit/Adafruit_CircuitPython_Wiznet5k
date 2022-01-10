@@ -44,9 +44,6 @@ def set_interface(iface):
     socket.set_interface(iface)
 
 
-# # Maximum number of sockets for the web server (number of connections we can hold)
-# MAX_SOCK_NUM = const(6)
-
 # pylint: disable=invalid-name
 class WSGIServer:
     """
@@ -62,12 +59,12 @@ class WSGIServer:
 
         self._response_status = None
         self._response_headers = []
-        if _the_interface.chip == "w5100s" :
+        if _the_interface.chip == "w5100s":
             self.MAX_SOCK_NUM = const(2)
-            print("MAX_SOCK_NUM is 2")
         else:
             self.MAX_SOCK_NUM = const(6)
-            print("MAX_SOCK_NUM is 6")
+        if self._debug:
+            print("Max sockets: ", self.MAX_SOCK_NUM)
 
     def start(self):
         """
