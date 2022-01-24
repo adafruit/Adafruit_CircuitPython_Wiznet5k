@@ -2,7 +2,7 @@ Introduction
 ============
 
 .. image:: https://readthedocs.org/projects/adafruit-circuitpython-wiznet5k/badge/?version=latest
-    :target: https://circuitpython.readthedocs.io/projects/wiznet5k/en/latest/
+    :target: https://docs.circuitpython.org/projects/wiznet5k/en/latest/
     :alt: Documentation Status
 
 .. image:: https://img.shields.io/discord/327254708534116352.svg
@@ -169,7 +169,7 @@ This example demonstrates a simple web server that allows setting the Neopixel c
 Documentation
 =============
 
-API documentation for this library can be found on `Read the Docs <https://circuitpython.readthedocs.io/projects/wiznet5k/en/latest/>`_.
+API documentation for this library can be found on `Read the Docs <https://docs.circuitpython.org/projects/wiznet5k/en/latest/>`_.
 
 Contributing
 ============
@@ -188,7 +188,7 @@ License
 
 This library was written by `Arduino LLC <https://github.com/arduino-libraries/Ethernet/blob/master/AUTHORS>`_. We've converted it to work
 with `CircuitPython <https://circuitpython.org/>`_ and made changes so it works similarly to `CircuitPython's WIZNET5k wrapper for the WIZnet
-5500 Ethernet interface <https://circuitpython.readthedocs.io/en/latest/shared-bindings/wiznet/wiznet5k.html>`_ and CPython's `Socket low-level
+5500 Ethernet interface <https://docs.circuitpython.org/en/latest/shared-bindings/wiznet/wiznet5k.html>`_ and CPython's `Socket low-level
 networking interface module <https://docs.python.org/3.8/library/socket.html>`_.
 
 This open source code is licensed under the LGPL license (see LICENSE for details).
