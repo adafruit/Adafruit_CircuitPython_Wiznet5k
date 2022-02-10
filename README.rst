@@ -178,3 +178,16 @@ For information on building library documentation, please check out `this guide 
 Contributing
 ============
 
+Contributions are welcome! Please read our `Code of Conduct
+<https://github.com/adafruit/Adafruit_CircuitPython_Wiznet5k/blob/main/CODE_OF_CONDUCT.md>`_
+before contributing to help this project stay welcoming.
+
+License
+=============
+
+This library was written by `Arduino LLC <https://github.com/arduino-libraries/Ethernet/blob/master/AUTHORS>`_. We've converted it to work
+with `CircuitPython <https://circuitpython.org/>`_ and made changes so it works similarly to `CircuitPython's WIZNET5k wrapper for the WIZnet
+5500 Ethernet interface <https://docs.circuitpython.org/en/latest/shared-bindings/wiznet/wiznet5k.html>`_ and CPython's `Socket low-level
+networking interface module <https://docs.python.org/3.8/library/socket.html>`_.
+
+This open source code is licensed under the LGPL license (see LICENSE for details).
