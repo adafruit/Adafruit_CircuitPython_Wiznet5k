@@ -166,9 +166,9 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
 
         # reset wiznet module prior to initialization
         if reset:
-            reset.value = True
-            time.sleep(0.1)
             reset.value = False
+            time.sleep(0.1)
+            reset.value = True
             time.sleep(0.1)
 
         # Buffer for reading params from module
