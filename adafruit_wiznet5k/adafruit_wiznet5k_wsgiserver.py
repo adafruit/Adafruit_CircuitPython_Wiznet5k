@@ -130,7 +130,9 @@ class WSGIServer:
                     client.send(data)
                 else:
                     # split to chunks of 2 kb
-                    data_chunks = [data[i:i + 0x800] for i in range(0, len(data), 0x800)]
+                    data_chunks = [
+                        data[i : i + 0x800] for i in range(0, len(data), 0x800)
+                    ]
                     for data_chunk in data_chunks:
                         client.send(data_chunk)
             gc.collect()
