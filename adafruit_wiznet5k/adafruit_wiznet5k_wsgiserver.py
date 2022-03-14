@@ -124,10 +124,17 @@ class WSGIServer:
             response += "\r\n"
             client.send(response.encode("utf-8"))
             for data in result:
-                if isinstance(data, bytes):
+                if not isinstance(data, bytes):
+                    data = data.encode("utf-8")
+                if len(data) < 0x800:
                     client.send(data)
                 else:
-                    client.send(data.encode("utf-8"))
+                    # split to chunks of 2 kb
+                    data_chunks = [
+                        data[i : i + 0x800] for i in range(0, len(data), 0x800)
+                    ]
+                    for data_chunk in data_chunks:
+                        client.send(data_chunk)
             gc.collect()
         finally:
             client.disconnect()
