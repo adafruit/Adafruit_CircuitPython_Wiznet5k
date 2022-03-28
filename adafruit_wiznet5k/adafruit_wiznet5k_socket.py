@@ -338,7 +338,7 @@ class socket:
 
         :param int bufsize: Maximum number of bytes to receive.
         :param int flags: ignored, present for compatibility.
-        :returns: a tuple (bytes, address) where address is a tuple (ip, port)
+        :return: a tuple (bytes, address) where address is a tuple (ip, port)
         """
         return (
             self.recv(bufsize),
@@ -354,7 +354,7 @@ class socket:
         :param bytearray buf: Data buffer
         :param nbytes: Maximum number of bytes to receive
         :param int flags: ignored, present for compatibility.
-        :returns: the number of bytes received
+        :return: the number of bytes received
         """
         if nbytes == 0:
             nbytes = len(buf)
@@ -369,7 +369,7 @@ class socket:
         :param bytearray buf: Data buffer
         :param nbytes: Maximum number of bytes to receive
         :param int flags: ignored, present for compatibility.
-        :returns: a tuple (nbytes, address) where address is a tuple (ip, port)
+        :return: a tuple (nbytes, address) where address is a tuple (ip, port)
         """
         return (
             self.recv_into(buf, nbytes),
