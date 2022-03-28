@@ -64,6 +64,7 @@ def getaddrinfo(host, port, family=0, socktype=0, proto=0, flags=0):
 def gethostbyname(hostname):
     """Translate a host name to IPv4 address format. The IPv4 address
     is returned as a string.
+
     :param str hostname: Desired hostname.
     """
     addr = _the_interface.get_host_by_name(hostname)
@@ -73,6 +74,7 @@ def gethostbyname(hostname):
 
 def is_ipv4(host):
     """Checks if a host string is an IPv4 address.
+
     :param str host: host's name or ip
     """
     octets = host.split(".", 3)
@@ -88,9 +90,9 @@ def is_ipv4(host):
 class socket:
     """A simplified implementation of the Python 'socket' class
     for connecting to a Wiznet5k module.
+
     :param int family: Socket address (and protocol) family.
     :param int type: Socket type.
-
     """
 
     # pylint: disable=redefined-builtin,unused-argument
@@ -162,8 +164,8 @@ class socket:
 
     def inet_aton(self, ip_string):
         """Convert an IPv4 address from dotted-quad string format.
-        :param str ip_string: IP Address, as a dotted-quad string.
 
+        :param str ip_string: IP Address, as a dotted-quad string.
         """
         self._buffer = b""
         self._buffer = [int(item) for item in ip_string.split(".")]
@@ -173,6 +175,7 @@ class socket:
     def bind(self, address):
         """Bind the socket to the listen port, if host is specified the interface
         will be reconfigured to that IP.
+
         :param tuple address: local socket as a (host, port) tuple.
         """
         if address[0] is not None:
@@ -191,6 +194,7 @@ class socket:
 
     def listen(self, backlog=None):
         """Listen on the port specified by bind.
+
         :param backlog: For compatibility but ignored.
         """
         assert self._listen_port is not None, "Use bind to set the port before listen!"
@@ -228,6 +232,7 @@ class socket:
 
     def connect(self, address, conntype=None):
         """Connect to a remote socket at address.
+
         :param tuple address: Remote socket as a (host, port) tuple.
         """
         assert (
@@ -253,6 +258,7 @@ class socket:
     def send(self, data):
         """Send data to the socket. The socket must be connected to
         a remote socket.
+
         :param bytearray data: Desired data to send to the socket.
         """
         _the_interface.socket_write(self.socknum, data, self._timeout)
@@ -261,6 +267,7 @@ class socket:
     def sendto(self, data, address):
         """Send data to the socket. The socket must be connected to
         a remote socket.
+
         :param bytearray data: Desired data to send to the socket.
         :param tuple address: Remote socket as a (host, port) tuple.
         """
@@ -269,6 +276,7 @@ class socket:
 
     def recv(self, bufsize=0, flags=0):  # pylint: disable=too-many-branches
         """Reads some bytes from the connected remote address.
+
         :param int bufsize: Maximum number of bytes to receive.
         :param int flags: ignored, present for compatibility.
         """
@@ -327,6 +335,7 @@ class socket:
 
     def recvfrom(self, bufsize=0, flags=0):
         """Reads some bytes from the connected remote address.
+
         :param int bufsize: Maximum number of bytes to receive.
         :param int flags: ignored, present for compatibility.
         :returns: a tuple (bytes, address) where address is a tuple (ip, port)
@@ -341,6 +350,7 @@ class socket:
 
     def recv_into(self, buf, nbytes=0, flags=0):
         """Reads some bytes from the connected remote address info the provided buffer.
+
         :param bytearray buf: Data buffer
         :param nbytes: Maximum number of bytes to receive
         :param int flags: ignored, present for compatibility.
@@ -355,10 +365,11 @@ class socket:
 
     def recvfrom_into(self, buf, nbytes=0, flags=0):
         """Reads some bytes from the connected remote address info the provided buffer.
+
         :param bytearray buf: Data buffer
         :param nbytes: Maximum number of bytes to receive
         :param int flags: ignored, present for compatibility.
-        :returns a tuple (nbytes, address) where address is a tuple (ip, port)
+        :returns: a tuple (nbytes, address) where address is a tuple (ip, port)
         """
         return (
             self.recv_into(buf, nbytes),
@@ -371,7 +382,6 @@ class socket:
     def readline(self):
         """Attempt to return as many bytes as we can up to \
         but not including '\r\n'.
-
         """
         stamp = time.monotonic()
         while b"\r\n" not in self._buffer:
@@ -407,8 +417,8 @@ class socket:
 
     def settimeout(self, value):
         """Sets socket read timeout.
-        :param int value: Socket read timeout, in seconds.
 
+        :param int value: Socket read timeout, in seconds.
         """
         if value < 0:
             raise Exception("Timeout period should be non-negative.")
@@ -417,6 +427,5 @@ class socket:
     def gettimeout(self):
         """Return the timeout in seconds (float) associated
         with socket operations, or None if no timeout is set.
-
         """
         return self._timeout

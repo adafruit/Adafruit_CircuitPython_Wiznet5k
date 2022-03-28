@@ -80,6 +80,7 @@ _BUFF = bytearray(318)
 
 class DHCP:
     """W5k DHCP Client implementation.
+
     :param eth: Wiznet 5k object
     :param list mac_address: Hardware MAC.
     :param str hostname: The desired hostname, with optional {} to fill in MAC.
@@ -134,6 +135,7 @@ class DHCP:
     # pylint: disable=too-many-statements
     def send_dhcp_message(self, state, time_elapsed, renew=False):
         """Assemble and send a DHCP message packet to a socket.
+
         :param int state: DHCP Message state.
         :param float time_elapsed: Number of seconds elapsed since DHCP process started
         :param bool renew: Set True for renew and rebind

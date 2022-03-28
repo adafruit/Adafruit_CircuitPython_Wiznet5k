@@ -12,3 +12,12 @@
 
 .. automodule:: adafruit_wiznet5k.adafruit_wiznet5k_dhcp
    :members:
+
+.. automodule:: adafruit_wiznet5k.adafruit_wiznet5k_ntp
+   :members:
+
+.. automodule:: adafruit_wiznet5k.adafruit_wiznet5k_dns
+   :members:
+
+.. automodule:: adafruit_wiznet5k.adafruit_wiznet5k_wsgiserver
+   :members:
