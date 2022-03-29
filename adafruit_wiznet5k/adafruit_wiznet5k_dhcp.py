@@ -472,14 +472,10 @@ class DHCP:
                 if self._debug:
                     print("* DHCP: Time to renew lease")
 
-        if (
-            self._dhcp_state
-            in (
-                STATE_DHCP_DISCOVER,
-                STATE_DHCP_REQUEST,
-            )
-            and time.monotonic() > (self._start_time + self._response_timeout)
-        ):
+        if self._dhcp_state in (
+            STATE_DHCP_DISCOVER,
+            STATE_DHCP_REQUEST,
+        ) and time.monotonic() > (self._start_time + self._response_timeout):
             self._dhcp_state = STATE_DHCP_WAIT
             if self._sock is not None:
                 self._sock.close()
