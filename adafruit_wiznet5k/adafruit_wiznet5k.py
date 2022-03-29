@@ -131,6 +131,7 @@ SRC_PORTS = [0] * W5200_W5500_MAX_SOCK_NUM
 
 class WIZNET5K:  # pylint: disable=too-many-public-methods
     """Interface for WIZNET5K module.
+
     :param ~busio.SPI spi_bus: The SPI bus the Wiznet module is connected to.
     :param ~digitalio.DigitalInOut cs: Chip select pin.
     :param ~digitalio.DigitalInOut rst: Optional reset pin.
@@ -139,7 +140,6 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
     :param str hostname: The desired hostname, with optional {} to fill in MAC.
     :param int dhcp_timeout: Timeout in seconds for DHCP response.
     :param bool debug: Enable debugging output.
-
     """
 
     TCP_MODE = const(0x21)
@@ -206,9 +206,9 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
         """Initializes the DHCP client and attempts to retrieve
         and set network configuration from the DHCP server.
         Returns 0 if DHCP configured, -1 otherwise.
+
         :param str hostname: The desired hostname, with optional {} to fill in MAC.
         :param int response_timeout: Time to wait for server to return packet, in seconds.
-
         """
         if self._debug:
             print("* Initializing DHCP")
@@ -290,8 +290,8 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
     @mac_address.setter
     def mac_address(self, address):
         """Sets the hardware MAC address.
-        :param tuple address: Hardware MAC address.
 
+        :param tuple address: Hardware MAC address.
         """
         self.write(REG_SHAR, 0x04, address)
 
@@ -311,8 +311,8 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
 
     def remote_ip(self, socket_num):
         """Returns the IP address of the host who sent the current incoming packet.
-        :param int socket num: Desired socket.
 
+        :param int socket num: Desired socket.
         """
         if socket_num >= self.max_sockets:
             return self._pbuff
@@ -441,15 +441,15 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
 
     def _write_mr(self, data):
         """Writes to the mode register (MR).
-        :param int data: Data to write to the mode register.
 
+        :param int data: Data to write to the mode register.
         """
         self.write(REG_MR, 0x04, data)
 
     def read(self, addr, callback, length=1, buffer=None):
         """Reads data from a register address.
-        :param int addr: Register address.
 
+        :param int addr: Register address.
         """
         with self._device as bus_device:
             if self._chip_type == "w5500":
@@ -471,11 +471,11 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
 
     def write(self, addr, callback, data):
         """Write data to a register address.
+
         :param int addr: Destination address.
         :param int callback: Callback reference.
         :param int data: Data to write, as an integer.
         :param bytearray data: Data to write, as a bytearray.
-
         """
         with self._device as bus_device:
             if self._chip_type == "w5500":
@@ -602,9 +602,10 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
 
     def socket_listen(self, socket_num, port, conn_mode=SNMR_TCP):
         """Start listening on a socket (default TCP mode).
-        :parm int socket_num: socket number
-        :parm int port: port to listen on
-        :parm int conn_mode: connection mode SNMR_TCP (default) or SNMR_UDP
+
+        :param int socket_num: socket number
+        :param int port: port to listen on
+        :param int conn_mode: connection mode SNMR_TCP (default) or SNMR_UDP
         """
         assert self.link_status, "Ethernet cable disconnected!"
         if self._debug:
@@ -631,7 +632,8 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
     def socket_accept(self, socket_num):
         """Gets the dest IP and port from an incoming connection.
         Returns the next socket number so listening can continue
-        :parm int socket_num: socket number
+
+        :param int socket_num: socket number
         """
         dest_ip = self.remote_ip(socket_num)
         dest_port = self.remote_port(socket_num)
@@ -704,7 +706,6 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
     def socket_read(self, socket_num, length):
         """Reads data from a socket into a buffer.
         Returns buffer.
-
         """
         assert self.link_status, "Ethernet cable disconnected!"
         assert socket_num <= self.max_sockets, "Provided socket exceeds max_sockets."
@@ -840,17 +841,13 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
         while (
             self._read_socket(socket_num, REG_SNIR)[0] & SNIR_SEND_OK
         ) != SNIR_SEND_OK:
-            if (
-                self.socket_status(socket_num)[0]
-                in (
-                    SNSR_SOCK_CLOSED,
-                    SNSR_SOCK_TIME_WAIT,
-                    SNSR_SOCK_FIN_WAIT,
-                    SNSR_SOCK_CLOSE_WAIT,
-                    SNSR_SOCK_CLOSING,
-                )
-                or (timeout and time.monotonic() - stamp > timeout)
-            ):
+            if self.socket_status(socket_num)[0] in (
+                SNSR_SOCK_CLOSED,
+                SNSR_SOCK_TIME_WAIT,
+                SNSR_SOCK_FIN_WAIT,
+                SNSR_SOCK_CLOSE_WAIT,
+                SNSR_SOCK_CLOSING,
+            ) or (timeout and time.monotonic() - stamp > timeout):
                 # self.socket_close(socket_num)
                 return 0
             time.sleep(0.01)

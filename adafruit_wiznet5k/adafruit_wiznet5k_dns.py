@@ -58,6 +58,7 @@ class DNS:
 
     def gethostbyname(self, hostname):
         """Translate a host name to IPv4 address format.
+
         :param str hostname: Desired host name to connect to.
 
         Returns the IPv4 address as a bytearray if successful, -1 otherwise.

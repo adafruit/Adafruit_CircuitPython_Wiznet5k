@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MIT
 
 """
-`wiznet5k_ntp`
+`adafruit_wiznet5k_ntp`
 ================================================================================
 
 Network Time Protocol (NTP) helper for CircuitPython
@@ -27,6 +27,7 @@ import adafruit_wiznet5k.adafruit_wiznet5k_socket as socket
 class NTP:
     """
     Wiznet5k NTP Client
+
     :param iface: Wiznet 5k object
     :param str ntp_address: The hostname of the NTP server
     :param int utc: Numbers of hours to offset time from UTC
@@ -50,6 +51,7 @@ class NTP:
     def get_time(self):
         """
         Get the time from the NTP server
+
         :return: time in seconds since the epoch
         """
         self._sock.bind((None, 50001))

@@ -80,6 +80,7 @@ _BUFF = bytearray(318)
 
 class DHCP:
     """W5k DHCP Client implementation.
+
     :param eth: Wiznet 5k object
     :param list mac_address: Hardware MAC.
     :param str hostname: The desired hostname, with optional {} to fill in MAC.
@@ -134,6 +135,7 @@ class DHCP:
     # pylint: disable=too-many-statements
     def send_dhcp_message(self, state, time_elapsed, renew=False):
         """Assemble and send a DHCP message packet to a socket.
+
         :param int state: DHCP Message state.
         :param float time_elapsed: Number of seconds elapsed since DHCP process started
         :param bool renew: Set True for renew and rebind
@@ -470,14 +472,10 @@ class DHCP:
                 if self._debug:
                     print("* DHCP: Time to renew lease")
 
-        if (
-            self._dhcp_state
-            in (
-                STATE_DHCP_DISCOVER,
-                STATE_DHCP_REQUEST,
-            )
-            and time.monotonic() > (self._start_time + self._response_timeout)
-        ):
+        if self._dhcp_state in (
+            STATE_DHCP_DISCOVER,
+            STATE_DHCP_REQUEST,
+        ) and time.monotonic() > (self._start_time + self._response_timeout):
             self._dhcp_state = STATE_DHCP_WAIT
             if self._sock is not None:
                 self._sock.close()
