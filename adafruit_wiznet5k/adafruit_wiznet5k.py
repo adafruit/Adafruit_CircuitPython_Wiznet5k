@@ -830,10 +830,6 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods
         ptr = (ptr + ret) & 0xFFFF
         self._write_sntx_wr(socket_num, ptr)
 
-        cntl_byte = 0x14 + (socket_num << 5)
-        txbuf = buffer[:ret]  # <- use ret
-        self.write(dst_addr, cntl_byte, txbuf)
-
         self._write_sncr(socket_num, CMD_SOCK_SEND)
         self._read_sncr(socket_num)
 
