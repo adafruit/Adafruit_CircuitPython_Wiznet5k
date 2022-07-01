@@ -180,7 +180,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         self.mac_address = mac
         self.src_port = 0
         self._dns = (0,0,0,0)
-        # udp related 
+        # udp related
         self.udp_datasize = [0] * self.max_sockets
         self.udp_from_ip = [b"\x00\x00\x00\x00"] * self.max_sockets
         self.udp_from_port = [0] * self.max_sockets
