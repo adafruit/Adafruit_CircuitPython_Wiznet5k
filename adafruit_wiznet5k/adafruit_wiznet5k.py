@@ -127,7 +127,7 @@ SOCKET_INVALID = const(255)
 SRC_PORTS = [0] * W5200_W5500_MAX_SOCK_NUM
 
 
-class WIZNET5K:  # pylint: disable=too-many-public-methods
+class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-attributes
     """Interface for WIZNET5K module.
 
     :param ~busio.SPI spi_bus: The SPI bus the Wiznet module is connected to.
