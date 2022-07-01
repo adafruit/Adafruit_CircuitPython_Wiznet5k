@@ -316,7 +316,7 @@ class socket:
                     )[1]
                 elif self._sock_type == SOCK_DGRAM:
                     recv = _the_interface.read_udp(self.socknum, min(to_read, avail))[1]
-                    to_read = len(recv) # only get this dgram
+                    to_read = len(recv)  # only get this dgram
                 recv = bytes(recv)
                 received.append(recv)
                 to_read -= len(recv)
