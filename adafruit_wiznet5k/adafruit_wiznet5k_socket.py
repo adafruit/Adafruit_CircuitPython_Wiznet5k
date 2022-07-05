@@ -294,6 +294,7 @@ class socket:
                         ]
                     elif self._sock_type == SOCK_DGRAM:
                         self._buffer += _the_interface.read_udp(self.socknum, avail)[1]
+                        break
                 else:
                     break
             gc.collect()
@@ -315,6 +316,7 @@ class socket:
                     )[1]
                 elif self._sock_type == SOCK_DGRAM:
                     recv = _the_interface.read_udp(self.socknum, min(to_read, avail))[1]
+                    to_read = len(recv)  # only get this dgram
                 recv = bytes(recv)
                 received.append(recv)
                 to_read -= len(recv)
@@ -333,6 +335,26 @@ class socket:
         gc.collect()
         return ret
 
+    def embed_recv(self, bufsize=0, flags=0):  # pylint: disable=too-many-branches
+        """Reads some bytes from the connected remote address and then return recv().
+        :param int bufsize: Maximum number of bytes to receive.
+        :param int flags: ignored, present for compatibility.
+        """
+        # print("Socket read", bufsize)
+        ret = None
+        avail = self.available()
+        if avail:
+            if self._sock_type == SOCK_STREAM:
+                self._buffer += _the_interface.socket_read(self.socknum, avail)[1]
+            elif self._sock_type == SOCK_DGRAM:
+                self._buffer += _the_interface.read_udp(self.socknum, avail)[1]
+        gc.collect()
+        ret = self._buffer
+        # print("RET ptr:", id(ret), id(self._buffer))
+        self._buffer = b""
+        gc.collect()
+        return ret
+
     def recvfrom(self, bufsize=0, flags=0):
         """Reads some bytes from the connected remote address.
 
@@ -343,8 +365,8 @@ class socket:
         return (
             self.recv(bufsize),
             (
-                _the_interface.remote_ip(self.socknum),
-                _the_interface.remote_port(self.socknum),
+                _the_interface.pretty_ip(_the_interface.udp_from_ip[self.socknum]),
+                _the_interface.udp_from_port[self.socknum],
             ),
         )
 
