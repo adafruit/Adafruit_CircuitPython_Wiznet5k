@@ -1,7 +1,7 @@
 Introduction
 ============
 
-.. image:: https://readthedocs.org/projects/adafruit-circuitpython-wiznet5k/badge/?version=latest
+.. image:: https://readthedocs.org/projects/wiznet5k/badge/?version=latest
     :target: https://docs.circuitpython.org/projects/wiznet5k/en/latest/
     :alt: Documentation Status
 
