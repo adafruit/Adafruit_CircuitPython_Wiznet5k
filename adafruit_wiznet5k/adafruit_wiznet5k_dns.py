@@ -113,7 +113,7 @@ class DNS:
             print("DNS Packet Received: ", self._pkt_buf)
 
         # Validate request identifier
-        xid = int.from_bytes(self._pkt_buf[0:2], "l")
+        xid = int.from_bytes(self._pkt_buf[0:2], "big")
         if not xid == self._request_id:
             if self._debug:
                 print(
@@ -124,19 +124,19 @@ class DNS:
                 )
             return -1
         # Validate flags
-        flags = int.from_bytes(self._pkt_buf[2:4], "l")
+        flags = int.from_bytes(self._pkt_buf[2:4], "big")
         if not flags in (0x8180, 0x8580):
             if self._debug:
                 print("* DNS ERROR: Invalid flags, ", flags)
             return -1
         # Number of questions
-        qr_count = int.from_bytes(self._pkt_buf[4:6], "l")
+        qr_count = int.from_bytes(self._pkt_buf[4:6], "big")
         if not qr_count >= 1:
             if self._debug:
                 print("* DNS ERROR: Question count >=1, ", qr_count)
             return -1
         # Number of answers
-        an_count = int.from_bytes(self._pkt_buf[6:8], "l")
+        an_count = int.from_bytes(self._pkt_buf[6:8], "big")
         if self._debug:
             print("* DNS Answer Count: ", an_count)
         if not an_count >= 1:
@@ -156,7 +156,7 @@ class DNS:
             ptr += name_len + 1
 
         # Validate Query is Type A
-        q_type = int.from_bytes(self._pkt_buf[ptr : ptr + 2], "l")
+        q_type = int.from_bytes(self._pkt_buf[ptr : ptr + 2], "big")
         if not q_type == TYPE_A:
             if self._debug:
                 print("* DNS ERROR: Incorrect Query Type: ", q_type)
@@ -164,7 +164,7 @@ class DNS:
         ptr += 2
 
         # Validate Query is Type A
-        q_class = int.from_bytes(self._pkt_buf[ptr : ptr + 2], "l")
+        q_class = int.from_bytes(self._pkt_buf[ptr : ptr + 2], "big")
         if not q_class == TYPE_A:
             if self._debug:
                 print("* DNS ERROR: Incorrect Query Class: ", q_class)
@@ -181,7 +181,7 @@ class DNS:
         ptr += 1
 
         # Validate Answer Type A
-        ans_type = int.from_bytes(self._pkt_buf[ptr : ptr + 2], "l")
+        ans_type = int.from_bytes(self._pkt_buf[ptr : ptr + 2], "big")
         if not ans_type == TYPE_A:
             if self._debug:
                 print("* DNS ERROR: Incorrect Answer Type: ", ans_type)
@@ -189,7 +189,7 @@ class DNS:
         ptr += 2
 
         # Validate Answer Class IN
-        ans_class = int.from_bytes(self._pkt_buf[ptr : ptr + 2], "l")
+        ans_class = int.from_bytes(self._pkt_buf[ptr : ptr + 2], "big")
         if not ans_class == TYPE_A:
             if self._debug:
                 print("* DNS ERROR: Incorrect Answer Class: ", ans_class)
@@ -200,7 +200,7 @@ class DNS:
         ptr += 4
 
         # Validate addr is IPv4
-        data_len = int.from_bytes(self._pkt_buf[ptr : ptr + 2], "l")
+        data_len = int.from_bytes(self._pkt_buf[ptr : ptr + 2], "big")
         if not data_len == DATA_LEN:
             if self._debug:
                 print("* DNS ERROR: Unexpected Data Length: ", data_len)
