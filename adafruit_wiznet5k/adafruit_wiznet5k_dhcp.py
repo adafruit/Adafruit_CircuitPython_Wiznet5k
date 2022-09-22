@@ -152,7 +152,7 @@ class DHCP:
 
         # Transaction ID (xid)
         self._initial_xid = htonl(self._transaction_id)
-        self._initial_xid = self._initial_xid.to_bytes(4, "l")
+        self._initial_xid = self._initial_xid.to_bytes(4, "big")
         _BUFF[4:7] = self._initial_xid
 
         # seconds elapsed
@@ -161,7 +161,7 @@ class DHCP:
 
         # flags
         flags = htons(0x8000)
-        flags = flags.to_bytes(2, "b")
+        flags = flags.to_bytes(2, "big")
         _BUFF[10] = flags[1]
         _BUFF[11] = flags[0]
 
@@ -259,7 +259,7 @@ class DHCP:
         if _BUFF[28:34] == 0:
             return 0, 0
 
-        if int.from_bytes(_BUFF[235:240], "l") != MAGIC_COOKIE:
+        if int.from_bytes(_BUFF[235:240], "big") != MAGIC_COOKIE:
             return 0, 0
 
         # -- Parse Packet, VARIABLE -- #
@@ -287,7 +287,7 @@ class DHCP:
                 ptr += 1
                 opt_len = _BUFF[ptr]
                 ptr += 1
-                self._lease_time = int.from_bytes(_BUFF[ptr : ptr + opt_len], "l")
+                self._lease_time = int.from_bytes(_BUFF[ptr : ptr + opt_len], "big")
                 ptr += opt_len
             elif _BUFF[ptr] == ROUTERS_ON_SUBNET:
                 ptr += 1
@@ -305,13 +305,13 @@ class DHCP:
                 ptr += 1
                 opt_len = _BUFF[ptr]
                 ptr += 1
-                self._t1 = int.from_bytes(_BUFF[ptr : ptr + opt_len], "l")
+                self._t1 = int.from_bytes(_BUFF[ptr : ptr + opt_len], "big")
                 ptr += opt_len
             elif _BUFF[ptr] == T2_VAL:
                 ptr += 1
                 opt_len = _BUFF[ptr]
                 ptr += 1
-                self._t2 = int.from_bytes(_BUFF[ptr : ptr + opt_len], "l")
+                self._t2 = int.from_bytes(_BUFF[ptr : ptr + opt_len], "big")
                 ptr += opt_len
             elif _BUFF[ptr] == 0:
                 break
@@ -399,7 +399,7 @@ class DHCP:
                 if msg_type == DHCP_OFFER:
                     # Check if transaction ID matches, otherwise it may be an offer
                     # for another device
-                    if htonl(self._transaction_id) == int.from_bytes(xid, "l"):
+                    if htonl(self._transaction_id) == int.from_bytes(xid, "big"):
                         if self._debug:
                             print(
                                 "* DHCP: Send request to {}".format(self.dhcp_server_ip)
@@ -423,7 +423,7 @@ class DHCP:
                 msg_type, xid = self.parse_dhcp_response()
                 # Check if transaction ID matches, otherwise it may be
                 # for another device
-                if htonl(self._transaction_id) == int.from_bytes(xid, "l"):
+                if htonl(self._transaction_id) == int.from_bytes(xid, "big"):
                     if msg_type == DHCP_ACK:
                         if self._debug:
                             print("* DHCP: Successful lease")
