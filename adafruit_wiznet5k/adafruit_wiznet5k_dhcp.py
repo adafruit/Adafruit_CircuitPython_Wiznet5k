@@ -95,6 +95,10 @@ class DHCP:
     ):
         self._debug = debug
         self._response_timeout = response_timeout
+
+        # Prevent buffer overrun in send_dhcp_message()
+        if len(mac_address) != 6:
+            raise ValueError("The MAC address must be 6 bytes.")
         self._mac_address = mac_address
 
         # Set socket interface
