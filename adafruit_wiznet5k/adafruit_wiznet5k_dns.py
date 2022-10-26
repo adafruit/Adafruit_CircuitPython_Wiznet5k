@@ -44,6 +44,8 @@ class DNS:
     :param iface: Network interface
     """
 
+    # TODO: Add typing
+
     def __init__(self, iface, dns_address, debug=False):
         self._debug = debug
         self._iface = iface
@@ -55,6 +57,8 @@ class DNS:
         self._host = 0
         self._request_id = 0  # request identifier
         self._pkt_buf = bytearray()
+
+    # TODO: Add typing
 
     def gethostbyname(self, hostname):
         """Translate a host name to IPv4 address format.
@@ -88,6 +92,8 @@ class DNS:
 
         self._sock.close()
         return addr
+
+    # TODO: Add typing
 
     def _parse_dns_response(
         self,
@@ -209,6 +215,8 @@ class DNS:
         # Return address
         return self._pkt_buf[ptr : ptr + 4]
 
+    # TODO: Add typing
+
     def _build_dns_header(self):
         """Builds DNS header."""
         # generate a random, 16-bit, request identifier
@@ -234,6 +242,8 @@ class DNS:
         # ARCOUNT
         self._pkt_buf.append(0x00)
         self._pkt_buf.append(0x00)
+
+    # TODO: Add typing
 
     def _build_dns_question(self):
         """Build DNS question"""

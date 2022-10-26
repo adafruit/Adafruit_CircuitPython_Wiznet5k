@@ -12,20 +12,24 @@ A socket compatible interface with the Wiznet5k module.
 * Author(s): ladyada, Brent Rubell, Patrick Van Oosterwijck, Adam Cummick
 
 """
+
+
 try:
-    import typing  # pylint: disable=unused-import
+    from typing import Any, Optional, Tuple, List, Union
 except ImportError:
     pass
 
 import gc
 import time
 from micropython import const
+
+# pylint is tripping over importing for typing so disable
 import adafruit_wiznet5k as wiznet5k
 
 _the_interface = None  # pylint: disable=invalid-name
 
 
-def set_interface(iface):
+def set_interface(iface: wiznet5k.adafruit_wiznet5k.WIZNET5K) -> None:
     """Helper to set the global internet interface."""
     global _the_interface  # pylint: disable=global-statement, invalid-name
     _the_interface = iface
@@ -54,10 +58,16 @@ SOCKET_INVALID = const(255)
 
 
 # pylint: disable=too-many-arguments, unused-argument
-def getaddrinfo(host, port: int, family=0, socktype: int = 0, proto=0, flags=0):
+def getaddrinfo(
+    host: str,
+    port: int,
+    family: Any = 0,
+    socktype: int = 0,
+    proto: int = 0,
+    flags: Any = 0,
+) -> List[Tuple[int, int, int, str, Tuple[str, int]]]:
     """Translate the host/port argument into a sequence of 5-tuples that
     contain all the necessary arguments for creating a socket connected to that service.
-
     """
     if not isinstance(port, int):
         raise RuntimeError("Port must be an integer")
@@ -66,7 +76,7 @@ def getaddrinfo(host, port: int, family=0, socktype: int = 0, proto=0, flags=0):
     return [(AF_INET, socktype, proto, "", (gethostbyname(host), port))]
 
 
-def gethostbyname(hostname):
+def gethostbyname(hostname: str) -> str:
     """Translate a host name to IPv4 address format. The IPv4 address
     is returned as a string.
 
@@ -77,7 +87,7 @@ def gethostbyname(hostname):
     return addr
 
 
-def is_ipv4(host):
+def is_ipv4(host: str) -> bool:
     """Checks if a host string is an IPv4 address.
 
     :param str host: host's name or ip
@@ -102,8 +112,14 @@ class socket:
 
     # pylint: disable=redefined-builtin,unused-argument
     def __init__(
-        self, family=AF_INET, type=SOCK_STREAM, proto=0, fileno=None, socknum=None
-    ):
+        self,
+        family: int = AF_INET,
+        type: int = SOCK_STREAM,
+        proto: Any = 0,
+        fileno: Optional[Any] = None,
+        socknum: Optional[Any] = None,
+    ) -> None:
+
         if family != AF_INET:
             raise RuntimeError("Only AF_INET family supported by W5K modules.")
         self._sock_type = type
@@ -118,7 +134,7 @@ class socket:
     def __enter__(self):
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         if self._sock_type == SOCK_STREAM:
             self.disconnect()
             stamp = time.monotonic()
@@ -132,18 +148,18 @@ class socket:
                 raise RuntimeError("Failed to close socket")
 
     @property
-    def socknum(self):
+    def socknum(self) -> int:
         """Returns the socket object's socket number."""
         return self._socknum
 
     @property
-    def status(self):
+    def status(self) -> int:
         """Returns the status of the socket"""
         return _the_interface.socket_status(self.socknum)[0]
 
     @property
-    def connected(self):
-        """Returns whether or not we are connected to the socket."""
+    def connected(self) -> bool:
+        """Returns whether we are connected to the socket."""
         if self.socknum >= _the_interface.max_sockets:
             return False
         status = _the_interface.socket_status(self.socknum)[0]
@@ -163,11 +179,11 @@ class socket:
             self.close()
         return result
 
-    def getpeername(self):
+    def getpeername(self) -> Union[str, bytearray]:
         """Return the remote address to which the socket is connected."""
         return _the_interface.remote_ip(self.socknum)
 
-    def inet_aton(self, ip_string):
+    def inet_aton(self, ip_string: str) -> bytearray:
         """Convert an IPv4 address from dotted-quad string format.
 
         :param str ip_string: IP Address, as a dotted-quad string.
@@ -177,7 +193,7 @@ class socket:
         self._buffer = bytearray(self._buffer)
         return self._buffer
 
-    def bind(self, address):
+    def bind(self, address: str) -> None:
         """Bind the socket to the listen port, if host is specified the interface
         will be reconfigured to that IP.
 
@@ -197,7 +213,7 @@ class socket:
             )
             self._buffer = b""
 
-    def listen(self, backlog=None):
+    def listen(self, backlog: Optional[Any] = None) -> None:
         """Listen on the port specified by bind.
 
         :param backlog: For compatibility but ignored.
@@ -206,7 +222,7 @@ class socket:
         _the_interface.socket_listen(self.socknum, self._listen_port)
         self._buffer = b""
 
-    def accept(self):
+    def accept(self) -> Optional[Tuple[wiznet5k.adafruit_wiznet5k_socket.socket, int]]:
         """Accept a connection. The socket must be bound to an address and listening for
         connections. The return value is a pair (conn, address) where conn is a new
         socket object usable to send and receive data on the connection, and address is
@@ -235,7 +251,7 @@ class socket:
             raise RuntimeError("Failed to open new listening socket")
         return client_sock, addr
 
-    def connect(self, address, conntype=None):
+    def connect(self, address: Tuple[str, int], conntype: Optional[int] = None) -> None:
         """Connect to a remote socket at address.
 
         :param tuple address: Remote socket as a (host, port) tuple.
@@ -260,7 +276,7 @@ class socket:
             raise RuntimeError("Failed to connect to host", host)
         self._buffer = b""
 
-    def send(self, data):
+    def send(self, data: bytearray) -> None:
         """Send data to the socket. The socket must be connected to
         a remote socket.
 
@@ -269,7 +285,7 @@ class socket:
         _the_interface.socket_write(self.socknum, data, self._timeout)
         gc.collect()
 
-    def sendto(self, data, address):
+    def sendto(self, data: bytearray, address: [Tuple[str, int]]) -> None:
         """Send data to the socket. The socket must be connected to
         a remote socket.
 
@@ -279,7 +295,12 @@ class socket:
         self.connect(address)
         return self.send(data)
 
-    def recv(self, bufsize=0, flags=0):  # pylint: disable=too-many-branches
+    def recv(
+        # pylint: disable=too-many-branches
+        self,
+        bufsize: int = 0,
+        flags: Any = 0,
+    ) -> bytes:
         """Reads some bytes from the connected remote address.
 
         :param int bufsize: Maximum number of bytes to receive.
@@ -330,7 +351,7 @@ class socket:
                 break
         self._buffer += b"".join(received)
 
-        ret = None
+        ret = None  # TODO: Useless definition
         if len(self._buffer) == bufsize:
             ret = self._buffer
             self._buffer = b""
@@ -340,13 +361,16 @@ class socket:
         gc.collect()
         return ret
 
-    def embed_recv(self, bufsize=0, flags=0):  # pylint: disable=too-many-branches
+    def embed_recv(
+        self, bufsize: int = 0, flags: Any = 0
+    ) -> bytes:  # pylint: disable=too-many-branches
         """Reads some bytes from the connected remote address and then return recv().
         :param int bufsize: Maximum number of bytes to receive.
         :param int flags: ignored, present for compatibility.
         """
+        # TODO: bufsize unused
         # print("Socket read", bufsize)
-        ret = None
+        ret = None  # TODO: Useless definition
         avail = self.available()
         if avail:
             if self._sock_type == SOCK_STREAM:
@@ -360,7 +384,9 @@ class socket:
         gc.collect()
         return ret
 
-    def recvfrom(self, bufsize=0, flags=0):
+    def recvfrom(
+        self, bufsize: int = 0, flags: Any = 0
+    ) -> Tuple[bytes, Tuple[str, int]]:
         """Reads some bytes from the connected remote address.
 
         :param int bufsize: Maximum number of bytes to receive.
@@ -375,7 +401,7 @@ class socket:
             ),
         )
 
-    def recv_into(self, buf, nbytes=0, flags=0):
+    def recv_into(self, buf: bytearray, nbytes: int = 0, flags: Any = 0) -> int:
         """Reads some bytes from the connected remote address info the provided buffer.
 
         :param bytearray buf: Data buffer
@@ -390,7 +416,9 @@ class socket:
         buf[:nbytes] = ret
         return nbytes
 
-    def recvfrom_into(self, buf, nbytes=0, flags=0):
+    def recvfrom_into(
+        self, buf: bytearray, nbytes: int = 0, flags: Any = 0
+    ) -> Tuple[int, Tuple[str, int]]:
         """Reads some bytes from the connected remote address info the provided buffer.
 
         :param bytearray buf: Data buffer
@@ -406,7 +434,7 @@ class socket:
             ),
         )
 
-    def readline(self):
+    def readline(self) -> bytes:
         """Attempt to return as many bytes as we can up to \
         but not including '\r\n'.
         """
@@ -429,29 +457,29 @@ class socket:
         gc.collect()
         return firstline
 
-    def disconnect(self):
+    def disconnect(self) -> None:
         """Disconnects a TCP socket."""
         assert self._sock_type == SOCK_STREAM, "Socket must be a TCP socket."
         _the_interface.socket_disconnect(self.socknum)
 
-    def close(self):
+    def close(self) -> None:
         """Closes the socket."""
         _the_interface.socket_close(self.socknum)
 
-    def available(self):
+    def available(self) -> int:
         """Returns how many bytes of data are available to be read from the socket."""
         return _the_interface.socket_available(self.socknum, self._sock_type)
 
-    def settimeout(self, value):
+    def settimeout(self, value: float) -> None:
         """Sets socket read timeout.
 
-        :param int value: Socket read timeout, in seconds.
+        :param float value: Socket read timeout, in seconds.
         """
         if value < 0:
             raise Exception("Timeout period should be non-negative.")
         self._timeout = value
 
-    def gettimeout(self):
+    def gettimeout(self) -> Optional[float]:
         """Return the timeout in seconds (float) associated
         with socket operations, or None if no timeout is set.
         """

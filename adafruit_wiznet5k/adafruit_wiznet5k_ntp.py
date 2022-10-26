@@ -17,6 +17,13 @@ Implementation Notes
 
 
 """
+try:
+    import typing  # pylint: disable=unused-import
+
+    # pylint: disable=cyclic-import
+    from adafruit_wiznet5k import adafruit_wiznet5k
+except ImportError:
+    pass
 import time
 import adafruit_wiznet5k.adafruit_wiznet5k_socket as socket
 
@@ -34,7 +41,13 @@ class NTP:
     :param bool debug: Enable debugging output.
     """
 
-    def __init__(self, iface, ntp_address, utc, debug=False):
+    def __init__(
+        self,
+        iface: adafruit_wiznet5k.WIZNET5K,
+        ntp_address: str,
+        utc: int,  # TODO: Should be float. India is UTC + 7.5
+        debug: bool = False,
+    ) -> None:
         self._debug = debug
         self._iface = iface
         socket.set_interface(self._iface)
@@ -48,7 +61,7 @@ class NTP:
 
         self._pkt_buf_ = bytearray([0x23] + [0x00] * 55)
 
-    def get_time(self):
+    def get_time(self) -> time.struct_time:
         """
         Get the time from the NTP server
 

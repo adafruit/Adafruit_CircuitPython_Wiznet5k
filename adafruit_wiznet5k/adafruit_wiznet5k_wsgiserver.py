@@ -37,6 +37,9 @@ import adafruit_wiznet5k.adafruit_wiznet5k_socket as socket
 _the_interface = None  # pylint: disable=invalid-name
 
 
+# TODO: Add typing
+
+
 def set_interface(iface):
     """Helper to set the global internet interface"""
     global _the_interface  # pylint: disable=global-statement, invalid-name
@@ -49,6 +52,8 @@ class WSGIServer:
     """
     A simple server that implements the WSGI interface
     """
+
+    # TODO: Add typing
 
     def __init__(self, port=80, debug=False, application=None):
         self.application = application
@@ -66,6 +71,8 @@ class WSGIServer:
         if self._debug:
             print("Max sockets: ", self.MAX_SOCK_NUM)
 
+    # TODO: Add typing
+
     def start(self):
         """
         Starts the server and begins listening for incoming connections.
@@ -81,6 +88,8 @@ class WSGIServer:
         if self._debug:
             ip = _the_interface.pretty_ip(_the_interface.ip_address)
             print("Server available at {0}:{1}".format(ip, self.port))
+
+    # TODO: Add typing
 
     def update_poll(self):
         """
@@ -107,6 +116,8 @@ class WSGIServer:
                 self._client_sock.append(new_sock)
             except RuntimeError:
                 pass
+
+    # TODO: Add typing
 
     def finish_response(self, result, client):
         """
@@ -140,6 +151,8 @@ class WSGIServer:
             client.disconnect()
             client.close()
 
+    # TODO: Add typing
+
     def _start_response(self, status, response_headers):
         """
         The application callable will be given this method as the second param
@@ -152,6 +165,8 @@ class WSGIServer:
         """
         self._response_status = status
         self._response_headers = [("Server", "w5kWSGIServer")] + response_headers
+
+    # TODO: Add typing
 
     def _get_environ(self, client):
         """
