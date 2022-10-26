@@ -193,7 +193,7 @@ class socket:
         self._buffer = bytearray(self._buffer)
         return self._buffer
 
-    def bind(self, address: str) -> None:
+    def bind(self, address: Tuple[Optional[str], int]) -> None:
         """Bind the socket to the listen port, if host is specified the interface
         will be reconfigured to that IP.
 

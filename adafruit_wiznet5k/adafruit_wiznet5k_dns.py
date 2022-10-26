@@ -13,6 +13,14 @@ ethernet modules.
 * Author(s): MCQN Ltd, Brent Rubell
 
 """
+try:
+    from typing import Union
+
+    # pylint: disable=cyclic-import
+    from adafruit_wiznet5k import adafruit_wiznet5k
+except ImportError:
+    pass
+
 import time
 from random import getrandbits
 from micropython import const
@@ -44,9 +52,12 @@ class DNS:
     :param iface: Network interface
     """
 
-    # TODO: Add typing
-
-    def __init__(self, iface, dns_address, debug=False):
+    def __init__(
+        self,
+        iface: adafruit_wiznet5k.WIZNET5K,
+        dns_address: str,
+        debug: bool = False,
+    ) -> None:
         self._debug = debug
         self._iface = iface
         socket.set_interface(iface)
@@ -54,13 +65,11 @@ class DNS:
         self._sock.settimeout(1)
 
         self._dns_server = dns_address
-        self._host = 0
+        self._host = 0  # TODO: make b"" to resolve a type error with .decode in _build_dns_ques...
         self._request_id = 0  # request identifier
         self._pkt_buf = bytearray()
 
-    # TODO: Add typing
-
-    def gethostbyname(self, hostname):
+    def gethostbyname(self, hostname: bytes) -> Union[int, bytes]:
         """Translate a host name to IPv4 address format.
 
         :param str hostname: Desired host name to connect to.
@@ -93,14 +102,13 @@ class DNS:
         self._sock.close()
         return addr
 
-    # TODO: Add typing
-
     def _parse_dns_response(
         self,
-    ):  # pylint: disable=too-many-return-statements, too-many-branches, too-many-statements, too-many-locals
-        """Receives and parses DNS query response.
-        Returns desired hostname address if obtained, -1 otherwise.
-
+    ) -> Union[
+        int, bytes
+    ]:  # pylint: disable=too-many-return-statements, too-many-branches, too-many-statements, too-many-locals
+        """Receive and parse DNS query response.
+        Return requested hostname address if obtained, -1 otherwise.
         """
         # wait for a response
         start_time = time.monotonic()
@@ -215,10 +223,8 @@ class DNS:
         # Return address
         return self._pkt_buf[ptr : ptr + 4]
 
-    # TODO: Add typing
-
-    def _build_dns_header(self):
-        """Builds DNS header."""
+    def _build_dns_header(self) -> None:
+        """Build a DNS header."""
         # generate a random, 16-bit, request identifier
         self._request_id = getrandbits(16)
 
@@ -243,10 +249,8 @@ class DNS:
         self._pkt_buf.append(0x00)
         self._pkt_buf.append(0x00)
 
-    # TODO: Add typing
-
-    def _build_dns_question(self):
-        """Build DNS question"""
+    def _build_dns_question(self) -> None:
+        """Build a DNS query."""
         host = self._host.decode("utf-8")
         host = host.split(".")
         # write out each section of host

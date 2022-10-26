@@ -7,7 +7,6 @@
 # SPDX-FileCopyrightText: 2021 Adam Cummick
 #
 # SPDX-License-Identifier: MIT
-
 """
 `adafruit_wiznet5k`
 ================================================================================
@@ -129,23 +128,12 @@ W5200_W5500_MAX_SOCK_NUM = const(0x08)
 W5100_MAX_SOCK_NUM = const(0x04)
 SOCKET_INVALID = const(255)
 
-
 # Source ports in use
 SRC_PORTS = [0] * W5200_W5500_MAX_SOCK_NUM
 
 
 class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-attributes
-    """Interface for WIZNET5K module.
-
-    :param ~busio.SPI spi_bus: The SPI bus the Wiznet module is connected to.
-    :param ~digitalio.DigitalInOut cs: Chip select pin.
-    :param ~digitalio.DigitalInOut reset: Optional reset pin.
-    :param bool is_dhcp: Whether to start DHCP automatically or not.
-    :param Union[List[int], Tuple[int]] mac: The Wiznet's MAC Address.
-    :param str hostname: The desired hostname, with optional {} to fill in MAC.
-    :param float dhcp_timeout: Timeout in seconds for DHCP response.
-    :param bool debug: Enable debugging output.
-    """
+    """Interface for WIZNET5K module."""
 
     TCP_MODE = const(0x21)
     UDP_MODE = const(0x02)
@@ -163,6 +151,18 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         dhcp_timeout: float = 30,
         debug: bool = False,
     ) -> None:
+        """
+        :param busio.SPI spi_bus: The SPI bus the Wiznet module is connected to.
+        :param digitalio.DigitalInOut cs: Chip select pin.
+        :param digitalio.DigitalInOut reset: Optional reset pin, defaults to None.
+        :param bool is_dhcp: Whether to start DHCP automatically or not, defaults to True.
+        :param Union[List[int], Tuple[int]] mac: The Wiznet's MAC Address, defaults to
+            (0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED).
+        :param str hostname: The desired hostname, with optional {} to fill in the MAC
+            address, defaults to None.
+        :param float dhcp_timeout: Timeout in seconds for DHCP response, defaults to 30.
+        :param bool debug: Enable debugging output, defaults to False.
+        """
         self._debug = debug
         self._chip_type = None
         self._device = SPIDevice(spi_bus, cs, baudrate=8000000, polarity=0, phase=0)
@@ -214,12 +214,15 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
     def set_dhcp(
         self, hostname: Optional[str] = None, response_timeout: float = 30
     ) -> int:
-        """Initializes the DHCP client and attempts to retrieve
-        and set network configuration from the DHCP server.
-        Returns 0 if DHCP configured, -1 otherwise.
+        """Initialize the DHCP client and attempt to retrieve and set network
+        configuration from the DHCP server.
 
-        :param str hostname: The desired hostname, with optional {} to fill in MAC.
-        :param float response_timeout: Time to wait for server to return packet, in seconds.
+        :param str hostname: The desired hostname for the DHCP server with optional {} to
+            fill in the MAC address, defaults to None.
+        :param float response_timeout: Time to wait for server to return packet in seconds,
+            defaults to 30.
+
+        :return: 0 if DHCP configured, -1 otherwise.
         """
         if self._debug:
             print("* Initializing DHCP")
@@ -242,11 +245,11 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         return -1
 
     def maintain_dhcp_lease(self) -> None:
-        """Maintain DHCP lease"""
+        """Maintain the DHCP lease."""
         if self._dhcp_client is not None:
             self._dhcp_client.maintain_dhcp_lease()
 
-    def get_host_by_name(self, hostname: str) -> bytearray:
+    def get_host_by_name(self, hostname: str) -> bytearray:  # TODO: ****
         """Convert a hostname to a packed 4-byte IP Address.
         Returns a 4 bytearray.
         """
