@@ -12,6 +12,11 @@ A socket compatible interface with the Wiznet5k module.
 * Author(s): ladyada, Brent Rubell, Patrick Van Oosterwijck, Adam Cummick
 
 """
+try:
+    import typing  # pylint: disable=unused-import
+except ImportError:
+    pass
+
 import gc
 import time
 from micropython import const
@@ -26,7 +31,7 @@ def set_interface(iface):
     _the_interface = iface
 
 
-def htonl(x):
+def htonl(x: int) -> int:
     """Convert 32-bit positive integers from host to network byte order."""
     return (
         ((x) << 24 & 0xFF000000)
@@ -36,7 +41,7 @@ def htonl(x):
     )
 
 
-def htons(x):
+def htons(x: int) -> int:
     """Convert 16-bit positive integers from host to network byte order."""
     return (((x) << 8) & 0xFF00) | (((x) >> 8) & 0xFF)
 
@@ -49,7 +54,7 @@ SOCKET_INVALID = const(255)
 
 
 # pylint: disable=too-many-arguments, unused-argument
-def getaddrinfo(host, port, family=0, socktype=0, proto=0, flags=0):
+def getaddrinfo(host, port: int, family=0, socktype: int = 0, proto=0, flags=0):
     """Translate the host/port argument into a sequence of 5-tuples that
     contain all the necessary arguments for creating a socket connected to that service.
 

@@ -13,6 +13,12 @@ Pure-Python implementation of Jordan Terrell's DHCP library v0.3
 * Author(s): Jordan Terrell, Brent Rubell
 
 """
+try:
+    from typing import Optional, Union, List, Tuple
+    from adafruit_wiznet5k import WIZNET5K
+except ImportError:
+    pass
+
 import gc
 import time
 from random import randint
@@ -81,18 +87,23 @@ _BUFF = bytearray(318)
 class DHCP:
     """W5k DHCP Client implementation.
 
-    :param eth: Wiznet 5k object
-    :param list mac_address: Hardware MAC.
+    :param WIZNET5K eth: Wiznet 5k object
+    :param Union[List[int], Tuple[int]] mac_address: Hardware MAC.
     :param str hostname: The desired hostname, with optional {} to fill in MAC.
-    :param int response_timeout: DHCP Response timeout.
+    :param float response_timeout: DHCP Response timeout.
     :param bool debug: Enable debugging output.
 
     """
 
     # pylint: disable=too-many-arguments, too-many-instance-attributes, invalid-name
     def __init__(
-        self, eth, mac_address, hostname=None, response_timeout=30, debug=False
-    ):
+        self,
+        eth: WIZNET5K,
+        mac_address: Union[List[int], Tuple[int]],
+        hostname: Optional[str] = None,
+        response_timeout: float = 30,
+        debug: bool = False,
+    ) -> None:
         self._debug = debug
         self._response_timeout = response_timeout
         self._mac_address = mac_address
@@ -133,7 +144,12 @@ class DHCP:
         )
 
     # pylint: disable=too-many-statements
-    def send_dhcp_message(self, state, time_elapsed, renew=False):
+    def send_dhcp_message(
+        self,
+        state: int,
+        time_elapsed: float,
+        renew: bool = False,
+    ) -> None:
         """Assemble and send a DHCP message packet to a socket.
 
         :param int state: DHCP Message state.
@@ -234,7 +250,7 @@ class DHCP:
         self._sock.send(_BUFF)
 
     # pylint: disable=too-many-branches, too-many-statements
-    def parse_dhcp_response(self):
+    def parse_dhcp_response(self) -> Tuple[int, int]:
         """Parse DHCP response from DHCP server.
         Returns DHCP packet type.
         """
@@ -343,10 +359,10 @@ class DHCP:
         return msg_type, xid
 
     # pylint: disable=too-many-branches, too-many-statements
-    def _dhcp_state_machine(self):
-        """DHCP state machine without wait loops to enable cooperative multi tasking
+    def _dhcp_state_machine(self) -> None:
+        """DHCP state machine without wait loops to enable cooperative multitasking
         This state machine is used both by the initial blocking lease request and
-        the non-blocking DHCP maintenance function"""
+        the non-blocking DHCP maintenance function."""
         if self._eth.link_status:
             if self._dhcp_state == STATE_DHCP_DISCONN:
                 self._dhcp_state = STATE_DHCP_START
@@ -481,7 +497,7 @@ class DHCP:
                 self._sock.close()
                 self._sock = None
 
-    def request_dhcp_lease(self):
+    def request_dhcp_lease(self) -> bool:
         """Request to renew or acquire a DHCP lease."""
         if self._dhcp_state in (STATE_DHCP_LEASED, STATE_DHCP_WAIT):
             self._dhcp_state = STATE_DHCP_START
@@ -491,6 +507,6 @@ class DHCP:
 
         return self._dhcp_state == STATE_DHCP_LEASED
 
-    def maintain_dhcp_lease(self):
+    def maintain_dhcp_lease(self) -> None:
         """Maintain DHCP lease"""
         self._dhcp_state_machine()

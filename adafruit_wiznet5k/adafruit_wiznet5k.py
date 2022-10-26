@@ -27,6 +27,13 @@ Implementation Notes
 
 * Adafruit's Bus Device library: https://github.com/adafruit/Adafruit_CircuitPython_BusDevice
 """
+try:
+    from typing import Optional, Union, List, Tuple
+    import busio
+    import digitalio
+except ImportError:
+    pass
+
 from random import randint
 import time
 from micropython import const
@@ -134,9 +141,9 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
     :param ~digitalio.DigitalInOut cs: Chip select pin.
     :param ~digitalio.DigitalInOut rst: Optional reset pin.
     :param bool is_dhcp: Whether to start DHCP automatically or not.
-    :param list mac: The Wiznet's MAC Address.
+    :param Union[List[int], Tuple[int]] mac: The Wiznet's MAC Address.
     :param str hostname: The desired hostname, with optional {} to fill in MAC.
-    :param int dhcp_timeout: Timeout in seconds for DHCP response.
+    :param float dhcp_timeout: Timeout in seconds for DHCP response.
     :param bool debug: Enable debugging output.
     """
 
@@ -147,15 +154,15 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
     # pylint: disable=too-many-arguments
     def __init__(
         self,
-        spi_bus,
-        cs,
-        reset=None,
-        is_dhcp=True,
-        mac=DEFAULT_MAC,
-        hostname=None,
-        dhcp_timeout=30,
-        debug=False,
-    ):
+        spi_bus: busio.SPI,
+        cs: digitalio.DigitalInOut,
+        reset: Optional[digitalio.DigitalInOut] = None,
+        is_dhcp: bool = True,
+        mac: Union[List[int], Tuple[int]] = DEFAULT_MAC,
+        hostname: Optional[str] = None,
+        dhcp_timeout: float = 30,
+        debug: bool = False,
+    ) -> None:
         self._debug = debug
         self._chip_type = None
         self._device = SPIDevice(spi_bus, cs, baudrate=8000000, polarity=0, phase=0)
@@ -204,7 +211,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
                 self._dhcp_client = None
             assert ret == 0, "Failed to configure DHCP Server!"
 
-    def set_dhcp(self, hostname=None, response_timeout=30):
+    def set_dhcp(self, hostname: Optional[str] = None, response_timeout=30) -> int:
         """Initializes the DHCP client and attempts to retrieve
         and set network configuration from the DHCP server.
         Returns 0 if DHCP configured, -1 otherwise.
@@ -232,12 +239,12 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             return 0
         return -1
 
-    def maintain_dhcp_lease(self):
+    def maintain_dhcp_lease(self) -> None:
         """Maintain DHCP lease"""
         if self._dhcp_client is not None:
             self._dhcp_client.maintain_dhcp_lease()
 
-    def get_host_by_name(self, hostname):
+    def get_host_by_name(self, hostname: str):
         """Convert a hostname to a packed 4-byte IP Address.
         Returns a 4 bytearray.
         """
@@ -254,7 +261,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         return ret
 
     @property
-    def max_sockets(self):
+    def max_sockets(self) -> int:
         """Returns max number of sockets supported by chip."""
         if self._chip_type == "w5500":
             return W5200_W5500_MAX_SOCK_NUM
@@ -263,24 +270,35 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         return -1
 
     @property
-    def chip(self):
+    def chip(self) -> str:
         """Returns the chip type."""
         return self._chip_type
 
     @property
-    def ip_address(self):
+    def ip_address(self) -> bytearray:
         """Returns the configured IP address."""
         return self.read(REG_SIPR, 0x00, 4)
 
-    def pretty_ip(self, ip):  # pylint: disable=no-self-use, invalid-name
-        """Converts a bytearray IP address to a
-        dotted-quad string for printing
+    def pretty_ip(
+        self,
+        # pylint: disable=no-self-use, invalid-name
+        ip: bytearray,
+    ) -> str:
+        """Converts a bytearray IP address to a dotted-quad string for printing.
 
+        :param bytearray ip: An IP address.
         """
         return "%d.%d.%d.%d" % (ip[0], ip[1], ip[2], ip[3])
 
-    def unpretty_ip(self, ip):  # pylint: disable=no-self-use, invalid-name
-        """Converts a dotted-quad string to a bytearray IP address"""
+    def unpretty_ip(
+        self,
+        # pylint: disable=no-self-use, invalid-name
+        ip: str,
+    ) -> bytearray:
+        """Converts a dotted-quad string to a bytearray IP address.
+
+        Takes an IP address in the form 0.0.0.0 and coverts it into an array of 4 bytes.
+        """
         octets = [int(x) for x in ip.split(".")]
         return bytes(octets)
 
@@ -498,7 +516,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
     # Socket-Register API
 
-    def socket_available(self, socket_num, sock_type=SNMR_TCP):
+    def socket_available(self, socket_num: int, sock_type: int = SNMR_TCP) -> int:
         """Returns the amount of bytes to be read from the socket.
 
         :param int socket_num: Desired socket to return bytes from.
@@ -851,7 +869,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
     # Socket-Register Methods
 
-    def _get_rx_rcv_size(self, sock):
+    def _get_rx_rcv_size(self, sock: int) -> int:
         """Get size of recieved and saved in socket buffer."""
         val = 0
         val_1 = self._read_snrx_rsr(sock)
@@ -861,7 +879,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
                 val = self._read_snrx_rsr(sock)
         return int.from_bytes(val, "big")
 
-    def _get_tx_free_size(self, sock):
+    def _get_tx_free_size(self, sock: int) -> int:
         """Get free size of sock's tx buffer block."""
         val = 0
         val_1 = self._read_sntx_fsr(sock)
@@ -871,37 +889,37 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
                 val = self._read_sntx_fsr(sock)
         return int.from_bytes(val, "big")
 
-    def _read_snrx_rd(self, sock):
+    def _read_snrx_rd(self, sock: int) -> int:
         self._pbuff[0] = self._read_socket(sock, REG_SNRX_RD)[0]
         self._pbuff[1] = self._read_socket(sock, REG_SNRX_RD + 1)[0]
         return self._pbuff[0] << 8 | self._pbuff[1]
 
-    def _write_snrx_rd(self, sock, data):
+    def _write_snrx_rd(self, sock: int, data: int) -> None:
         self._write_socket(sock, REG_SNRX_RD, data >> 8 & 0xFF)
         self._write_socket(sock, REG_SNRX_RD + 1, data & 0xFF)
 
-    def _write_sntx_wr(self, sock, data):
+    def _write_sntx_wr(self, sock: int, data: int) -> None:
         self._write_socket(sock, REG_SNTX_WR, data >> 8 & 0xFF)
         self._write_socket(sock, REG_SNTX_WR + 1, data & 0xFF)
 
-    def _read_sntx_wr(self, sock):
+    def _read_sntx_wr(self, sock: int) -> int:
         self._pbuff[0] = self._read_socket(sock, 0x0024)[0]
         self._pbuff[1] = self._read_socket(sock, 0x0024 + 1)[0]
         return self._pbuff[0] << 8 | self._pbuff[1]
 
-    def _read_sntx_fsr(self, sock):
+    def _read_sntx_fsr(self, sock: int) -> Optional[bytearray]:
         data = self._read_socket(sock, REG_SNTX_FSR)
         data += self._read_socket(sock, REG_SNTX_FSR + 1)
         return data
 
-    def _read_snrx_rsr(self, sock):
+    def _read_snrx_rsr(self, sock: int) -> Optional[bytearray]:
         data = self._read_socket(sock, REG_SNRX_RSR)
         data += self._read_socket(sock, REG_SNRX_RSR + 1)
         return data
 
-    def _write_sndipr(self, sock, ip_addr):
+    def _write_sndipr(self, sock: int, ip_addr):
         """Writes to socket destination IP Address."""
-        for octet in range(0, 4):
+        for octet in range(4):
             self._write_socket(sock, REG_SNDIPR + octet, ip_addr[octet])
 
     def _write_sndport(self, sock, port):
@@ -935,7 +953,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
     def _read_snmr(self, sock):
         return self._read_socket(sock, REG_SNMR)
 
-    def _write_socket(self, sock, address, data):
+    def _write_socket(self, sock: int, address, data):
         """Write to a W5k socket register."""
         if self._chip_type == "w5500":
             cntl_byte = (sock << 5) + 0x0C
@@ -947,7 +965,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             )
         return None
 
-    def _read_socket(self, sock, address):
+    def _read_socket(self, sock: int, address):
         """Read a W5k socket register."""
         if self._chip_type == "w5500":
             cntl_byte = (sock << 5) + 0x08
