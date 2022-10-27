@@ -27,6 +27,10 @@ https://www.python.org/dev/peps/pep-0333/
 * Author(s): Matt Costi, Patrick Van Oosterwijck
 """
 # pylint: disable=no-name-in-module
+try:
+    from typing import Optional, List, Tuple, Dict
+except ImportError:
+    pass
 
 import io
 import gc
@@ -40,7 +44,7 @@ _the_interface = None  # pylint: disable=invalid-name
 # TODO: Add typing
 
 
-def set_interface(iface):
+def set_interface(iface: wiznet5k.adafruit_wiznet5k.WIZNET5K) -> None:
     """Helper to set the global internet interface"""
     global _the_interface  # pylint: disable=global-statement, invalid-name
     _the_interface = iface
@@ -53,9 +57,12 @@ class WSGIServer:
     A simple server that implements the WSGI interface
     """
 
-    # TODO: Add typing
-
-    def __init__(self, port=80, debug=False, application=None):
+    def __init__(
+        self,
+        port: int = 80,
+        debug: bool = False,
+        application: Optional[callable] = None,
+    ) -> None:
         self.application = application
         self.port = port
         self._timeout = 20
@@ -71,9 +78,7 @@ class WSGIServer:
         if self._debug:
             print("Max sockets: ", self.MAX_SOCK_NUM)
 
-    # TODO: Add typing
-
-    def start(self):
+    def start(self) -> None:
         """
         Starts the server and begins listening for incoming connections.
         Call update_poll in the main loop for the application callable to be
@@ -89,9 +94,7 @@ class WSGIServer:
             ip = _the_interface.pretty_ip(_the_interface.ip_address)
             print("Server available at {0}:{1}".format(ip, self.port))
 
-    # TODO: Add typing
-
-    def update_poll(self):
+    def update_poll(self) -> None:
         """
         Call this method inside your main event loop to get the server
         check for new incoming client requests. When a request comes in,
@@ -117,9 +120,7 @@ class WSGIServer:
             except RuntimeError:
                 pass
 
-    # TODO: Add typing
-
-    def finish_response(self, result, client):
+    def finish_response(self, result: str, client: socket.socket) -> None:
         """
         Called after the application callable returns result data to respond with.
         Creates the HTTP Response payload from the response_headers and results data,
@@ -151,9 +152,9 @@ class WSGIServer:
             client.disconnect()
             client.close()
 
-    # TODO: Add typing
-
-    def _start_response(self, status, response_headers):
+    def _start_response(
+        self, status: str, response_headers: List[Tuple[str, str]]
+    ) -> None:
         """
         The application callable will be given this method as the second param
         This is to be called before the application callable returns, to signify
@@ -166,9 +167,7 @@ class WSGIServer:
         self._response_status = status
         self._response_headers = [("Server", "w5kWSGIServer")] + response_headers
 
-    # TODO: Add typing
-
-    def _get_environ(self, client):
+    def _get_environ(self, client: socket.socket) -> Dict:
         """
         The application callable will be given the resulting environ dictionary.
         It contains metadata about the incoming request and the request body ("wsgi.input")
@@ -209,10 +208,10 @@ class WSGIServer:
         if "content-length" in headers:
             env["CONTENT_LENGTH"] = headers.get("content-length")
             body = client.recv(int(env["CONTENT_LENGTH"]))
-            env["wsgi.input"] = io.StringIO(body)
+            env["wsgi.input"] = io.StringIO(body)  # TODO: Is bytes should be str
         else:
             body = client.recv()
-            env["wsgi.input"] = io.StringIO(body)
+            env["wsgi.input"] = io.StringIO(body)  # TODO: Is bytes should be str
         for name, value in headers.items():
             key = "HTTP_" + name.replace("-", "_").upper()
             if key in env:

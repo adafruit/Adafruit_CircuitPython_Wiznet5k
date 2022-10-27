@@ -487,7 +487,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         callback: int,
         length: int = 1,
         buffer: Optional[WriteableBuffer] = None,
-    ) -> Union[WriteableBuffer, bytearray]:
+    ) -> Union[WriteableBuffer, bytearray]:  # TODO: Try a TypeVar
         """Reads data from a register address.
 
         :param int addr: Register address.

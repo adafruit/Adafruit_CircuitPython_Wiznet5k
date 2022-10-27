@@ -283,7 +283,7 @@ class socket:
             raise RuntimeError("Failed to connect to host", host)
         self._buffer = b""
 
-    def send(self, data: bytearray) -> None:
+    def send(self, data: Union[bytes, bytearray]) -> None:
         """Send data to the socket. The socket must be connected to
         a remote socket.
 

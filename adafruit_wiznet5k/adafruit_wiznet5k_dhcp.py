@@ -253,7 +253,9 @@ class DHCP:
         self._sock.send(_BUFF)
 
     # pylint: disable=too-many-branches, too-many-statements
-    def parse_dhcp_response(self) -> Tuple[int, int]:
+    def parse_dhcp_response(
+        self,
+    ) -> Union[Tuple[int, bytes], Tuple[int, int]]:  # TODO: ****
         """Parse DHCP response from DHCP server.
         Returns DHCP packet type.
         """
@@ -420,6 +422,7 @@ class DHCP:
                 if msg_type == DHCP_OFFER:
                     # Check if transaction ID matches, otherwise it may be an offer
                     # for another device
+                    # TODO: xid is already an int
                     if htonl(self._transaction_id) == int.from_bytes(xid, "big"):
                         if self._debug:
                             print(
@@ -444,6 +447,7 @@ class DHCP:
                 msg_type, xid = self.parse_dhcp_response()
                 # Check if transaction ID matches, otherwise it may be
                 # for another device
+                # TODO: xid is already an int
                 if htonl(self._transaction_id) == int.from_bytes(xid, "big"):
                     if msg_type == DHCP_ACK:
                         if self._debug:
