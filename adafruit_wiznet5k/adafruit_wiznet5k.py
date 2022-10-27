@@ -26,8 +26,10 @@ Implementation Notes
 
 * Adafruit's Bus Device library: https://github.com/adafruit/Adafruit_CircuitPython_BusDevice
 """
+# pylint: disable=too-many-lines
 try:
-    from typing import Optional, Union, List, Tuple
+    from typing import Optional, Union, List, Tuple, Sequence
+    from circuitpython_typing import WriteableBuffer
     import busio
     import digitalio
 except ImportError:
@@ -249,7 +251,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         if self._dhcp_client is not None:
             self._dhcp_client.maintain_dhcp_lease()
 
-    def get_host_by_name(self, hostname: str) -> bytearray:  # TODO: ****
+    def get_host_by_name(self, hostname: str) -> Union[int, bytes]:
         """Convert a hostname to a packed 4-byte IP Address.
         Returns a 4 bytearray.
         """
@@ -280,7 +282,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         return self._chip_type
 
     @property
-    def ip_address(self) -> bytearray:
+    def ip_address(self) -> bytearray:  # *1
         """Returns the configured IP address."""
         return self.read(REG_SIPR, 0x00, 4)
 
@@ -299,7 +301,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         self,
         # pylint: disable=no-self-use, invalid-name
         ip: str,
-    ) -> bytearray:
+    ) -> bytes:
         """Converts a dotted-quad string to a bytearray IP address.
 
         Takes an IP address in the form 0.0.0.0 and coverts it into an array of 4 bytes.
@@ -308,12 +310,12 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         return bytes(octets)
 
     @property
-    def mac_address(self) -> bytearray:
+    def mac_address(self) -> bytearray:  # *1
         """Returns the hardware's MAC address."""
         return self.read(REG_SHAR, 0x00, 6)
 
     @mac_address.setter
-    def mac_address(self, address: Union[List, Tuple]) -> None:
+    def mac_address(self, address: Sequence[Union[int, bytes]]) -> None:
         """Sets the hardware MAC address.
 
         :param tuple address: Hardware MAC address.
@@ -350,7 +352,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         return self.pretty_ip(self._pbuff)
 
     @property
-    def link_status(self) -> int:
+    def link_status(self) -> int:  # *1
         """ "Returns if the PHY is connected."""
         if self._chip_type == "w5500":
             data = self.read(REG_PHYCFGR, 0x00)
@@ -364,14 +366,14 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         """Returns the port of the host who sent the current incoming packet."""
         if socket_num >= self.max_sockets:
             return self._pbuff
-        for octet in range(0, 2):
+        for octet in range(2):
             self._pbuff[octet] = self._read_socket(socket_num, REG_SNDPORT + octet)[0]
         return int((self._pbuff[0] << 8) | self._pbuff[0])
 
     @property
     def ifconfig(
         self,
-    ) -> Tuple[bytearray, bytearray, bytearray, Tuple[int, int, int, int]]:
+    ) -> Tuple[bytearray, bytearray, bytearray, Tuple[int, int, int, int]]:  # *1
         """Returns the network configuration as a tuple."""
         return (
             self.ip_address,
@@ -398,6 +400,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
     def _w5100_init(self) -> int:
         """Initializes and detects a Wiznet5k module."""
         time.sleep(1)
+        # TODO: Isn't the CS pin initialized in busio?
         self._cs.switch_to_output()
         self._cs.value = 1
 
@@ -441,7 +444,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         # self._ch_base_msb = 0x10
         return 1
 
-    def detect_w5100s(self) -> int:
+    def detect_w5100s(self) -> int:  # *1
         """Detects W5100S chip."""
         self._chip_type = "w5100s"
         # sw reset
@@ -466,12 +469,12 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             return -1
         return 0
 
-    def _read_mr(self) -> bytearray:
+    def _read_mr(self) -> bytearray:  # *1
         """Reads from the Mode Register (MR)."""
         res = self.read(REG_MR, 0x00)
         return res
 
-    def _write_mr(self, data: int):
+    def _write_mr(self, data: int) -> None:
         """Writes to the mode register (MR).
 
         :param int data: Data to write to the mode register.
@@ -479,12 +482,17 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         self.write(REG_MR, 0x04, data)
 
     def read(
-        self, addr: int, callback: int, length: int = 1, buffer: bytearray = None
-    ) -> bytearray:
+        self,
+        addr: int,
+        callback: int,
+        length: int = 1,
+        buffer: Optional[WriteableBuffer] = None,
+    ) -> Union[WriteableBuffer, bytearray]:
         """Reads data from a register address.
 
         :param int addr: Register address.
         """
+        # TODO: Hardware calls
         with self._device as bus_device:
             if self._chip_type == "w5500":
                 bus_device.write(bytes([addr >> 8]))  # pylint: disable=no-member
@@ -503,7 +511,9 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             bus_device.readinto(buffer, end=length)  # pylint: disable=no-member
             return buffer
 
-    def write(self, addr: int, callback: int, data: Union[int, bytearray]) -> None:
+    def write(
+        self, addr: int, callback: int, data: Union[int, Sequence[Union[int, bytes]]]
+    ) -> None:
         """Write data to a register address.
 
         :param int addr: Destination address.
@@ -511,6 +521,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         :param int data: Data to write, as an integer.
         :param bytearray data: Data to write, as a bytearray.
         """
+        # TODO: Hardware calls
         with self._device as bus_device:
             if self._chip_type == "w5500":
                 bus_device.write(bytes([addr >> 8]))  # pylint: disable=no-member
@@ -572,7 +583,11 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         return self._read_snsr(socket_num)
 
     def socket_connect(
-        self, socket_num: int, dest: bytearray, port: int, conn_mode: int = SNMR_TCP
+        self,
+        socket_num: int,
+        dest: Union[bytes, bytearray],
+        port: int,
+        conn_mode: int = SNMR_TCP,
     ) -> int:
         """Open and verify we've connected a socket to a dest IP address
         or hostname. By default, we use 'conn_mode'= SNMR_TCP but we
@@ -662,7 +677,9 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             if status[0] == SNSR_SOCK_CLOSED:
                 raise RuntimeError("Listening socket closed.")
 
-    def socket_accept(self, socket_num: int) -> Tuple[int, Tuple[str, int]]:
+    def socket_accept(
+        self, socket_num: int
+    ) -> Tuple[int, Tuple[Union[str, bytearray], Union[int, bytearray]]]:
         """Gets the dest IP and port from an incoming connection.
         Returns the next socket number so listening can continue
 
@@ -976,7 +993,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
     def _read_snmr(self, sock: int) -> Optional[bytearray]:
         return self._read_socket(sock, REG_SNMR)
 
-    def _write_socket(self, sock: int, address: int, data: int) -> None:
+    def _write_socket(self, sock: int, address: int, data: int) -> None:  # 1*
         """Write to a W5k socket register."""
         if self._chip_type == "w5500":
             cntl_byte = (sock << 5) + 0x0C
@@ -988,7 +1005,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             )
         return None
 
-    def _read_socket(self, sock: int, address: int) -> Optional[bytearray]:
+    def _read_socket(self, sock: int, address: int) -> Union[bytearray, None]:  # *1
         """Read a W5k socket register."""
         if self._chip_type == "w5500":
             cntl_byte = (sock << 5) + 0x08

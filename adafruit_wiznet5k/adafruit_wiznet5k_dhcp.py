@@ -14,7 +14,7 @@ Pure-Python implementation of Jordan Terrell's DHCP library v0.3
 
 """
 try:
-    from typing import Optional, Union, List, Tuple
+    from typing import Optional, Union, Tuple, Sequence
 
     # pylint: disable=cyclic-import
     from adafruit_wiznet5k import adafruit_wiznet5k
@@ -101,7 +101,7 @@ class DHCP:
     def __init__(
         self,
         eth: adafruit_wiznet5k.WIZNET5K,
-        mac_address: Union[List[int], Tuple[int]],
+        mac_address: Sequence[Union[int, bytes]],
         hostname: Optional[str] = None,
         response_timeout: float = 30,
         debug: bool = False,
@@ -270,11 +270,13 @@ class DHCP:
             DHCP message OP is not expected BOOT Reply."
 
         xid = _BUFF[4:8]
+        # TODO: ValueError bytes & int
         if bytes(xid) < self._initial_xid:
             print("f")
             return 0, 0
 
         self.local_ip = tuple(_BUFF[16:20])
+        # TODO: Don't think this will ever be True
         if _BUFF[28:34] == 0:
             return 0, 0
 
@@ -362,7 +364,7 @@ class DHCP:
         return msg_type, xid
 
     # pylint: disable=too-many-branches, too-many-statements
-    def _dhcp_state_machine(self) -> None:
+    def _dhcp_state_machine(self) -> None:  # 2*
         """DHCP state machine without wait loops to enable cooperative multitasking
         This state machine is used both by the initial blocking lease request and
         the non-blocking DHCP maintenance function."""

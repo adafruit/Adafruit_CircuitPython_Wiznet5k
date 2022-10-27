@@ -14,7 +14,7 @@ ethernet modules.
 
 """
 try:
-    from typing import Union
+    from typing import Union, Tuple
 
     # pylint: disable=cyclic-import
     from adafruit_wiznet5k import adafruit_wiznet5k
@@ -55,7 +55,7 @@ class DNS:
     def __init__(
         self,
         iface: adafruit_wiznet5k.WIZNET5K,
-        dns_address: str,
+        dns_address: Union[str, Tuple[int, int, int, int]],
         debug: bool = False,
     ) -> None:
         self._debug = debug
@@ -139,7 +139,7 @@ class DNS:
             return -1
         # Validate flags
         flags = int.from_bytes(self._pkt_buf[2:4], "big")
-        if not flags in (0x8180, 0x8580):
+        if not flags in (0x8180, 0x8580):  # TODO: Should be `flags not in ...`
             if self._debug:
                 print("* DNS ERROR: Invalid flags, ", flags)
             return -1

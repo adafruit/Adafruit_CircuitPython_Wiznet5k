@@ -26,7 +26,8 @@ from micropython import const
 # pylint is tripping over importing for typing so disable
 import adafruit_wiznet5k as wiznet5k
 
-_the_interface = None  # pylint: disable=invalid-name
+# pylint: disable=invalid-name
+_the_interface: Optional[wiznet5k.adafruit_wiznet5k.WIZNET5K] = None
 
 
 def set_interface(iface: wiznet5k.adafruit_wiznet5k.WIZNET5K) -> None:
@@ -193,7 +194,7 @@ class socket:
         self._buffer = bytearray(self._buffer)
         return self._buffer
 
-    def bind(self, address: Tuple[Optional[str], int]) -> None:
+    def bind(self, address: Tuple[Optional[str], int]) -> None:  # * 2
         """Bind the socket to the listen port, if host is specified the interface
         will be reconfigured to that IP.
 
@@ -222,7 +223,9 @@ class socket:
         _the_interface.socket_listen(self.socknum, self._listen_port)
         self._buffer = b""
 
-    def accept(self) -> Optional[Tuple[wiznet5k.adafruit_wiznet5k_socket.socket, int]]:
+    def accept(
+        self,
+    ) -> Optional[int, Tuple[int, Tuple[Union[str, bytearray], Union[int, bytearray]]]]:
         """Accept a connection. The socket must be bound to an address and listening for
         connections. The return value is a pair (conn, address) where conn is a new
         socket object usable to send and receive data on the connection, and address is
@@ -251,7 +254,11 @@ class socket:
             raise RuntimeError("Failed to open new listening socket")
         return client_sock, addr
 
-    def connect(self, address: Tuple[str, int], conntype: Optional[int] = None) -> None:
+    def connect(
+        self,
+        address: Tuple[Union[str, Tuple[int, int, int, int]], int],
+        conntype: Optional[int] = None,
+    ) -> None:
         """Connect to a remote socket at address.
 
         :param tuple address: Remote socket as a (host, port) tuple.
@@ -343,7 +350,9 @@ class socket:
                 elif self._sock_type == SOCK_DGRAM:
                     recv = _the_interface.read_udp(self.socknum, min(to_read, avail))[1]
                     to_read = len(recv)  # only get this dgram
-                recv = bytes(recv)
+                recv = bytes(
+                    recv
+                )  # TODO: Maybe raise a specific exception before this line
                 received.append(recv)
                 to_read -= len(recv)
                 gc.collect()
