@@ -216,7 +216,8 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
     def set_dhcp(
         self, hostname: Optional[str] = None, response_timeout: float = 30
     ) -> int:
-        """Initialize the DHCP client and attempt to retrieve and set network
+        """
+        Initialize the DHCP client and attempt to retrieve and set network
         configuration from the DHCP server.
 
         :param Optional[str] hostname: The desired hostname for the DHCP server with optional {} to
@@ -252,7 +253,8 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             self._dhcp_client.maintain_dhcp_lease()
 
     def get_host_by_name(self, hostname: str) -> bytes:
-        """Convert a hostname to a packed 4-byte IP Address.
+        """
+        Convert a hostname to a packed 4-byte IP Address.
 
         :param str hostname: The host name to be converted.
 
@@ -272,7 +274,8 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
     @property
     def max_sockets(self) -> int:
-        """Maximum number of sockets supported by chip.
+        """
+        Maximum number of sockets supported by chip.
 
         :return int: Maximum supported sockets.
         """
@@ -1054,12 +1057,12 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         self._pbuff[1] = self._read_socket(sock, 0x0024 + 1)[0]
         return self._pbuff[0] << 8 | self._pbuff[1]
 
-    def _read_sntx_fsr(self, sock: int) -> Optional[bytearray]:
+    def _read_sntx_fsr(self, sock: int) -> Union[bytearray, None]:
         data = self._read_socket(sock, REG_SNTX_FSR)
         data += self._read_socket(sock, REG_SNTX_FSR + 1)
         return data
 
-    def _read_snrx_rsr(self, sock: int) -> Optional[bytearray]:
+    def _read_snrx_rsr(self, sock: int) -> Union[bytearray, None]:
         data = self._read_socket(sock, REG_SNRX_RSR)
         data += self._read_socket(sock, REG_SNRX_RSR + 1)
         return data
@@ -1074,7 +1077,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         self._write_socket(sock, REG_SNDPORT, port >> 8)
         self._write_socket(sock, REG_SNDPORT + 1, port & 0xFF)
 
-    def _read_snsr(self, sock: int) -> Optional[bytearray]:
+    def _read_snsr(self, sock: int) -> Union[bytearray, None]:
         """Reads Socket n Status Register."""
         return self._read_socket(sock, REG_SNSR)
 
@@ -1094,13 +1097,13 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
     def _write_sncr(self, sock: int, data: int) -> None:
         self._write_socket(sock, REG_SNCR, data)
 
-    def _read_sncr(self, sock: int) -> Optional[bytearray]:
+    def _read_sncr(self, sock: int) -> Union[bytearray, None]:
         return self._read_socket(sock, REG_SNCR)
 
-    def _read_snmr(self, sock: int) -> Optional[bytearray]:
+    def _read_snmr(self, sock: int) -> Union[bytearray, None]:
         return self._read_socket(sock, REG_SNMR)
 
-    def _write_socket(self, sock: int, address: int, data: int) -> None:  # 1*
+    def _write_socket(self, sock: int, address: int, data: int) -> None:
         """Write to a W5k socket register."""
         if self._chip_type == "w5500":
             cntl_byte = (sock << 5) + 0x0C

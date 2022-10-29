@@ -476,7 +476,8 @@ class socket:
     def recvfrom(
         self, bufsize: int = 0, flags: Any = 0
     ) -> Tuple[bytes, Tuple[str, int]]:
-        """Reads some bytes from the connected remote address.
+        """
+        Read some bytes from the connected remote address.
 
         :param int bufsize: Maximum number of bytes to receive.
         :param Any flags: ignored, present for compatibility.
