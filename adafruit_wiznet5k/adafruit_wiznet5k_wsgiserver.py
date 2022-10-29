@@ -41,11 +41,12 @@ import adafruit_wiznet5k.adafruit_wiznet5k_socket as socket
 _the_interface = None  # pylint: disable=invalid-name
 
 
-# TODO: Add typing
-
-
 def set_interface(iface: wiznet5k.adafruit_wiznet5k.WIZNET5K) -> None:
-    """Helper to set the global internet interface"""
+    """
+    Helper to set the global internet interface.
+
+    :param wiznet5k.adafruit_wiznet5k.WIZNET5K: Ethernet interface.
+    """
     global _the_interface  # pylint: disable=global-statement, invalid-name
     _the_interface = iface
     socket.set_interface(iface)
@@ -53,9 +54,7 @@ def set_interface(iface: wiznet5k.adafruit_wiznet5k.WIZNET5K) -> None:
 
 # pylint: disable=invalid-name
 class WSGIServer:
-    """
-    A simple server that implements the WSGI interface
-    """
+    """A simple server that implements the WSGI interface."""
 
     def __init__(
         self,
@@ -63,6 +62,11 @@ class WSGIServer:
         debug: bool = False,
         application: Optional[callable] = None,
     ) -> None:
+        """
+        :param int port: WSGI server port, defaults to 80.
+        :param bool debug: Enable debugging, defaults to False.
+        :param Optional[callable] application: Application to call in response to a HTTP request.
+        """
         self.application = application
         self.port = port
         self._timeout = 20
@@ -80,7 +84,8 @@ class WSGIServer:
 
     def start(self) -> None:
         """
-        Starts the server and begins listening for incoming connections.
+        Start the server and listen for incoming connections.
+
         Call update_poll in the main loop for the application callable to be
         invoked on receiving an incoming request.
         """
@@ -96,6 +101,8 @@ class WSGIServer:
 
     def update_poll(self) -> None:
         """
+        Check for new incoming client requests.
+
         Call this method inside your main event loop to get the server
         check for new incoming client requests. When a request comes in,
         the application callable will be invoked.
@@ -126,8 +133,8 @@ class WSGIServer:
         Creates the HTTP Response payload from the response_headers and results data,
         and sends it back to client.
 
-        :param string result: the data string to send back in the response to the client.
-        :param Socket client: the socket to send the response to.
+        :param str result: the data string to send back in the response to the client.
+        :param socket.socket client: the socket to send the response to.
         """
         try:
             response = "HTTP/1.1 {0}\r\n".format(self._response_status)
@@ -160,8 +167,8 @@ class WSGIServer:
         This is to be called before the application callable returns, to signify
         the response can be started with the given status and headers.
 
-        :param string status: a status string including the code and reason. ex: "200 OK"
-        :param list response_headers: a list of tuples to represent the headers.
+        :param str status: a status string including the code and reason. ex: "200 OK"
+        :param List[Tuple[str, str]] response_headers: a list of tuples to represent the headers.
             ex ("header-name", "header value")
         """
         self._response_status = status
@@ -172,7 +179,9 @@ class WSGIServer:
         The application callable will be given the resulting environ dictionary.
         It contains metadata about the incoming request and the request body ("wsgi.input")
 
-        :param Socket client: socket to read the request from
+        :param socket.socket client: socket to read the request from
+
+        :return Dict: Data for the application callable.
         """
         env = {}
         line = str(client.readline(), "utf-8")

@@ -47,10 +47,7 @@ DNS_PORT = const(0x35)  # port used for DNS request
 
 
 class DNS:
-    """W5K DNS implementation.
-
-    :param iface: Network interface
-    """
+    """W5K DNS implementation."""
 
     def __init__(
         self,
@@ -58,6 +55,11 @@ class DNS:
         dns_address: Union[str, Tuple[int, int, int, int]],
         debug: bool = False,
     ) -> None:
+        """
+        :param adafruit_wiznet5k.WIZNET5K: Ethernet network connection.
+        :param Union[str, Tuple[int, int, int, int]]: IP address of the DNS server.
+        :param bool debug: Enable debugging messages, defaults to False.
+        """
         self._debug = debug
         self._iface = iface
         socket.set_interface(iface)
@@ -70,12 +72,13 @@ class DNS:
         self._pkt_buf = bytearray()
 
     def gethostbyname(self, hostname: bytes) -> Union[int, bytes]:
-        """Translate a host name to IPv4 address format.
+        """DNS look up of a host name.
 
-        :param str hostname: Desired host name to connect to.
+        :param bytes hostname: Host name to connect to.
 
-        Returns the IPv4 address as a bytearray if successful, -1 otherwise.
+        :return Union[int, bytes] The IPv4 address if successful, -1 otherwise.
         """
+        # TODO: See if it will take a string.
         if self._dns_server is None:
             return INVALID_SERVER
         self._host = hostname

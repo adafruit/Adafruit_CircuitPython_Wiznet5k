@@ -87,15 +87,7 @@ _BUFF = bytearray(318)
 
 
 class DHCP:
-    """W5k DHCP Client implementation.
-
-    :param WIZNET5K eth: Wiznet 5k object
-    :param Union[List[int], Tuple[int]] mac_address: Hardware MAC.
-    :param str hostname: The desired hostname, with optional {} to fill in MAC.
-    :param float response_timeout: DHCP Response timeout.
-    :param bool debug: Enable debugging output.
-
-    """
+    """W5k DHCP Client implementation."""
 
     # pylint: disable=too-many-arguments, too-many-instance-attributes, invalid-name
     def __init__(
@@ -106,7 +98,14 @@ class DHCP:
         response_timeout: float = 30,
         debug: bool = False,
     ) -> None:
-
+        """
+        :param adafruit_wiznet5k.WIZNET5K eth: Wiznet 5k object
+        :param Sequence[Union[int, bytes]] mac_address: Hardware MAC address.
+        :param Optional[str] hostname: The desired hostname, with optional {} to fill
+            in the MAC address, defaults to None.
+        :param float response_timeout: DHCP Response timeout in seconds, defaults to 30.
+        :param bool debug: Enable debugging output.
+        """
         self._debug = debug
         self._response_timeout = response_timeout
         self._mac_address = mac_address
@@ -157,7 +156,7 @@ class DHCP:
 
         :param int state: DHCP Message state.
         :param float time_elapsed: Number of seconds elapsed since DHCP process started
-        :param bool renew: Set True for renew and rebind
+        :param bool renew: Set True for renew and rebind, defaults to False
         """
         _BUFF[:] = b"\x00" * len(_BUFF)
         # OP
@@ -257,7 +256,8 @@ class DHCP:
         self,
     ) -> Union[Tuple[int, bytes], Tuple[int, int]]:  # TODO: ****
         """Parse DHCP response from DHCP server.
-        Returns DHCP packet type.
+
+        :return Union[Tuple[int, bytes], Tuple[int, int]]: DHCP packet type.
         """
         # store packet in buffer
         _BUFF = self._sock.recv()
@@ -366,7 +366,7 @@ class DHCP:
         return msg_type, xid
 
     # pylint: disable=too-many-branches, too-many-statements
-    def _dhcp_state_machine(self) -> None:  # 2*
+    def _dhcp_state_machine(self) -> None:
         """DHCP state machine without wait loops to enable cooperative multitasking
         This state machine is used both by the initial blocking lease request and
         the non-blocking DHCP maintenance function."""

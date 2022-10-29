@@ -33,13 +33,7 @@ import adafruit_wiznet5k.adafruit_wiznet5k_socket as socket
 
 class NTP:
     """
-    Wiznet5k NTP Client
-
-    :param iface: Wiznet 5k object
-    :param str ntp_address: The hostname of the NTP server
-    :param int utc: Numbers of hours to offset time from UTC
-    :param bool debug: Enable debugging output.
-    """
+    Wiznet5k NTP Client."""
 
     def __init__(
         self,
@@ -48,6 +42,12 @@ class NTP:
         utc: int,  # TODO: Should be float. India is UTC + 7.5
         debug: bool = False,
     ) -> None:
+        """
+        :param adafruit_wiznet5k.WIZNET5K iface: Wiznet 5k object.
+        :param str ntp_address: The hostname of the NTP server.
+        :param int utc: Numbers of hours to offset time from UTC.
+        :param bool debug: Enable debugging output, defaults to False.
+        """
         self._debug = debug
         self._iface = iface
         socket.set_interface(self._iface)
@@ -63,9 +63,9 @@ class NTP:
 
     def get_time(self) -> time.struct_time:
         """
-        Get the time from the NTP server
+        Get the time from the NTP server.
 
-        :return: time in seconds since the epoch
+        :return int: Time in seconds since the epoch.
         """
         self._sock.bind((None, 50001))
         self._sock.sendto(self._pkt_buf_, (self._ntp_server, 123))

@@ -12,8 +12,6 @@ A socket compatible interface with the Wiznet5k module.
 * Author(s): ladyada, Brent Rubell, Patrick Van Oosterwijck, Adam Cummick
 
 """
-
-
 try:
     from typing import Any, Optional, Tuple, List, Union
 except ImportError:
@@ -27,17 +25,27 @@ from micropython import const
 import adafruit_wiznet5k as wiznet5k
 
 # pylint: disable=invalid-name
-_the_interface: Optional[wiznet5k.adafruit_wiznet5k.WIZNET5K] = None
+_the_interface: Union[wiznet5k.adafruit_wiznet5k.WIZNET5K, None] = None
 
 
 def set_interface(iface: wiznet5k.adafruit_wiznet5k.WIZNET5K) -> None:
-    """Helper to set the global internet interface."""
+    """
+    Helper to set the global internet interface.
+
+    :param wiznet5k.adafruit_wiznet5k.WIZNET5K iface: The ethernet interface.
+    """
     global _the_interface  # pylint: disable=global-statement, invalid-name
     _the_interface = iface
 
 
 def htonl(x: int) -> int:
-    """Convert 32-bit positive integers from host to network byte order."""
+    """
+    Convert 32-bit positive integer from host to network byte order.
+
+    :param int x: 32-bit positive integer from host.
+
+    :return int: 32-bit positive integer in network byte order.
+    """
     return (
         ((x) << 24 & 0xFF000000)
         | ((x) << 8 & 0x00FF0000)
@@ -47,7 +55,13 @@ def htonl(x: int) -> int:
 
 
 def htons(x: int) -> int:
-    """Convert 16-bit positive integers from host to network byte order."""
+    """
+    Convert 16-bit positive integer from host to network byte order.
+
+    :param int x: 16-bit positive integer from host.
+
+    :return int: 16-bit positive integer in network byte order.
+    """
     return (((x) << 8) & 0xFF00) | (((x) >> 8) & 0xFF)
 
 
@@ -62,14 +76,24 @@ SOCKET_INVALID = const(255)
 def getaddrinfo(
     host: str,
     port: int,
-    family: Any = 0,
+    family: int = 0,
     socktype: int = 0,
     proto: int = 0,
     flags: Any = 0,
 ) -> List[Tuple[int, int, int, str, Tuple[str, int]]]:
-    """Translate the host/port argument into a sequence of 5-tuples that
-    contain all the necessary arguments for creating a socket connected to that service.
     """
+    Translate the host/port argument into a sequence of 5-tuples that
+    contain all the necessary arguments for creating a socket connected to that service.
+
+    :param str host: Host to connect to.
+    :param int port: Port number to connect to (0 - 65536).
+    :param int family: Ignored and hardcoded as 0x03 (the only family implemented) by the function.
+    :param int socktype: The type of socket, either SOCK_STREAM (0x21) for TCP or SOCK_DGRAM (0x02)
+        for UDP, defaults to 0x00.
+    :param int proto: Protocol, unused in this implementation of socket.
+    :param Any flags: Socket flags, unused in this implementation,.
+    """
+
     if not isinstance(port, int):
         raise RuntimeError("Port must be an integer")
     if is_ipv4(host):
@@ -78,10 +102,12 @@ def getaddrinfo(
 
 
 def gethostbyname(hostname: str) -> str:
-    """Translate a host name to IPv4 address format. The IPv4 address
-    is returned as a string.
+    """
+    Lookup a host name's IPv4 address.
 
-    :param str hostname: Desired hostname.
+    :param str hostname: Hostname to lookup.
+
+    :return str: IPv4 address in 0.0.0.0 form.
     """
     addr = _the_interface.get_host_by_name(hostname)
     addr = "{}.{}.{}.{}".format(addr[0], addr[1], addr[2], addr[3])
@@ -89,9 +115,12 @@ def gethostbyname(hostname: str) -> str:
 
 
 def is_ipv4(host: str) -> bool:
-    """Checks if a host string is an IPv4 address.
+    """
+    Check if a hostname is an IPv4 address in the form 0.0.0.0.
 
-    :param str host: host's name or ip
+    :param str host: Hostname to check.
+
+    :return bool:
     """
     octets = host.split(".", 3)
     if len(octets) != 4 or not "".join(octets).isdigit():
@@ -104,12 +133,8 @@ def is_ipv4(host: str) -> bool:
 
 # pylint: disable=invalid-name, too-many-public-methods
 class socket:
-    """A simplified implementation of the Python 'socket' class
-    for connecting to a Wiznet5k module.
-
-    :param int family: Socket address (and protocol) family.
-    :param int type: Socket type.
-    """
+    """A simplified implementation of the Python 'socket' class for connecting
+    to a Wiznet5k module."""
 
     # pylint: disable=redefined-builtin,unused-argument
     def __init__(
@@ -120,7 +145,14 @@ class socket:
         fileno: Optional[Any] = None,
         socknum: Optional[Any] = None,
     ) -> None:
-
+        """
+        :param int family: Socket address (and protocol) family, defaults to AF_INET.
+        :param int type: Socket type, use SOCK_STREAM for TCP and SOCK_DGRAM for UDP,
+            defaults to SOCK_STREAM.
+        :param Any proto: Unused, retained for compatibility.
+        :param Optional[Any] fileno: Unused, retained for compatibility.
+        :param Optional[Any] socknum: Unused, retained for compatibility.
+        """
         if family != AF_INET:
             raise RuntimeError("Only AF_INET family supported by W5K modules.")
         self._sock_type = type
@@ -150,17 +182,29 @@ class socket:
 
     @property
     def socknum(self) -> int:
-        """Returns the socket object's socket number."""
+        """
+        Return the socket object's socket number.
+
+        :return int: The socket number
+        """
         return self._socknum
 
     @property
     def status(self) -> int:
-        """Returns the status of the socket"""
+        """
+        Return the status of the socket.
+
+        :return int: Status of the socket.
+        """
         return _the_interface.socket_status(self.socknum)[0]
 
     @property
     def connected(self) -> bool:
-        """Returns whether we are connected to the socket."""
+        """
+        Return whether connected to the socket.
+
+        :return bool: Whether connected.
+        """
         if self.socknum >= _the_interface.max_sockets:
             return False
         status = _the_interface.socket_status(self.socknum)[0]
@@ -181,24 +225,34 @@ class socket:
         return result
 
     def getpeername(self) -> Union[str, bytearray]:
-        """Return the remote address to which the socket is connected."""
+        """Return the remote address to which the socket is connected.
+
+        :return Union[str, bytearray]: An IPv4 address in the form 0.0.0.0. An error may return
+            a bytearray.
+        """
         return _the_interface.remote_ip(self.socknum)
 
     def inet_aton(self, ip_string: str) -> bytearray:
-        """Convert an IPv4 address from dotted-quad string format.
+        """
+        Convert an IPv4 address from dotted-quad string format.
 
-        :param str ip_string: IP Address, as a dotted-quad string.
+        :param str ip_string: IPv4 address in the form 0.0.0.0.
+
+        :return bytearray: IPv4 address as a 4 byte bytearray.
         """
         self._buffer = b""
         self._buffer = [int(item) for item in ip_string.split(".")]
         self._buffer = bytearray(self._buffer)
         return self._buffer
 
-    def bind(self, address: Tuple[Optional[str], int]) -> None:  # * 2
-        """Bind the socket to the listen port, if host is specified the interface
-        will be reconfigured to that IP.
+    def bind(self, address: Tuple[Optional[str], int]) -> None:
+        """Bind the socket to the listen port.
 
-        :param tuple address: local socket as a (host, port) tuple.
+        If the host is specified the interface will be reconfigured to that IP address.
+
+        :param Tuple[Optional[str], int] address: Address as a (host, port) tuple. The host
+            may be an IPv4 address in 0.0.0.0 form, or None. The port number is in the range
+            90- 65536).
         """
         if address[0] is not None:
             ip_address = _the_interface.unpretty_ip(address[0])
@@ -215,7 +269,8 @@ class socket:
             self._buffer = b""
 
     def listen(self, backlog: Optional[Any] = None) -> None:
-        """Listen on the port specified by bind.
+        """
+        Listen on the port specified by bind.
 
         :param backlog: For compatibility but ignored.
         """
@@ -225,11 +280,23 @@ class socket:
 
     def accept(
         self,
-    ) -> Optional[int, Tuple[int, Tuple[Union[str, bytearray], Union[int, bytearray]]]]:
-        """Accept a connection. The socket must be bound to an address and listening for
-        connections. The return value is a pair (conn, address) where conn is a new
-        socket object usable to send and receive data on the connection, and address is
+    ) -> Union[
+        wiznet5k.adafruit_wiznet5k_socket.socket,
+        Tuple[int, Tuple[Union[str, bytearray], Union[int, bytearray]]],
+        None,
+    ]:
+        """
+        Accept a connection.
+
+        The socket must be bound to an address and listening for connections.
+
+        The return value is a pair (conn, address) where conn is a new
+        socket object to send and receive data on the connection, and address is
         the address bound to the socket on the other end of the connection.
+
+        :return Union[int, Tuple[int, Tuple[Union[str, bytearray], Union[int, bytearray]]], None]:
+            If successful (socket object, (IP address, port)). If errors occur, the IP address
+            and / or the port may be returned as bytearrays.
         """
         stamp = time.monotonic()
         while self.status not in (
@@ -250,6 +317,7 @@ class socket:
         self._socknum = new_listen_socknum  # pylint: disable=protected-access
         self.bind((None, self._listen_port))
         self.listen()
+        # TODO: Weird logic below. Should be an if, not a while
         while self.status != wiznet5k.adafruit_wiznet5k.SNSR_SOCK_LISTEN:
             raise RuntimeError("Failed to open new listening socket")
         return client_sock, addr
@@ -259,10 +327,15 @@ class socket:
         address: Tuple[Union[str, Tuple[int, int, int, int]], int],
         conntype: Optional[int] = None,
     ) -> None:
-        """Connect to a remote socket at address.
-
-        :param tuple address: Remote socket as a (host, port) tuple.
         """
+        Connect to a remote socket.
+
+        :param Tuple[Union[str, Tuple[int, int, int, int]], int] address: Remote socket as
+            a (host, port) tuple. The host may be a tuple in the form (0, 0, 0, 0) or a string.
+        :param Optional[int] conntype: Raises an exception if set to 3, unused otherwise, defaults
+            to None.
+        """
+        # TODO: conntype unused beyond raising an exception.
         assert (
             conntype != 0x03
         ), "Error: SSL/TLS is not currently supported by CircuitPython."
@@ -284,23 +357,25 @@ class socket:
         self._buffer = b""
 
     def send(self, data: Union[bytes, bytearray]) -> None:
-        """Send data to the socket. The socket must be connected to
-        a remote socket.
+        """
+        Send data to the socket.
 
-        :param bytearray data: Desired data to send to the socket.
+        The socket must be connected to a remote socket.
+
+        :param bytearray data: Data to send to the socket.
         """
         _the_interface.socket_write(self.socknum, data, self._timeout)
         gc.collect()
 
     def sendto(self, data: bytearray, address: [Tuple[str, int]]) -> None:
-        """Send data to the socket. The socket must be connected to
-        a remote socket.
+        """
+        Connect to a remote socket and send data.
 
         :param bytearray data: Desired data to send to the socket.
         :param tuple address: Remote socket as a (host, port) tuple.
         """
         self.connect(address)
-        return self.send(data)
+        return self.send(data)  # TODO: send only returns None, so can delete
 
     def recv(
         # pylint: disable=too-many-branches
@@ -308,7 +383,7 @@ class socket:
         bufsize: int = 0,
         flags: Any = 0,
     ) -> bytes:
-        """Reads some bytes from the connected remote address.
+        """Reads from the connected remote address.
 
         :param int bufsize: Maximum number of bytes to receive.
         :param int flags: ignored, present for compatibility.
@@ -360,7 +435,7 @@ class socket:
                 break
         self._buffer += b"".join(received)
 
-        ret = None  # TODO: Useless definition
+        ret = None  # TODO: Unused definition
         if len(self._buffer) == bufsize:
             ret = self._buffer
             self._buffer = b""
@@ -373,9 +448,14 @@ class socket:
     def embed_recv(
         self, bufsize: int = 0, flags: Any = 0
     ) -> bytes:  # pylint: disable=too-many-branches
-        """Reads some bytes from the connected remote address and then return recv().
-        :param int bufsize: Maximum number of bytes to receive.
+        """
+        Reads from the connected remote address.
+
+        :param int bufsize: Maximum number of bytes to receive, ignored by the
+            function, defaults to 0.
         :param int flags: ignored, present for compatibility.
+
+        :return bytes: All data available from the connection.
         """
         # TODO: bufsize unused
         # print("Socket read", bufsize)
@@ -399,8 +479,10 @@ class socket:
         """Reads some bytes from the connected remote address.
 
         :param int bufsize: Maximum number of bytes to receive.
-        :param int flags: ignored, present for compatibility.
-        :return: a tuple (bytes, address) where address is a tuple (ip, port)
+        :param Any flags: ignored, present for compatibility.
+
+        :return Tuple[bytes, Tuple[str, int]]: a tuple (bytes, address)
+            where address is a tuple (ip, port)
         """
         return (
             self.recv(bufsize),
@@ -411,11 +493,12 @@ class socket:
         )
 
     def recv_into(self, buf: bytearray, nbytes: int = 0, flags: Any = 0) -> int:
-        """Reads some bytes from the connected remote address info the provided buffer.
+        """Read from the connected remote address into the provided buffer.
 
         :param bytearray buf: Data buffer
         :param nbytes: Maximum number of bytes to receive
-        :param int flags: ignored, present for compatibility.
+        :param Any flags: ignored, present for compatibility.
+
         :return: the number of bytes received
         """
         if nbytes == 0:
@@ -428,11 +511,12 @@ class socket:
     def recvfrom_into(
         self, buf: bytearray, nbytes: int = 0, flags: Any = 0
     ) -> Tuple[int, Tuple[str, int]]:
-        """Reads some bytes from the connected remote address info the provided buffer.
+        """Reads some bytes from the connected remote address into the provided buffer.
 
-        :param bytearray buf: Data buffer
-        :param nbytes: Maximum number of bytes to receive
+        :param bytearray buf: Data buffer.
+        :param int nbytes: Maximum number of bytes to receive.
         :param int flags: ignored, present for compatibility.
+
         :return: a tuple (nbytes, address) where address is a tuple (ip, port)
         """
         return (
@@ -444,8 +528,12 @@ class socket:
         )
 
     def readline(self) -> bytes:
-        """Attempt to return as many bytes as we can up to \
-        but not including '\r\n'.
+        """
+        Read a line from the socket.
+
+        Attempt to return as many bytes as we can up to but not including '\r\n'.
+
+        :return bytes: The data read from the socket.
         """
         stamp = time.monotonic()
         while b"\r\n" not in self._buffer:
@@ -467,29 +555,36 @@ class socket:
         return firstline
 
     def disconnect(self) -> None:
-        """Disconnects a TCP socket."""
+        """Disconnect a TCP socket."""
         assert self._sock_type == SOCK_STREAM, "Socket must be a TCP socket."
         _the_interface.socket_disconnect(self.socknum)
 
     def close(self) -> None:
-        """Closes the socket."""
+        """Close the socket."""
         _the_interface.socket_close(self.socknum)
 
     def available(self) -> int:
-        """Returns how many bytes of data are available to be read from the socket."""
+        """
+        Return how many bytes of data are available to be read from the socket.
+
+        :return int: Number of bytes available.
+        """
         return _the_interface.socket_available(self.socknum, self._sock_type)
 
     def settimeout(self, value: float) -> None:
-        """Sets socket read timeout.
+        """
+        Set the socket read timeout.
 
-        :param float value: Socket read timeout, in seconds.
+        :param float value: Socket read timeout in seconds.
         """
         if value < 0:
             raise Exception("Timeout period should be non-negative.")
         self._timeout = value
 
-    def gettimeout(self) -> Optional[float]:
-        """Return the timeout in seconds (float) associated
-        with socket operations, or None if no timeout is set.
+    def gettimeout(self) -> Union[float, None]:
+        """
+        Timeout associated with socket operations.
+
+        :return Optional[float]: Timeout in seconds, or None if no timeout is set.
         """
         return self._timeout
