@@ -285,10 +285,11 @@ class socket:
 
     def accept(
         self,
-    ) -> Union[
-        wiznet5k.adafruit_wiznet5k_socket.socket,
-        Tuple[int, Tuple[Union[str, bytearray], Union[int, bytearray]]],
-        None,
+    ) -> Optional[
+        Tuple[
+            wiznet5k.adafruit_wiznet5k_socket.socket,
+            Tuple[Union[str, bytearray], Union[int, bytearray]],
+        ]
     ]:
         """
         Accept a connection.
