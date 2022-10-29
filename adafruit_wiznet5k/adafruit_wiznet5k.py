@@ -380,7 +380,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         """
         if socket_num >= self.max_sockets:
             return self._pbuff
-        for octet in range(4):
+        for octet in range(0, 4):
             self._pbuff[octet] = self._read_socket(socket_num, REG_SNDIPR + octet)[0]
         return self.pretty_ip(self._pbuff)
 
@@ -1099,7 +1099,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
     def _write_sndipr(self, sock: int, ip_addr: bytearray) -> None:
         """Write to socket destination IP Address."""
-        for octet in range(4):
+        for octet in range(0, 4):
             self._write_socket(sock, REG_SNDIPR + octet, ip_addr[octet])
 
     def _write_sndport(self, sock: int, port: int) -> None:
