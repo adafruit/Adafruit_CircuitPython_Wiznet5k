@@ -152,7 +152,8 @@ class DHCP:
         time_elapsed: float,
         renew: bool = False,
     ) -> None:
-        """Assemble and send a DHCP message packet to a socket.
+        """
+        Assemble and send a DHCP message packet to a socket.
 
         :param int state: DHCP Message state.
         :param float time_elapsed: Number of seconds elapsed since DHCP process started
@@ -367,9 +368,11 @@ class DHCP:
 
     # pylint: disable=too-many-branches, too-many-statements
     def _dhcp_state_machine(self) -> None:
-        """DHCP state machine without wait loops to enable cooperative multitasking
+        """
+        DHCP state machine without wait loops to enable cooperative multitasking
         This state machine is used both by the initial blocking lease request and
-        the non-blocking DHCP maintenance function."""
+        the non-blocking DHCP maintenance function.
+        """
         if self._eth.link_status:
             if self._dhcp_state == STATE_DHCP_DISCONN:
                 self._dhcp_state = STATE_DHCP_START

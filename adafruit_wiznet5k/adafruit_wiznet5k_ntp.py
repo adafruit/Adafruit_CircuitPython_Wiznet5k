@@ -32,8 +32,7 @@ import adafruit_wiznet5k.adafruit_wiznet5k_socket as socket
 
 
 class NTP:
-    """
-    Wiznet5k NTP Client."""
+    """Wiznet5k NTP Client."""
 
     def __init__(
         self,

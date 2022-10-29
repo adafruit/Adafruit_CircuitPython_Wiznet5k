@@ -79,21 +79,23 @@ def getaddrinfo(
     family: int = 0,
     socktype: int = 0,
     proto: int = 0,
-    flags: Any = 0,
+    flags: int = 0,
 ) -> List[Tuple[int, int, int, str, Tuple[str, int]]]:
     """
     Translate the host/port argument into a sequence of 5-tuples that
     contain all the necessary arguments for creating a socket connected to that service.
 
-    :param str host: Host to connect to.
+    :param str host: a domain name, a string representation of an IPv4/v6 address or
+        None.
     :param int port: Port number to connect to (0 - 65536).
     :param int family: Ignored and hardcoded as 0x03 (the only family implemented) by the function.
     :param int socktype: The type of socket, either SOCK_STREAM (0x21) for TCP or SOCK_DGRAM (0x02)
         for UDP, defaults to 0x00.
-    :param int proto: Protocol, unused in this implementation of socket.
-    :param Any flags: Socket flags, unused in this implementation,.
+    :param int proto: Unused in this implementation of socket.
+    :param int flags: Unused in this implementation of socket.
     """
-
+    # TODO: Python socket accepts port as a string or int or None. How are str and None handled?
+    # TODO: Python socket has arg type in place of socktype.
     if not isinstance(port, int):
         raise RuntimeError("Port must be an integer")
     if is_ipv4(host):
@@ -107,7 +109,7 @@ def gethostbyname(hostname: str) -> str:
 
     :param str hostname: Hostname to lookup.
 
-    :return str: IPv4 address in 0.0.0.0 form.
+    :return str: IPv4 address (a string of the form '255.255.255.255').
     """
     addr = _the_interface.get_host_by_name(hostname)
     addr = "{}.{}.{}.{}".format(addr[0], addr[1], addr[2], addr[3])
@@ -116,7 +118,7 @@ def gethostbyname(hostname: str) -> str:
 
 def is_ipv4(host: str) -> bool:
     """
-    Check if a hostname is an IPv4 address in the form 0.0.0.0.
+    Check if a hostname is an IPv4 address (a string of the form '255.255.255.255').
 
     :param str host: Hostname to check.
 
@@ -133,8 +135,10 @@ def is_ipv4(host: str) -> bool:
 
 # pylint: disable=invalid-name, too-many-public-methods
 class socket:
-    """A simplified implementation of the Python 'socket' class for connecting
-    to a Wiznet5k module."""
+    """
+    A simplified implementation of the Python 'socket' class for connecting
+    to a Wiznet5k module.
+    """
 
     # pylint: disable=redefined-builtin,unused-argument
     def __init__(
@@ -225,10 +229,11 @@ class socket:
         return result
 
     def getpeername(self) -> Union[str, bytearray]:
-        """Return the remote address to which the socket is connected.
+        """
+        Return the remote address to which the socket is connected.
 
-        :return Union[str, bytearray]: An IPv4 address in the form 0.0.0.0. An error may return
-            a bytearray.
+        :return Union[str, bytearray]: An IPv4 address (a string of the form '255.255.255.255').
+            An error may return a bytearray.
         """
         return _the_interface.remote_ip(self.socknum)
 
@@ -236,7 +241,7 @@ class socket:
         """
         Convert an IPv4 address from dotted-quad string format.
 
-        :param str ip_string: IPv4 address in the form 0.0.0.0.
+        :param str ip_string: IPv4 address (a string of the form '255.255.255.255').
 
         :return bytearray: IPv4 address as a 4 byte bytearray.
         """
@@ -251,8 +256,8 @@ class socket:
         If the host is specified the interface will be reconfigured to that IP address.
 
         :param Tuple[Optional[str], int] address: Address as a (host, port) tuple. The host
-            may be an IPv4 address in 0.0.0.0 form, or None. The port number is in the range
-            90- 65536).
+            may be an IPv4 address (a string of the form '255.255.255.255'), or None.
+            The port number is in the range (0- 65536).
         """
         if address[0] is not None:
             ip_address = _the_interface.unpretty_ip(address[0])
@@ -383,7 +388,8 @@ class socket:
         bufsize: int = 0,
         flags: Any = 0,
     ) -> bytes:
-        """Reads from the connected remote address.
+        """
+        Read from the connected remote address.
 
         :param int bufsize: Maximum number of bytes to receive.
         :param int flags: ignored, present for compatibility.
@@ -449,7 +455,7 @@ class socket:
         self, bufsize: int = 0, flags: Any = 0
     ) -> bytes:  # pylint: disable=too-many-branches
         """
-        Reads from the connected remote address.
+        Read from the connected remote address.
 
         :param int bufsize: Maximum number of bytes to receive, ignored by the
             function, defaults to 0.
@@ -494,7 +500,8 @@ class socket:
         )
 
     def recv_into(self, buf: bytearray, nbytes: int = 0, flags: Any = 0) -> int:
-        """Read from the connected remote address into the provided buffer.
+        """
+        Read from the connected remote address into the provided buffer.
 
         :param bytearray buf: Data buffer
         :param nbytes: Maximum number of bytes to receive
@@ -512,13 +519,14 @@ class socket:
     def recvfrom_into(
         self, buf: bytearray, nbytes: int = 0, flags: Any = 0
     ) -> Tuple[int, Tuple[str, int]]:
-        """Reads some bytes from the connected remote address into the provided buffer.
+        """
+        Read some bytes from the connected remote address into the provided buffer.
 
         :param bytearray buf: Data buffer.
         :param int nbytes: Maximum number of bytes to receive.
-        :param int flags: ignored, present for compatibility.
+        :param int flags: Unused, present for compatibility.
 
-        :return: a tuple (nbytes, address) where address is a tuple (ip, port)
+        :return: A tuple (nbytes, address) where address is a tuple (ip, port)
         """
         return (
             self.recv_into(buf, nbytes),

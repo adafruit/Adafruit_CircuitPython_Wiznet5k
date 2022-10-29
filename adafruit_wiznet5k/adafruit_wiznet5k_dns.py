@@ -72,7 +72,8 @@ class DNS:
         self._pkt_buf = bytearray()
 
     def gethostbyname(self, hostname: bytes) -> Union[int, bytes]:
-        """DNS look up of a host name.
+        """
+        DNS look up of a host name.
 
         :param bytes hostname: Host name to connect to.
 
@@ -107,11 +108,12 @@ class DNS:
 
     def _parse_dns_response(
         self,
-    ) -> Union[
-        int, bytes
-    ]:  # pylint: disable=too-many-return-statements, too-many-branches, too-many-statements, too-many-locals
-        """Receive and parse DNS query response.
-        Return requested hostname address if obtained, -1 otherwise.
+    ) -> Union[int, bytes]:
+        # pylint: disable=too-many-return-statements, too-many-branches, too-many-statements, too-many-locals
+        """
+        Receive and parse DNS query response.
+
+        :return Union[int, bytes]: Requested hostname IP address if obtained, -1 otherwise.
         """
         # wait for a response
         start_time = time.monotonic()
