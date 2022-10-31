@@ -12,8 +12,13 @@ A socket compatible interface with the Wiznet5k module.
 * Author(s): ladyada, Brent Rubell, Patrick Van Oosterwijck, Adam Cummick
 
 """
+from __future__ import annotations
+
 try:
     from typing import Any, Optional, Tuple, List, Union
+
+    # pylint: disable=cyclic-import
+    from adafruit_wiznet5k.adafruit_wiznet5k import WIZNET5K
 except ImportError:
     pass
 
@@ -24,10 +29,10 @@ from micropython import const
 import adafruit_wiznet5k as wiznet5k
 
 # pylint: disable=invalid-name
-_the_interface: Union[wiznet5k.adafruit_wiznet5k.WIZNET5K, None] = None
+_the_interface: Optional[WIZNET5K] = None
 
 
-def set_interface(iface: wiznet5k.adafruit_wiznet5k.WIZNET5K) -> None:
+def set_interface(iface: WIZNET5K) -> None:
     """
     Helper to set the global internet interface.
 
@@ -282,12 +287,8 @@ class socket:
 
     def accept(
         self,
-    ) -> Optional[
-        Tuple[
-            wiznet5k.adafruit_wiznet5k_socket.socket,
-            Tuple[Union[str, bytearray], Union[int, bytearray]],
-        ]
-    ]:
+    ) -> Optional[Tuple[socket, Tuple[Union[str, bytearray], Union[int, bytearray]],]]:
+        # wiznet5k.adafruit_wiznet5k_socket.socket,
         """
         Accept a connection.
 
@@ -297,7 +298,7 @@ class socket:
         socket object to send and receive data on the connection, and address is
         the address bound to the socket on the other end of the connection.
 
-        :return Union[int, Tuple[int, Tuple[Union[str, bytearray], Union[int, bytearray]]], None]:
+        :return Optional[Tuple[socket.socket, Tuple[Union[str, bytearray], Union[int, bytearray]]]:
             If successful (socket object, (IP address, port)). If errors occur, the IP address
             and / or the port may be returned as bytearrays.
         """
@@ -583,7 +584,7 @@ class socket:
             raise Exception("Timeout period should be non-negative.")
         self._timeout = value
 
-    def gettimeout(self) -> Union[float, None]:
+    def gettimeout(self) -> Optional[float]:
         """
         Timeout associated with socket operations.
 

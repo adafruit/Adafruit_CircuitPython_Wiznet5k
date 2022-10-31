@@ -645,7 +645,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
                 return ret
         return 0
 
-    def socket_status(self, socket_num: int) -> Union[bytearray, None]:
+    def socket_status(self, socket_num: int) -> Optional[bytearray]:
         """
         Return the socket connection status.
 
@@ -656,7 +656,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
         :param int socket_num: ID of socket to check.
 
-        :return: Union[bytearray, None]
+        :return: Optional[bytearray]
         """
         return self._read_snsr(socket_num)
 
@@ -1087,12 +1087,12 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         self._pbuff[1] = self._read_socket(sock, 0x0024 + 1)[0]
         return self._pbuff[0] << 8 | self._pbuff[1]
 
-    def _read_sntx_fsr(self, sock: int) -> Union[bytearray, None]:
+    def _read_sntx_fsr(self, sock: int) -> Optional[bytearray]:
         data = self._read_socket(sock, REG_SNTX_FSR)
         data += self._read_socket(sock, REG_SNTX_FSR + 1)
         return data
 
-    def _read_snrx_rsr(self, sock: int) -> Union[bytearray, None]:
+    def _read_snrx_rsr(self, sock: int) -> Optional[bytearray]:
         data = self._read_socket(sock, REG_SNRX_RSR)
         data += self._read_socket(sock, REG_SNRX_RSR + 1)
         return data
@@ -1107,7 +1107,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         self._write_socket(sock, REG_SNDPORT, port >> 8)
         self._write_socket(sock, REG_SNDPORT + 1, port & 0xFF)
 
-    def _read_snsr(self, sock: int) -> Union[bytearray, None]:
+    def _read_snsr(self, sock: int) -> Optional[bytearray]:
         """Read Socket n Status Register."""
         return self._read_socket(sock, REG_SNSR)
 
@@ -1127,10 +1127,10 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
     def _write_sncr(self, sock: int, data: int) -> None:
         self._write_socket(sock, REG_SNCR, data)
 
-    def _read_sncr(self, sock: int) -> Union[bytearray, None]:
+    def _read_sncr(self, sock: int) -> Optional[bytearray]:
         return self._read_socket(sock, REG_SNCR)
 
-    def _read_snmr(self, sock: int) -> Union[bytearray, None]:
+    def _read_snmr(self, sock: int) -> Optional[bytearray]:
         return self._read_socket(sock, REG_SNMR)
 
     def _write_socket(self, sock: int, address: int, data: int) -> None:
@@ -1145,7 +1145,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             )
         return None
 
-    def _read_socket(self, sock: int, address: int) -> Union[bytearray, None]:  # *1
+    def _read_socket(self, sock: int, address: int) -> Optional[bytearray]:  # *1
         """Read a W5k socket register."""
         if self._chip_type == "w5500":
             cntl_byte = (sock << 5) + 0x08

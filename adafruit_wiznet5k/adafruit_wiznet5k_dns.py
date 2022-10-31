@@ -13,8 +13,13 @@ ethernet modules.
 * Author(s): MCQN Ltd, Brent Rubell
 
 """
+from __future__ import annotations
+
 try:
     from typing import Union, Tuple
+
+    # pylint: disable=cyclic-import
+    from adafruit_wiznet5k.adafruit_wiznet5k import WIZNET5K
 except ImportError:
     pass
 
@@ -23,7 +28,6 @@ from random import getrandbits
 from micropython import const
 import adafruit_wiznet5k.adafruit_wiznet5k_socket as socket
 from adafruit_wiznet5k.adafruit_wiznet5k_socket import htons
-
 
 QUERY_FLAG = const(0x00)
 OPCODE_STANDARD_QUERY = const(0x00)
@@ -48,7 +52,7 @@ class DNS:
 
     def __init__(
         self,
-        iface,
+        iface: WIZNET5K,
         dns_address: Union[str, Tuple[int, int, int, int]],
         debug: bool = False,
     ) -> None:

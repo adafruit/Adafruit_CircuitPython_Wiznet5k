@@ -13,9 +13,13 @@ Pure-Python implementation of Jordan Terrell's DHCP library v0.3
 * Author(s): Jordan Terrell, Brent Rubell
 
 """
+from __future__ import annotations
+
 try:
     from typing import Optional, Union, Tuple, Sequence
 
+    # pylint: disable=cyclic-import
+    from adafruit_wiznet5k.adafruit_wiznet5k import WIZNET5K
 except ImportError:
     pass
 
@@ -90,7 +94,7 @@ class DHCP:
     # pylint: disable=too-many-arguments, too-many-instance-attributes, invalid-name
     def __init__(
         self,
-        eth,
+        eth: WIZNET5K,
         mac_address: Sequence[Union[int, bytes]],
         hostname: Optional[str] = None,
         response_timeout: float = 30,

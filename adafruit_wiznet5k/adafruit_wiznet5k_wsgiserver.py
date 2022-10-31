@@ -27,8 +27,10 @@ https://www.python.org/dev/peps/pep-0333/
 * Author(s): Matt Costi, Patrick Van Oosterwijck
 """
 # pylint: disable=no-name-in-module
+# from __future__ import annotations
 try:
     from typing import Optional, List, Tuple, Dict
+    from adafruit_wiznet5k.adafruit_wiznet5k import WIZNET5K
 except ImportError:
     pass
 
@@ -38,10 +40,10 @@ from micropython import const
 import adafruit_wiznet5k as wiznet5k
 import adafruit_wiznet5k.adafruit_wiznet5k_socket as socket
 
-_the_interface = None  # pylint: disable=invalid-name
+_the_interface: Optional[WIZNET5K] = None  # pylint: disable=invalid-name
 
 
-def set_interface(iface) -> None:
+def set_interface(iface: WIZNET5K) -> None:
     """
     Helper to set the global internet interface.
 
@@ -217,10 +219,10 @@ class WSGIServer:
         if "content-length" in headers:
             env["CONTENT_LENGTH"] = headers.get("content-length")
             body = client.recv(int(env["CONTENT_LENGTH"]))
-            env["wsgi.input"] = io.StringIO(body)  # TODO: Is bytes should be str
+            env["wsgi.input"] = io.StringIO(body)
         else:
             body = client.recv()
-            env["wsgi.input"] = io.StringIO(body)  # TODO: Is bytes should be str
+            env["wsgi.input"] = io.StringIO(body)
         for name, value in headers.items():
             key = "HTTP_" + name.replace("-", "_").upper()
             if key in env:
