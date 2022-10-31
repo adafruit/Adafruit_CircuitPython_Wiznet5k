@@ -369,7 +369,7 @@ class DHCP:
     # pylint: disable=too-many-branches, too-many-statements
     def _dhcp_state_machine(self) -> None:
         """
-        DHCP state machine without wait loops to enable cooperative multitasking
+        DHCP state machine without wait loops to enable cooperative multitasking.
         This state machine is used both by the initial blocking lease request and
         the non-blocking DHCP maintenance function.
         """

@@ -27,7 +27,6 @@ https://www.python.org/dev/peps/pep-0333/
 * Author(s): Matt Costi, Patrick Van Oosterwijck
 """
 # pylint: disable=no-name-in-module
-# from __future__ import annotations
 try:
     from typing import Optional, List, Tuple, Dict
     from adafruit_wiznet5k.adafruit_wiznet5k import WIZNET5K

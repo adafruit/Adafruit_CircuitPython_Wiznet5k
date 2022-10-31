@@ -26,6 +26,10 @@ Implementation Notes
 
 * Adafruit's Bus Device library: https://github.com/adafruit/Adafruit_CircuitPython_BusDevice
 """
+
+__version__ = "0.0.0+auto.0"
+__repo__ = "https://github.com/adafruit/Adafruit_CircuitPython_Wiznet5k.git"
+
 # pylint: disable=too-many-lines
 try:
     from typing import Optional, Union, List, Tuple, Sequence
@@ -42,11 +46,6 @@ from micropython import const
 from adafruit_bus_device.spi_device import SPIDevice
 import adafruit_wiznet5k.adafruit_wiznet5k_dhcp as dhcp
 import adafruit_wiznet5k.adafruit_wiznet5k_dns as dns
-
-
-__version__ = "0.0.0+auto.0"
-__repo__ = "https://github.com/adafruit/Adafruit_CircuitPython_Wiznet5k.git"
-
 
 # Wiznet5k Registers
 REG_MR = const(0x0000)  # Mode
@@ -223,7 +222,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         :param Optional[str] hostname: The desired hostname for the DHCP server with optional {} to
             fill in the MAC address, defaults to None.
         :param float response_timeout: Time to wait for server to return packet in seconds,
-            defaults to 30.
+            defaults to 30.0.
 
         :return int: 0 if DHCP configured, -1 otherwise.
         """
@@ -359,7 +358,6 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         :param bytearray mac: The MAC address.
 
         :return str: Mac Address in the form 00:00:00:00:00:00
-
         """
         return "%s:%s:%s:%s:%s:%s" % (
             hex(mac[0]),
@@ -420,7 +418,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         Network configuration information.
 
         :return Tuple[bytearray, bytearray, bytearray, Tuple[int, int, int, int]]: \
-        The IP address, subnet mask, gateway address and DNS server address."""
+            The IP address, subnet mask, gateway address and DNS server address."""
         return (
             self.ip_address,
             self.read(REG_SUBR, 0x00, 4),
@@ -435,8 +433,8 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         """
         Set network configuration.
 
-        :params Tuple[bytearray, bytearray, bytearray, Tuple[int, int, int, int]]: \
-        Configuration settings - (ip_address, subnet_mask, gateway_address, dns_server).
+        :param Tuple[bytearray, bytearray, bytearray, Tuple[int, int, int, int]]:
+            Configuration settings - (ip_address, subnet_mask, gateway_address, dns_server).
         """
         ip_address, subnet_mask, gateway_address, dns_server = params
 
@@ -606,12 +604,11 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
     def socket_available(self, socket_num: int, sock_type: int = SNMR_TCP) -> int:
         """
-        Return the number of bytes available to be read from the socket.
+        Number of bytes available to be read from the socket.
 
         :param int socket_num: Socket to check for available bytes.
         :param int sock_type: Socket type. Use SNMR_TCP for TCP or SNMR_UDP for UDP, \
-        defaults to SNMR_TCP.
-
+            defaults to SNMR_TCP.
         :return int: Number of bytes available to read.
         """
         if self._debug:
@@ -642,7 +639,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
     def socket_status(self, socket_num: int) -> Optional[bytearray]:
         """
-        Return the socket connection status.
+        Socket connection status.
 
         Can be: SNSR_SOCK_CLOSED, SNSR_SOCK_INIT, SNSR_SOCK_LISTEN, SNSR_SOCK_SYNSENT,
         SNSR_SOCK_SYNRECV, SNSR_SYN_SOCK_ESTABLISHED, SNSR_SOCK_FIN_WAIT,
@@ -671,7 +668,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         :param Union[bytes, bytearray] dest: The destination as a host name or IP address.
         :param int port: Port to connect to (0 - 65,536).
         :param int conn_mode: The connection mode. Use SNMR_TCP for TCP or SNMR_UDP for UDP,
-        defaults to SNMR_TCP.
+            defaults to SNMR_TCP.
         """
         assert self.link_status, "Ethernet cable disconnected!"
         if self._debug:
@@ -712,7 +709,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
     def get_socket(self) -> int:
         """Request, allocate and return a socket from the W5k chip.
 
-        Cycles through the sockets to find the first available one, if any.
+        Cycle through the sockets to find the first available one, if any.
 
         :return int: The first available socket. Returns 0xFF if no sockets are free.
         """
@@ -773,7 +770,6 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         the IP address and port of the incoming connection.
 
         :param int socket_num: Socket number with connection to check.
-
         :return Tuple[int, Tuple[Union[str, bytearray], Union[int, bytearray]]]:
             If successful, the next (socket number, (destination IP address, destination port)).
 
@@ -799,8 +795,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
         :param int socket_num: The socket number to open.
         :param int conn_mode: The protocol to use. Use SNMR_TCP for TCP or SNMR_UDP for \
-        UDP, defaults to SNMR_TCP.
-
+            UDP, defaults to SNMR_TCP.
         :return int: 1 if the socket was opened, 0 if not.
         """
         assert self.link_status, "Ethernet cable disconnected!"
@@ -874,9 +869,9 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         :param int length: The number of bytes to read from the socket.
 
         :return Tuple[int, Union[int, bytearray]]: If the read was successful then the first
-        item of the tuple is the length of the data and the second is the data. If the read
-        was unsuccessful then both items equal an error code, 0 for no data waiting and -1
-        for no connection to the socket.
+            item of the tuple is the length of the data and the second is the data. If the read
+            was unsuccessful then both items equal an error code, 0 for no data waiting and -1
+            for no connection to the socket.
         """
         assert self.link_status, "Ethernet cable disconnected!"
         assert socket_num <= self.max_sockets, "Provided socket exceeds max_sockets."

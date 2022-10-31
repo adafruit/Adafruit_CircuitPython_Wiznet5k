@@ -86,8 +86,8 @@ def getaddrinfo(
     flags: int = 0,
 ) -> List[Tuple[int, int, int, str, Tuple[str, int]]]:
     """
-    Translate the host/port argument into a sequence of 5-tuples that
-    contain all the necessary arguments for creating a socket connected to that service.
+    Translate the host/port argument into a sequence of 5-tuples that contain all the necessary
+    arguments for creating a socket connected to that service.
 
     :param str host: a domain name, a string representation of an IPv4/v6 address or
         None.
@@ -97,6 +97,8 @@ def getaddrinfo(
         for UDP, defaults to 0x00.
     :param int proto: Unused in this implementation of socket.
     :param int flags: Unused in this implementation of socket.
+
+    :return List[Tuple[int, int, int, str, Tuple[str, int]]]: Address info entries.
     """
     if not isinstance(port, int):
         raise RuntimeError("Port must be an integer")
@@ -191,7 +193,7 @@ class socket:
         """
         Return the socket object's socket number.
 
-        :return int: The socket number
+        :return int: Socket number.
         """
         return self._socknum
 
@@ -259,7 +261,7 @@ class socket:
 
         :param Tuple[Optional[str], int] address: Address as a (host, port) tuple. The host
             may be an IPv4 address (a string of the form '255.255.255.255'), or None.
-            The port number is in the range (0- 65536).
+            The port number is in the range (0 - 65536).
         """
         if address[0] is not None:
             ip_address = _the_interface.unpretty_ip(address[0])
@@ -279,7 +281,7 @@ class socket:
         """
         Listen on the port specified by bind.
 
-        :param backlog: For compatibility but ignored.
+        :param Optional[Any] backlog: Included for compatibility but ignored.
         """
         assert self._listen_port is not None, "Use bind to set the port before listen!"
         _the_interface.socket_listen(self.socknum, self._listen_port)
@@ -373,7 +375,7 @@ class socket:
         """
         Connect to a remote socket and send data.
 
-        :param bytearray data: Desired data to send to the socket.
+        :param bytearray data: Data to send to the socket.
         :param tuple address: Remote socket as a (host, port) tuple.
         """
         self.connect(address)
@@ -390,6 +392,8 @@ class socket:
 
         :param int bufsize: Maximum number of bytes to receive.
         :param int flags: ignored, present for compatibility.
+
+        :return bytes: Data from the remote address.
         """
         if self.status == wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSED:
             return b""
@@ -501,7 +505,7 @@ class socket:
         :param nbytes: Maximum number of bytes to receive
         :param Any flags: ignored, present for compatibility.
 
-        :return: the number of bytes received
+        :return int: the number of bytes received
         """
         if nbytes == 0:
             nbytes = len(buf)
@@ -520,7 +524,8 @@ class socket:
         :param int nbytes: Maximum number of bytes to receive.
         :param int flags: Unused, present for compatibility.
 
-        :return: A tuple (nbytes, address) where address is a tuple (ip, port)
+        :return Tuple[int, Tuple[str, int]]: A tuple (nbytes, address) where address is a
+            tuple (ip, port)
         """
         return (
             self.recv_into(buf, nbytes),
@@ -534,7 +539,8 @@ class socket:
         """
         Read a line from the socket.
 
-        Attempt to return as many bytes as we can up to but not including '\r\n'.
+        Attempt to return as many bytes as we can up to but not including carriage return and
+        linefeed charater pairs.
 
         :return bytes: The data read from the socket.
         """
