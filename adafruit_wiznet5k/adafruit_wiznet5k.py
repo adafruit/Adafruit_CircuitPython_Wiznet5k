@@ -964,6 +964,8 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
         :param int socket_num: The socket to write to.
         :param bytearray buffer: The data to write to the socket.
+        :param float timeout: Write data timeout in seconds, defaults to 0.0 which waits
+            indefinitely.
 
         :return int: The number of bytes written to the buffer.
         """
