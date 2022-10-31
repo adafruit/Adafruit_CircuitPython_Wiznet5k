@@ -148,8 +148,8 @@ class socket:
         family: int = AF_INET,
         type: int = SOCK_STREAM,
         proto: Any = 0,
-        fileno: Optional[Any] = None,
-        socknum: Optional[Any] = None,
+        fileno: Optional[int] = None,
+        socknum: Optional[int] = None,
     ) -> None:
         """
         :param int family: Socket address (and protocol) family, defaults to AF_INET.
@@ -315,7 +315,7 @@ class socket:
 
         new_listen_socknum, addr = _the_interface.socket_accept(self.socknum)
         current_socknum = self.socknum
-        # Create a new socket object and swap socket nums so we can continue listening
+        # Create a new socket object and swap socket nums, so we can continue listening
         client_sock = socket()
         client_sock._socknum = current_socknum  # pylint: disable=protected-access
         self._socknum = new_listen_socknum  # pylint: disable=protected-access

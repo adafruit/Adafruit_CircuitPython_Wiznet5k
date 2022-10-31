@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2009 Jordan Terell (blog.jordanterrell.com)
+# SPDX-FileCopyrightText: 2009 Jordan Terrell (blog.jordanterrell.com)
 # SPDX-FileCopyrightText: 2020 Brent Rubell for Adafruit Industries
 # SPDX-FileCopyrightText: 2021 Patrick Van Oosterwijck @ Silicognition LLC
 #

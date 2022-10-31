@@ -38,7 +38,7 @@ class NTP:
         self,
         iface: WIZNET5K,
         ntp_address: str,
-        utc: int,
+        utc: float,
         debug: bool = False,
     ) -> None:
         """
@@ -64,7 +64,7 @@ class NTP:
         """
         Get the time from the NTP server.
 
-        :return int: Time in seconds since the epoch.
+        :return time.struct_time: The local time.
         """
         self._sock.bind((None, 50001))
         self._sock.sendto(self._pkt_buf_, (self._ntp_server, 123))
@@ -73,6 +73,7 @@ class NTP:
             if data:
                 sec = data[40:44]
                 int_cal = int.from_bytes(sec, "big")
-                cal = int_cal - 2208988800 + self._utc * 3600
+                # UTC offset may be a float as some offsets are half hours so force int.
+                cal = int(int_cal - 2208988800 + self._utc * 3600)
                 cal = time.localtime(cal)
                 return cal

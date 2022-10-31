@@ -181,7 +181,7 @@ class WSGIServer:
         The application callable will be given the resulting environ dictionary.
         It contains metadata about the incoming request and the request body ("wsgi.input")
 
-        :param socket.socket client: socket to read the request from
+        :param socket.socket client: socket to read the request from.
 
         :return Dict: Data for the application callable.
         """

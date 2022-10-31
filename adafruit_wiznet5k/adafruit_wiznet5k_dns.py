@@ -68,7 +68,7 @@ class DNS:
         self._sock.settimeout(1)
 
         self._dns_server = dns_address
-        self._host = 0
+        self._host = b""
         self._request_id = 0  # request identifier
         self._pkt_buf = bytearray()
 
@@ -136,7 +136,7 @@ class DNS:
         if not xid == self._request_id:
             if self._debug:
                 print(
-                    "* DNS ERROR: Received request identifer {} \
+                    "* DNS ERROR: Received request identifier {} \
                       does not match expected {}".format(
                         xid, self._request_id
                     )

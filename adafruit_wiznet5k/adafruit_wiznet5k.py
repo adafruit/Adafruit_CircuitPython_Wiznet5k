@@ -150,7 +150,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         is_dhcp: bool = True,
         mac: Union[List[int], Tuple[int]] = DEFAULT_MAC,
         hostname: Optional[str] = None,
-        dhcp_timeout: float = 30,
+        dhcp_timeout: float = 30.0,
         debug: bool = False,
     ) -> None:
         """
@@ -162,7 +162,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             (0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED).
         :param str hostname: The desired hostname, with optional {} to fill in the MAC
             address, defaults to None.
-        :param float dhcp_timeout: Timeout in seconds for DHCP response, defaults to 30.
+        :param float dhcp_timeout: Timeout in seconds for DHCP response, defaults to 30.0.
         :param bool debug: Enable debugging output, defaults to False.
         """
         self._debug = debug
@@ -406,7 +406,6 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
         :return Union[int, bytearray]: The port number of the socket connection.
         """
-        # TODO: why return the buffer?
         if socket_num >= self.max_sockets:
             return self._pbuff
         for octet in range(2):
@@ -439,7 +438,6 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         :params Tuple[bytearray, bytearray, bytearray, Tuple[int, int, int, int]]: \
         Configuration settings - (ip_address, subnet_mask, gateway_address, dns_server).
         """
-        # TODO: Might be better if params can be str as well
         ip_address, subnet_mask, gateway_address, dns_server = params
 
         self.write(REG_SIPR, 0x04, ip_address)
@@ -455,7 +453,6 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         :return int: 1 if the initialization succeeds, 0 if it fails.
         """
         time.sleep(1)
-        # TODO: Isn't the CS pin initialized in busio?
         self._cs.switch_to_output()
         self._cs.value = 1
 
@@ -525,7 +522,6 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
         :return int: 0 if the reset succeeds, -1 if not.
         """
-        # TODO: mode_reg appears to be unused, maybe self._read_mr starts the reset?
         mode_reg = self._read_mr()
         self._write_mr(0x80)
         mode_reg = self._read_mr()
@@ -589,7 +585,6 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         :param int callback: Callback reference.
         :param Union[int, Sequence[Union[int, bytes]]] data: Data to write to the register address.
         """
-        # TODO: Call with int means an error in a previous function
         with self._device as bus_device:
             if self._chip_type == "w5500":
                 bus_device.write(bytes([addr >> 8]))  # pylint: disable=no-member
@@ -688,7 +683,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         # initialize a socket and set the mode
         res = self.socket_open(socket_num, conn_mode=conn_mode)
         if res == 1:
-            raise RuntimeError("Failed to initalize a connection with the socket.")
+            raise RuntimeError("Failed to initialize a connection with the socket.")
 
         # set socket destination IP and port
         self._write_sndipr(socket_num, dest)
@@ -758,7 +753,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         res = self.socket_open(socket_num, conn_mode=conn_mode)
         self.src_port = 0
         if res == 1:
-            raise RuntimeError("Failed to initalize the socket.")
+            raise RuntimeError("Failed to initialize the socket.")
         # Send listen command
         self._send_socket_cmd(socket_num, CMD_SOCK_LISTEN)
         # Wait until ready
@@ -979,7 +974,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         assert socket_num <= self.max_sockets, "Provided socket exceeds max_sockets."
         status = 0
         ret = 0
-        free_size = 0  # TODO: Bug report
+        free_size = 0
         if len(buffer) > SOCK_SIZE:
             ret = SOCK_SIZE
         else:
@@ -1020,7 +1015,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
                 dst_addr = socket_num * SOCK_SIZE + 0x4000
                 self.write(dst_addr, 0x00, txbuf)
             else:
-                txbuf = buffer[:ret]  # TODO: Bug report
+                txbuf = buffer[:ret]
                 self.write(dst_addr, 0x00, buffer[:ret])
 
         # update sn_tx_wr to the value + data size
@@ -1153,5 +1148,4 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         if self._chip_type == "w5100s":
             cntl_byte = 0
             return self.read(self._ch_base_msb + sock * CH_SIZE + address, cntl_byte)
-        # TODO: If the chip is not supported, this should raise an exception.
         return None
