@@ -16,7 +16,6 @@ ethernet modules.
 try:
     from typing import Union, Tuple
 
-    # pylint: disable=cyclic-import
     from adafruit_wiznet5k import adafruit_wiznet5k
 except ImportError:
     pass

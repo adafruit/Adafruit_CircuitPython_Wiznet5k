@@ -20,7 +20,6 @@ Implementation Notes
 try:
     import typing  # pylint: disable=unused-import
 
-    # pylint: disable=cyclic-import
     from adafruit_wiznet5k import adafruit_wiznet5k
 except ImportError:
     pass

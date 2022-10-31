@@ -16,7 +16,6 @@ Pure-Python implementation of Jordan Terrell's DHCP library v0.3
 try:
     from typing import Optional, Union, Tuple, Sequence
 
-    # pylint: disable=cyclic-import
     from adafruit_wiznet5k import adafruit_wiznet5k
 except ImportError:
     pass

@@ -21,7 +21,6 @@ import gc
 import time
 from micropython import const
 
-# pylint is tripping over importing for typing so disable
 import adafruit_wiznet5k as wiznet5k
 
 # pylint: disable=invalid-name
