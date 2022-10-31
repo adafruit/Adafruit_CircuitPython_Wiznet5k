@@ -66,7 +66,7 @@ class DNS:
         self._sock.settimeout(1)
 
         self._dns_server = dns_address
-        self._host = 0  # TODO: make b"" to resolve a type error with .decode in _build_dns_ques...
+        self._host = 0
         self._request_id = 0  # request identifier
         self._pkt_buf = bytearray()
 
@@ -78,7 +78,6 @@ class DNS:
 
         :return Union[int, bytes] The IPv4 address if successful, -1 otherwise.
         """
-        # TODO: See if it will take a string.
         if self._dns_server is None:
             return INVALID_SERVER
         self._host = hostname
@@ -143,7 +142,7 @@ class DNS:
             return -1
         # Validate flags
         flags = int.from_bytes(self._pkt_buf[2:4], "big")
-        if not flags in (0x8180, 0x8580):  # TODO: Should be `flags not in ...`
+        if not flags in (0x8180, 0x8580):
             if self._debug:
                 print("* DNS ERROR: Invalid flags, ", flags)
             return -1

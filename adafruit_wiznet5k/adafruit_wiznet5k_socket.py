@@ -93,8 +93,6 @@ def getaddrinfo(
     :param int proto: Unused in this implementation of socket.
     :param int flags: Unused in this implementation of socket.
     """
-    # TODO: Python socket accepts port as a string or int or None. How are str and None handled?
-    # TODO: Python socket has arg type in place of socktype.
     if not isinstance(port, int):
         raise RuntimeError("Port must be an integer")
     if is_ipv4(host):
@@ -322,7 +320,6 @@ class socket:
         self._socknum = new_listen_socknum  # pylint: disable=protected-access
         self.bind((None, self._listen_port))
         self.listen()
-        # TODO: Weird logic below. Should be an if, not a while
         while self.status != wiznet5k.adafruit_wiznet5k.SNSR_SOCK_LISTEN:
             raise RuntimeError("Failed to open new listening socket")
         return client_sock, addr
@@ -340,7 +337,6 @@ class socket:
         :param Optional[int] conntype: Raises an exception if set to 3, unused otherwise, defaults
             to None.
         """
-        # TODO: conntype unused beyond raising an exception.
         assert (
             conntype != 0x03
         ), "Error: SSL/TLS is not currently supported by CircuitPython."
@@ -380,7 +376,7 @@ class socket:
         :param tuple address: Remote socket as a (host, port) tuple.
         """
         self.connect(address)
-        return self.send(data)  # TODO: send only returns None, so can delete
+        return self.send(data)
 
     def recv(
         # pylint: disable=too-many-branches
@@ -431,9 +427,7 @@ class socket:
                 elif self._sock_type == SOCK_DGRAM:
                     recv = _the_interface.read_udp(self.socknum, min(to_read, avail))[1]
                     to_read = len(recv)  # only get this dgram
-                recv = bytes(
-                    recv
-                )  # TODO: Maybe raise a specific exception before this line
+                recv = bytes(recv)
                 received.append(recv)
                 to_read -= len(recv)
                 gc.collect()
@@ -441,7 +435,7 @@ class socket:
                 break
         self._buffer += b"".join(received)
 
-        ret = None  # TODO: Unused definition
+        ret = None
         if len(self._buffer) == bufsize:
             ret = self._buffer
             self._buffer = b""
@@ -463,9 +457,8 @@ class socket:
 
         :return bytes: All data available from the connection.
         """
-        # TODO: bufsize unused
         # print("Socket read", bufsize)
-        ret = None  # TODO: Useless definition
+        ret = None
         avail = self.available()
         if avail:
             if self._sock_type == SOCK_STREAM:

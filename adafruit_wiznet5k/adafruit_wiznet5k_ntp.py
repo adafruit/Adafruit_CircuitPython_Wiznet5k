@@ -37,7 +37,7 @@ class NTP:
         self,
         iface: adafruit_wiznet5k.WIZNET5K,
         ntp_address: str,
-        utc: int,  # TODO: Should be float. India is UTC + 7.5
+        utc: int,
         debug: bool = False,
     ) -> None:
         """
