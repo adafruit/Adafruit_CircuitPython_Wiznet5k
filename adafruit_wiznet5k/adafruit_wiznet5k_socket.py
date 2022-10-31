@@ -539,8 +539,8 @@ class socket:
         """
         Read a line from the socket.
 
-        Attempt to return as many bytes as we can up to but not including carriage return and
-        linefeed charater pairs.
+        Attempt to return as many bytes as we can up to but not including a carriage return and
+        linefeed charater pair.
 
         :return bytes: The data read from the socket.
         """

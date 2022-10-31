@@ -289,7 +289,8 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         """
         Ethernet controller chip type.
 
-        :return str: The chip type."""
+        :return str: The chip type.
+        """
         return self._chip_type
 
     @property
@@ -297,7 +298,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         """
         Configured IP address.
 
-        :return bytearray.
+        :return bytearray: IP address as four bytes.
         """
         return self.read(REG_SIPR, 0x00, 4)
 
@@ -307,7 +308,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         ip: bytearray,
     ) -> str:
         """
-        Convert a bytearray IP address to a dotted-quad string for printing.
+        Convert a 4 byte IP address to a dotted-quad string for printing.
 
         :param bytearray ip: A four byte IP address.
 
@@ -323,9 +324,9 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         """
         Convert a dotted-quad string to a four byte IP address.
 
-        :param str ip: The IP address (a string of the form '255.255.255.255') to be converted.
+        :param str ip: IP address (a string of the form '255.255.255.255') to be converted.
 
-        :return bytes: The IP address in four bytes.
+        :return bytes: IP address in four bytes.
         """
         octets = [int(x) for x in ip.split(".")]
         return bytes(octets)
@@ -335,7 +336,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         """
         Ethernet hardware's MAC address.
 
-        :return bytearray: The six byte MAC address."""
+        :return bytearray: Six byte MAC address."""
         return self.read(REG_SHAR, 0x00, 6)
 
     @mac_address.setter
@@ -374,7 +375,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
         :param int socket_num: ID number of the socket to check.
 
-        :return Union[str, bytearray]: The four byte IP address.
+        :return Union[str, bytearray]: A four byte IP address.
         """
         if socket_num >= self.max_sockets:
             return self._pbuff
@@ -553,7 +554,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         :param int length: Number of bytes to read from the register, defaults to 1.
         :param Optional[WriteableBuffer] buffer: Buffer to read data into, defaults to None.
 
-        :return Union[WriteableBuffer, bytearray]: The data read from the chip.
+        :return Union[WriteableBuffer, bytearray]: Data read from the chip.
         """
         with self._device as bus_device:
             if self._chip_type == "w5500":
@@ -609,6 +610,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         :param int socket_num: Socket to check for available bytes.
         :param int sock_type: Socket type. Use SNMR_TCP for TCP or SNMR_UDP for UDP, \
             defaults to SNMR_TCP.
+
         :return int: Number of bytes available to read.
         """
         if self._debug:
