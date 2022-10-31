@@ -41,7 +41,7 @@ import adafruit_wiznet5k.adafruit_wiznet5k_socket as socket
 _the_interface = None  # pylint: disable=invalid-name
 
 
-def set_interface(iface: wiznet5k.adafruit_wiznet5k.WIZNET5K) -> None:
+def set_interface(iface) -> None:
     """
     Helper to set the global internet interface.
 

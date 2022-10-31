@@ -19,8 +19,6 @@ Implementation Notes
 """
 try:
     import typing  # pylint: disable=unused-import
-
-    from adafruit_wiznet5k import adafruit_wiznet5k
 except ImportError:
     pass
 import time
@@ -35,7 +33,7 @@ class NTP:
 
     def __init__(
         self,
-        iface: adafruit_wiznet5k.WIZNET5K,
+        iface,
         ntp_address: str,
         utc: int,
         debug: bool = False,

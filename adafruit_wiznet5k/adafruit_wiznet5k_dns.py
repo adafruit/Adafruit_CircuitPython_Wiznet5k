@@ -15,8 +15,6 @@ ethernet modules.
 """
 try:
     from typing import Union, Tuple
-
-    from adafruit_wiznet5k import adafruit_wiznet5k
 except ImportError:
     pass
 
@@ -50,7 +48,7 @@ class DNS:
 
     def __init__(
         self,
-        iface: adafruit_wiznet5k.WIZNET5K,
+        iface,
         dns_address: Union[str, Tuple[int, int, int, int]],
         debug: bool = False,
     ) -> None:
