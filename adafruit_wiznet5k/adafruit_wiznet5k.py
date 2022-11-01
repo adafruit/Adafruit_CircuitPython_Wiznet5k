@@ -27,17 +27,21 @@ Implementation Notes
 * Adafruit's Bus Device library: https://github.com/adafruit/Adafruit_CircuitPython_BusDevice
 """
 
-__version__ = "0.0.0+auto.0"
-__repo__ = "https://github.com/adafruit/Adafruit_CircuitPython_Wiznet5k.git"
-
 # pylint: disable=too-many-lines
+from __future__ import annotations
+
 try:
-    from typing import Optional, Union, List, Tuple, Sequence
-    from circuitpython_typing import WriteableBuffer
-    import busio
-    import digitalio
+    from typing import TYPE_CHECKING, Optional, Union, List, Tuple, Sequence
+
+    if TYPE_CHECKING:
+        from circuitpython_typing import WriteableBuffer
+        import busio
+        import digitalio
 except ImportError:
     pass
+
+__version__ = "0.0.0+auto.0"
+__repo__ = "https://github.com/adafruit/Adafruit_CircuitPython_Wiznet5k.git"
 
 from random import randint
 import time

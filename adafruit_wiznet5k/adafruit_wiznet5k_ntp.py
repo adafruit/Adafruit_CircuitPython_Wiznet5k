@@ -20,15 +20,17 @@ Implementation Notes
 from __future__ import annotations
 
 try:
-    import typing  # pylint: disable=unused-import
-    from adafruit_wiznet5k.adafruit_wiznet5k import WIZNET5K
+    from typing import TYPE_CHECKING
+
+    if TYPE_CHECKING:
+        from adafruit_wiznet5k.adafruit_wiznet5k import WIZNET5K
 except ImportError:
     pass
 import time
 import adafruit_wiznet5k.adafruit_wiznet5k_socket as socket
 
-##__version__ = "0.0.0+auto.0"
-##__repo__ = "https://github.com/adafruit/Adafruit_CircuitPython_NTP.git"
+# __version__ = "0.0.0+auto.0"
+# __repo__ = "https://github.com/adafruit/Adafruit_CircuitPython_NTP.git"
 
 
 class NTP:

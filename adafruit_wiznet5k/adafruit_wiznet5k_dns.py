@@ -16,10 +16,10 @@ ethernet modules.
 from __future__ import annotations
 
 try:
-    from typing import Union, Tuple
+    from typing import TYPE_CHECKING, Union, Tuple
 
-    # pylint: disable=cyclic-import
-    from adafruit_wiznet5k.adafruit_wiznet5k import WIZNET5K
+    if TYPE_CHECKING:
+        from adafruit_wiznet5k.adafruit_wiznet5k import WIZNET5K
 except ImportError:
     pass
 

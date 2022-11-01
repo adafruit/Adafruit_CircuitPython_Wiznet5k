@@ -16,12 +16,13 @@ Pure-Python implementation of Jordan Terrell's DHCP library v0.3
 from __future__ import annotations
 
 try:
-    from typing import Optional, Union, Tuple, Sequence
+    from typing import TYPE_CHECKING, Optional, Union, Tuple, Sequence
 
-    # pylint: disable=cyclic-import
-    from adafruit_wiznet5k.adafruit_wiznet5k import WIZNET5K
+    if TYPE_CHECKING:
+        from adafruit_wiznet5k.adafruit_wiznet5k import WIZNET5K
 except ImportError:
     pass
+
 
 import gc
 import time

@@ -15,10 +15,10 @@ A socket compatible interface with the Wiznet5k module.
 from __future__ import annotations
 
 try:
-    from typing import Any, Optional, Tuple, List, Union
+    from typing import TYPE_CHECKING, Any, Optional, Tuple, List, Union
 
-    # pylint: disable=cyclic-import
-    from adafruit_wiznet5k.adafruit_wiznet5k import WIZNET5K
+    if TYPE_CHECKING:
+        from adafruit_wiznet5k.adafruit_wiznet5k import WIZNET5K
 except ImportError:
     pass
 
