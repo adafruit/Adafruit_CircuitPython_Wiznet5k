@@ -244,7 +244,7 @@ class DNS:
             # append the sz of the section
             self._pkt_buf.append(len(host[i]))
             # append the section data
-            self._pkt_buf += host[i]
+            self._pkt_buf += bytes(host[i], "utf-8")
         # end of the name
         self._pkt_buf.append(0x00)
         # Type A record
