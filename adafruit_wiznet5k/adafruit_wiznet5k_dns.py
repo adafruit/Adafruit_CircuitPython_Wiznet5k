@@ -198,7 +198,6 @@ class DNS:
         self._sock.settimeout(1)
 
         self._dns_server = dns_address
-        self._host = 0
         self._request_id = 0  # Request ID.
         self._request_length = 0  # Length of last query.
         self._pkt_buf = bytearray()
@@ -212,10 +211,10 @@ class DNS:
         """
         if self._dns_server is None:
             return INVALID_SERVER
-        self._host = hostname
+
         # build DNS request packet
         self._request_id, self._request_length, self._pkt_buf = _build_dns_query(
-            self._host
+            hostname
         )
 
         # Send DNS request packet
