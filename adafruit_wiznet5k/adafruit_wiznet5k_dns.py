@@ -38,6 +38,12 @@ INVALID_RESPONSE = const(-4)
 DNS_PORT = const(0x35)  # port used for DNS request
 
 
+def _debug_print(*, debug: bool, message: str) -> None:
+    """Helper fucntion to improve code readability."""
+    if debug:
+        print(message)
+
+
 class DNS:
     """W5K DNS implementation.
 
@@ -73,8 +79,7 @@ class DNS:
         # Send DNS request packet
         self._sock.bind((None, DNS_PORT))
         self._sock.connect((self._dns_server, DNS_PORT))
-        if self._debug:
-            print("* DNS: Sending request packet...")
+        _debug_print(debug=self._debug, message="* DNS: Sending request packet...")
         self._sock.send(self._pkt_buf)
 
         # wait and retry 3 times for a response
@@ -87,15 +92,20 @@ class DNS:
             while packet_sz <= 0:
                 packet_sz = self._sock.available()
                 if (time.monotonic() - start_time) > 1.0:
-                    if self._debug:
-                        print("* DNS ERROR: Did not receive DNS response!")
+                    _debug_print(
+                        debug=self._debug,
+                        message="* DNS ERROR: Did not receive DNS response!",
+                    )
                     return -1
                 time.sleep(0.05)
             # recv packet into buf
             self._pkt_buf = self._sock.recv()
             addr = self._parse_dns_response()
-            if addr == -1 and self._debug:
-                print("* DNS ERROR: Failed to resolve DNS response, retrying...")
+            if addr == -1:
+                _debug_print(
+                    debug=self._debug,
+                    message="* DNS ERROR: Failed to resolve DNS response, retrying…",
+                )
             retries += 1
 
         self._sock.close()
@@ -115,30 +125,34 @@ class DNS:
         # Validate request identifier
         xid = int.from_bytes(self._pkt_buf[0:2], "big")
         if not xid == self._request_id:
-            if self._debug:
-                print(
-                    "* DNS ERROR: Received request identifer {} \
-                      does not match expected {}".format(
-                        xid, self._request_id
-                    )
-                )
+            _debug_print(
+                debug=self._debug,
+                message="* DNS ERROR: Response ID {x:x} does not match query ID {y:x}".format(
+                    x=xid, y=self._request_id
+                ),
+            )
             return -1
         # Validate flags
         flags = int.from_bytes(self._pkt_buf[2:4], "big")
         if not flags in (0x8180, 0x8580):
-            if self._debug:
-                print("* DNS ERROR: Invalid flags, ", flags)
+            _debug_print(
+                debug=self._debug,
+                message="* DNS ERROR: Invalid flags 0x{x:x}, bx{x:b}".format(x=flags),
+            )
             return -1
         # Number of questions
         qr_count = int.from_bytes(self._pkt_buf[4:6], "big")
         if not qr_count >= 1:
-            if self._debug:
-                print("* DNS ERROR: Question count >=1, ", qr_count)
+            _debug_print(
+                debug=self._debug,
+                message="* DNS ERROR: Question count >=1, {}".format(qr_count),
+            )
             return -1
         # Number of answers
         an_count = int.from_bytes(self._pkt_buf[6:8], "big")
-        if self._debug:
-            print("* DNS Answer Count: ", an_count)
+        _debug_print(
+            debug=self._debug, message="* DNS Answer Count: {}".format(an_count)
+        )
         if not an_count >= 1:
             return -1
 
@@ -158,16 +172,20 @@ class DNS:
         # Validate Query is Type A
         q_type = int.from_bytes(self._pkt_buf[ptr : ptr + 2], "big")
         if not q_type == TYPE_A:
-            if self._debug:
-                print("* DNS ERROR: Incorrect Query Type: ", q_type)
+            _debug_print(
+                debug=self._debug,
+                message="* DNS ERROR: Incorrect Query Type: {}".format(q_type),
+            )
             return -1
         ptr += 2
 
         # Validate Query is Type A
         q_class = int.from_bytes(self._pkt_buf[ptr : ptr + 2], "big")
         if not q_class == TYPE_A:
-            if self._debug:
-                print("* DNS ERROR: Incorrect Query Class: ", q_class)
+            _debug_print(
+                debug=self._debug,
+                message="* DNS ERROR: Incorrect Query Class: {}".format(q_class),
+            )
             return -1
         ptr += 2
 
@@ -183,16 +201,20 @@ class DNS:
         # Validate Answer Type A
         ans_type = int.from_bytes(self._pkt_buf[ptr : ptr + 2], "big")
         if not ans_type == TYPE_A:
-            if self._debug:
-                print("* DNS ERROR: Incorrect Answer Type: ", ans_type)
+            _debug_print(
+                debug=self._debug,
+                message="* DNS ERROR: Incorrect Answer Type: {}".format(ans_type),
+            )
             return -1
         ptr += 2
 
         # Validate Answer Class IN
         ans_class = int.from_bytes(self._pkt_buf[ptr : ptr + 2], "big")
         if not ans_class == TYPE_A:
-            if self._debug:
-                print("* DNS ERROR: Incorrect Answer Class: ", ans_class)
+            _debug_print(
+                debug=self._debug,
+                message="* DNS ERROR: Incorrect Answer Class: {}".format(ans_class),
+            )
             return -1
         ptr += 2
 
@@ -202,8 +224,10 @@ class DNS:
         # Validate addr is IPv4
         data_len = int.from_bytes(self._pkt_buf[ptr : ptr + 2], "big")
         if not data_len == DATA_LEN:
-            if self._debug:
-                print("* DNS ERROR: Unexpected Data Length: ", data_len)
+            _debug_print(
+                debug=self._debug,
+                message="* DNS ERROR: Unexpected Data Length: {}".format(data_len),
+            )
             return -1
         ptr += 2
         # Return address
