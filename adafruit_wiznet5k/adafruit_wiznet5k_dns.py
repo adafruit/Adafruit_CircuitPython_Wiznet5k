@@ -22,8 +22,6 @@ import time
 from random import getrandbits
 from micropython import const
 import adafruit_wiznet5k.adafruit_wiznet5k_socket as socket
-from adafruit_wiznet5k.adafruit_wiznet5k_socket import htons
-
 
 QUERY_FLAG = const(0x00)
 OPCODE_STANDARD_QUERY = const(0x00)
@@ -72,6 +70,19 @@ def _build_dns_header() -> Tuple[int, bytearray]:
     return request_id, request_header
 
 
+def _build_dns_question(*, domain: bytes, buffer: bytearray) -> bytearray:
+    """Build DNS question"""
+    host = domain.decode("utf-8").split(".")
+    # write out each label of host
+    for label in host:
+        # Append the length of the label
+        buffer.append(len(label))
+        # Append the label
+        buffer += bytes(label, "utf-8")
+    # Hard code null, question type and class as they never vary.
+    return buffer + bytearray([0x00, 0x00, 0x01, 0x00, 0x01])
+
+
 class DNS:
     """W5K DNS implementation.
 
@@ -102,7 +113,7 @@ class DNS:
         self._host = hostname
         # build DNS request packet
         self._request_id, self._pkt_buf = _build_dns_header()
-        self._build_dns_question()
+        self._pkt_buf = _build_dns_question(domain=self._host, buffer=self._pkt_buf)
 
         # Send DNS request packet
         self._sock.bind((None, DNS_PORT))
@@ -260,48 +271,3 @@ class DNS:
         ptr += 2
         # Return address
         return self._pkt_buf[ptr : ptr + 4]
-
-    def _build_dns_header(self):
-        """Builds DNS header."""
-        # generate a random, 16-bit, request identifier
-        self._request_id = getrandbits(16)
-
-        # ID, 16-bit identifier
-        self._pkt_buf.append(self._request_id >> 8)
-        self._pkt_buf.append(self._request_id & 0xFF)
-
-        # Flags (0x0100)
-        self._pkt_buf.append(0x01)
-        self._pkt_buf.append(0x00)
-
-        # QDCOUNT
-        self._pkt_buf.append(0x00)
-        self._pkt_buf.append(0x01)
-        # ANCOUNT
-        self._pkt_buf.append(0x00)
-        self._pkt_buf.append(0x00)
-        # NSCOUNT
-        self._pkt_buf.append(0x00)
-        self._pkt_buf.append(0x00)
-        # ARCOUNT
-        self._pkt_buf.append(0x00)
-        self._pkt_buf.append(0x00)
-
-    def _build_dns_question(self):
-        """Build DNS question"""
-        host = self._host.decode("utf-8")
-        host = host.split(".")
-        # write out each section of host
-        for i, _ in enumerate(host):
-            # append the sz of the section
-            self._pkt_buf.append(len(host[i]))
-            # append the section data
-            self._pkt_buf += bytes(host[i], "utf-8")
-        # end of the name
-        self._pkt_buf.append(0x00)
-        # Type A record
-        self._pkt_buf.append(htons(TYPE_A) & 0xFF)
-        self._pkt_buf.append(htons(TYPE_A) >> 8)
-        # Class IN
-        self._pkt_buf.append(htons(CLASS_IN) & 0xFF)
-        self._pkt_buf.append(htons(CLASS_IN) >> 8)
