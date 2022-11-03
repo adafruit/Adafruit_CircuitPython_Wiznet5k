@@ -79,6 +79,123 @@ def _build_dns_query(domain: bytes) -> Tuple[int, bytearray]:
     return query_id, query
 
 
+def _parse_dns_response(*, response: bytearray, query_id: int, debug) -> bytearray:
+    # pylint: disable=too-many-return-statements, too-many-branches, too-many-statements, too-many-locals
+    """Receives and parses DNS query response.
+    Returns desired hostname address if obtained, -1 otherwise.
+
+    """
+
+    # Validate request identifier
+    xid = int.from_bytes(response[0:2], "big")
+    if not xid == query_id:
+        _debug_print(
+            debug=debug,
+            message="* DNS ERROR: Response ID {x:x} does not match query ID {y:x}".format(
+                x=xid, y=query_id
+            ),
+        )
+        return -1
+    # Validate flags
+    flags = int.from_bytes(response[2:4], "big")
+    if not flags in (0x8180, 0x8580):
+        _debug_print(
+            debug=debug,
+            message="* DNS ERROR: Invalid flags 0x{x:x}, bx{x:b}".format(x=flags),
+        )
+        return -1
+    # Number of questions
+    qr_count = int.from_bytes(response[4:6], "big")
+    if not qr_count >= 1:
+        _debug_print(
+            debug=debug,
+            message="* DNS ERROR: Question count >=1, {}".format(qr_count),
+        )
+        return -1
+    # Number of answers
+    an_count = int.from_bytes(response[6:8], "big")
+    _debug_print(debug=debug, message="* DNS Answer Count: {}".format(an_count))
+    if not an_count >= 1:
+        return -1
+
+    # Parse query
+    ptr = 12
+    name_len = 1
+    while name_len > 0:
+        # read the length of the name
+        name_len = response[ptr]
+        if name_len == 0x00:
+            # we reached the end of this name
+            ptr += 1  # inc. pointer by 0x00
+            break
+        # advance pointer
+        ptr += name_len + 1
+
+    # Validate Query is Type A
+    q_type = int.from_bytes(response[ptr : ptr + 2], "big")
+    if not q_type == TYPE_A:
+        _debug_print(
+            debug=debug,
+            message="* DNS ERROR: Incorrect Query Type: {}".format(q_type),
+        )
+        return -1
+    ptr += 2
+
+    # Validate Query is Type A
+    q_class = int.from_bytes(response[ptr : ptr + 2], "big")
+    if not q_class == TYPE_A:
+        _debug_print(
+            debug=debug,
+            message="* DNS ERROR: Incorrect Query Class: {}".format(q_class),
+        )
+        return -1
+    ptr += 2
+
+    # Let's take the first type-a answer
+    if response[ptr] != 0xC0:
+        return -1
+    ptr += 1
+
+    if response[ptr] != 0xC:
+        return -1
+    ptr += 1
+
+    # Validate Answer Type A
+    ans_type = int.from_bytes(response[ptr : ptr + 2], "big")
+    if not ans_type == TYPE_A:
+        _debug_print(
+            debug=debug,
+            message="* DNS ERROR: Incorrect Answer Type: {}".format(ans_type),
+        )
+        return -1
+    ptr += 2
+
+    # Validate Answer Class IN
+    ans_class = int.from_bytes(response[ptr : ptr + 2], "big")
+    if not ans_class == TYPE_A:
+        _debug_print(
+            debug=debug,
+            message="* DNS ERROR: Incorrect Answer Class: {}".format(ans_class),
+        )
+        return -1
+    ptr += 2
+
+    # skip over TTL
+    ptr += 4
+
+    # Validate addr is IPv4
+    data_len = int.from_bytes(response[ptr : ptr + 2], "big")
+    if not data_len == DATA_LEN:
+        _debug_print(
+            debug=debug,
+            message="* DNS ERROR: Unexpected Data Length: {}".format(data_len),
+        )
+        return -1
+    ptr += 2
+    # Return address
+    return response[ptr : ptr + 4]
+
+
 class DNS:
     """W5K DNS implementation.
 
@@ -134,7 +251,13 @@ class DNS:
                 time.sleep(0.05)
             # recv packet into buf
             self._pkt_buf = self._sock.recv()
-            addr = self._parse_dns_response()
+            _debug_print(
+                debug=self._debug,
+                message="DNS Packet Received: {}".format(self._pkt_buf),
+            )
+            addr = _parse_dns_response(
+                response=self._pkt_buf, query_id=self._request_id, debug=self._debug
+            )
             if addr == -1:
                 _debug_print(
                     debug=self._debug,
@@ -144,125 +267,3 @@ class DNS:
 
         self._sock.close()
         return addr
-
-    def _parse_dns_response(
-        self,
-    ):  # pylint: disable=too-many-return-statements, too-many-branches, too-many-statements, too-many-locals
-        """Receives and parses DNS query response.
-        Returns desired hostname address if obtained, -1 otherwise.
-
-        """
-
-        if self._debug:
-            print("DNS Packet Received: ", self._pkt_buf)
-
-        # Validate request identifier
-        xid = int.from_bytes(self._pkt_buf[0:2], "big")
-        if not xid == self._request_id:
-            _debug_print(
-                debug=self._debug,
-                message="* DNS ERROR: Response ID {x:x} does not match query ID {y:x}".format(
-                    x=xid, y=self._request_id
-                ),
-            )
-            return -1
-        # Validate flags
-        flags = int.from_bytes(self._pkt_buf[2:4], "big")
-        if not flags in (0x8180, 0x8580):
-            _debug_print(
-                debug=self._debug,
-                message="* DNS ERROR: Invalid flags 0x{x:x}, bx{x:b}".format(x=flags),
-            )
-            return -1
-        # Number of questions
-        qr_count = int.from_bytes(self._pkt_buf[4:6], "big")
-        if not qr_count >= 1:
-            _debug_print(
-                debug=self._debug,
-                message="* DNS ERROR: Question count >=1, {}".format(qr_count),
-            )
-            return -1
-        # Number of answers
-        an_count = int.from_bytes(self._pkt_buf[6:8], "big")
-        _debug_print(
-            debug=self._debug, message="* DNS Answer Count: {}".format(an_count)
-        )
-        if not an_count >= 1:
-            return -1
-
-        # Parse query
-        ptr = 12
-        name_len = 1
-        while name_len > 0:
-            # read the length of the name
-            name_len = self._pkt_buf[ptr]
-            if name_len == 0x00:
-                # we reached the end of this name
-                ptr += 1  # inc. pointer by 0x00
-                break
-            # advance pointer
-            ptr += name_len + 1
-
-        # Validate Query is Type A
-        q_type = int.from_bytes(self._pkt_buf[ptr : ptr + 2], "big")
-        if not q_type == TYPE_A:
-            _debug_print(
-                debug=self._debug,
-                message="* DNS ERROR: Incorrect Query Type: {}".format(q_type),
-            )
-            return -1
-        ptr += 2
-
-        # Validate Query is Type A
-        q_class = int.from_bytes(self._pkt_buf[ptr : ptr + 2], "big")
-        if not q_class == TYPE_A:
-            _debug_print(
-                debug=self._debug,
-                message="* DNS ERROR: Incorrect Query Class: {}".format(q_class),
-            )
-            return -1
-        ptr += 2
-
-        # Let's take the first type-a answer
-        if self._pkt_buf[ptr] != 0xC0:
-            return -1
-        ptr += 1
-
-        if self._pkt_buf[ptr] != 0xC:
-            return -1
-        ptr += 1
-
-        # Validate Answer Type A
-        ans_type = int.from_bytes(self._pkt_buf[ptr : ptr + 2], "big")
-        if not ans_type == TYPE_A:
-            _debug_print(
-                debug=self._debug,
-                message="* DNS ERROR: Incorrect Answer Type: {}".format(ans_type),
-            )
-            return -1
-        ptr += 2
-
-        # Validate Answer Class IN
-        ans_class = int.from_bytes(self._pkt_buf[ptr : ptr + 2], "big")
-        if not ans_class == TYPE_A:
-            _debug_print(
-                debug=self._debug,
-                message="* DNS ERROR: Incorrect Answer Class: {}".format(ans_class),
-            )
-            return -1
-        ptr += 2
-
-        # skip over TTL
-        ptr += 4
-
-        # Validate addr is IPv4
-        data_len = int.from_bytes(self._pkt_buf[ptr : ptr + 2], "big")
-        if not data_len == DATA_LEN:
-            _debug_print(
-                debug=self._debug,
-                message="* DNS ERROR: Unexpected Data Length: {}".format(data_len),
-            )
-            return -1
-        ptr += 2
-        # Return address
-        return self._pkt_buf[ptr : ptr + 4]
