@@ -12,7 +12,7 @@
 Pure-Python implementation of the Arduino DNS client for WIZnet 5k-based
 ethernet modules.
 
-* Author(s): MCQN Ltd, Brent Rubell
+* Author(s): MCQN Ltd, Brent Rubell, Martin Stephens
 
 """
 try:
@@ -199,7 +199,7 @@ class DNS:
 
         self._dns_server = dns_address
         self._host = 0
-        self._request_id = 0  # Request identifier.
+        self._request_id = 0  # Request ID.
         self._request_length = 0  # Length of last query.
         self._pkt_buf = bytearray()
 
@@ -224,19 +224,18 @@ class DNS:
         _debug_print(debug=self._debug, message="* DNS: Sending request packet...")
         self._sock.send(self._pkt_buf)
 
-        # wait and retry 3 times for a response
-        retries = 0
+        # Read and parse the DNS response
         addr = -1
-        while (retries < 5) and (addr == -1):
+        for _ in range(5):
             # wait for a response
-            start_time = time.monotonic()
-            packet_sz = self._sock.available()
-            while packet_sz <= 0:
-                packet_sz = self._sock.available()
-                if (time.monotonic() - start_time) > 1.0:
+            socket_timeout = time.monotonic() + 1.0
+            packet_size = self._sock.available()
+            while packet_size == 0:
+                packet_size = self._sock.available()
+                if time.monotonic() > socket_timeout:
                     _debug_print(
                         debug=self._debug,
-                        message="* DNS ERROR: Did not receive DNS response!",
+                        message="* DNS ERROR: Did not receive DNS response (socket timeout).",
                     )
                     return -1
                 time.sleep(0.05)
@@ -253,13 +252,11 @@ class DNS:
                     query_length=self._request_length,
                     debug=self._debug,
                 )
+                break
             except ValueError:
-                addr = -1
                 _debug_print(
                     debug=self._debug,
                     message="* DNS ERROR: Failed to resolve DNS response, retrying…",
                 )
-            retries += 1
-
         self._sock.close()
         return addr
