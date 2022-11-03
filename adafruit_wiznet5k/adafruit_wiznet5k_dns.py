@@ -112,7 +112,7 @@ def _parse_dns_response(
     response_id = int.from_bytes(response[0:2], "big")
     if response_id != query_id:
         raise ValueError(
-            "* DNS ERROR: Response ID {x:x} does not match query ID {y:x}".format(
+            "Response ID 0x{x:x} does not match query ID 0x{y:x}".format(
                 x=response_id, y=query_id
             )
         )
@@ -122,21 +122,17 @@ def _parse_dns_response(
     flags &= 0xF87F
     # Check that the response bit is set, the query is standard and no error occurred.
     if flags != 0x8000:
-        raise ValueError("* DNS ERROR: Invalid flags 0x{x:x}, bx{x:b}.".format(x=flags))
+        raise ValueError("Invalid flags 0x{x:x}, bx{x:b}.".format(x=flags))
     # Number of questions
     question_count = int.from_bytes(response[4:6], "big")
     # Never more than one question per DNS query in this implementation.
     if question_count != 1:
-        raise ValueError(
-            "* DNS ERROR: Question count should be 1, is {}.".format(question_count)
-        )
+        raise ValueError("Question count should be 1, is {}.".format(question_count))
     # Number of answers
     answer_count = int.from_bytes(response[6:8], "big")
     _debug_print(debug=debug, message="* DNS Answer Count: {}.".format(answer_count))
     if answer_count < 1:
-        raise ValueError(
-            "* DNS ERROR: Answer count should be > 0, is {}.".format(answer_count)
-        )
+        raise ValueError("Answer count should be > 0, is {}.".format(answer_count))
 
     # Parse answers
     pointer = query_length  # Response header is the same length as the query header.
@@ -264,10 +260,11 @@ class DNS:
                     debug=self._debug,
                 )
                 break
-            except ValueError:
+            except ValueError as error:
                 _debug_print(
                     debug=self._debug,
-                    message="* DNS ERROR: Failed to resolve DNS response, retrying…",
+                    message="* DNS ERROR: Failed to resolve DNS response, retrying…\n"
+                    "    ({}).".format(error.args[0]),
                 )
         self._sock.close()
         return ipaddress

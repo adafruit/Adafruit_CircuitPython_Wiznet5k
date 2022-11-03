@@ -11,7 +11,7 @@ import adafruit_wiznet5k.adafruit_wiznet5k_dns as wiz_dns
 from adafruit_wiznet5k.adafruit_wiznet5k_socket import socket
 
 #
-DEFAULT_DEBUG_ON = False
+DEFAULT_DEBUG_ON = True
 
 
 @pytest.fixture
@@ -53,8 +53,8 @@ class TestDNSInit:
         assert dns_server._debug is False
         assert isinstance(dns_server._sock, socket)
         # assert dns_server._host == b""
-        assert dns_server._request_id == 0
-        assert dns_server._request_length == 0
+        assert dns_server._query_id == 0
+        assert dns_server._query_length == 0
         wrench.assert_called_once_with(type=2)
 
     def test_dns_setup_other_args(self, wiznet):
