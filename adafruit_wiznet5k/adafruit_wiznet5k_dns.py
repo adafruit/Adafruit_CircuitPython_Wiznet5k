@@ -42,19 +42,19 @@ DNS_PORT = const(0x35)  # port used for DNS request
 
 
 def _debug_print(*, debug: bool, message: str) -> None:
-    """Helper fucntion to improve code readability."""
+    """Helper function to improve code readability."""
     if debug:
         print(message)
 
 
-def _build_dns_header() -> Tuple[int, bytearray]:
+def _build_dns_query(domain: bytes) -> Tuple[int, bytearray]:
     """Builds DNS header."""
     # generate a random, 16-bit, request identifier
-    request_id = getrandbits(16)
-    request_header = bytearray(
+    query_id = getrandbits(16)
+    query = bytearray(
         [
-            request_id >> 8,
-            request_id & 0xFF,
+            query_id >> 8,
+            query_id & 0xFF,
             0x01,
             0x00,
             0x00,
@@ -67,20 +67,16 @@ def _build_dns_header() -> Tuple[int, bytearray]:
             0x00,
         ]
     )
-    return request_id, request_header
-
-
-def _build_dns_question(*, domain: bytes, buffer: bytearray) -> bytearray:
-    """Build DNS question"""
     host = domain.decode("utf-8").split(".")
     # write out each label of host
     for label in host:
         # Append the length of the label
-        buffer.append(len(label))
+        query.append(len(label))
         # Append the label
-        buffer += bytes(label, "utf-8")
+        query += bytes(label, "utf-8")
     # Hard code null, question type and class as they never vary.
-    return buffer + bytearray([0x00, 0x00, 0x01, 0x00, 0x01])
+    query += bytearray([0x00, 0x00, 0x01, 0x00, 0x01])
+    return query_id, query
 
 
 class DNS:
@@ -112,8 +108,7 @@ class DNS:
             return INVALID_SERVER
         self._host = hostname
         # build DNS request packet
-        self._request_id, self._pkt_buf = _build_dns_header()
-        self._pkt_buf = _build_dns_question(domain=self._host, buffer=self._pkt_buf)
+        self._request_id, self._pkt_buf = _build_dns_query(self._host)
 
         # Send DNS request packet
         self._sock.bind((None, DNS_PORT))
