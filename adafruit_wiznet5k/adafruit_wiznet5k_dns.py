@@ -53,31 +53,40 @@ def _build_dns_query(domain: bytes) -> Tuple[int, int, bytearray]:
     """Builds DNS header."""
     # generate a random, 16-bit, request identifier
     query_id = getrandbits(16)
+    # Hard code everything except the ID, it never changes in this implementation.
     query = bytearray(
         [
-            query_id >> 8,
-            query_id & 0xFF,
-            0x01,
-            0x00,
-            0x00,
-            0x01,
-            0x00,
-            0x00,
-            0x00,
-            0x00,
-            0x00,
-            0x00,
+            query_id >> 8,  # Query MSB.
+            query_id & 0xFF,  # Query LSB.
+            0x01,  # Flags MSB: QR=0, 4 bit Opcode=0, AA=0, TC=0, RD=1 (recursion is desired).
+            0x00,  # Flags LSB: RA=0, 3 bit Z=0, 4 bit RCode=0.
+            0x00,  # QDcount MSB:
+            0x01,  # QDcount LSB: Question count, always 1 in this implementation.
+            0x00,  # ANcount MSB:
+            0x00,  # ANcount LSB: Answer Record Count, 0 in queries.
+            0x00,  # NScount MSB:
+            0x00,  # NScount LSB: Authority Record Count, 0 in queries.
+            0x00,  # ARcount MSB:
+            0x00,  # ARcount LSB: Additional Record Count, 0 in queries.
         ]
     )
     host = domain.decode("utf-8").split(".")
-    # write out each label of host
+    # Write out each label of question name.
     for label in host:
         # Append the length of the label
         query.append(len(label))
         # Append the label
         query += bytes(label, "utf-8")
     # Hard code null, question type and class as they never vary.
-    query += bytearray([0x00, 0x00, 0x01, 0x00, 0x01])
+    query += bytearray(
+        [
+            0x00,  # Null, indicates end of question name
+            0x00,  # Question Type MSB:
+            0x01,  # Question Type LSB: Always 1 (Type A) in this implementation.
+            0x00,  # Question Class MSB:
+            0x01,  # Question Class LSB: Always 1 (Class IN) in this implementation.
+        ]
+    )
     return query_id, len(query), query
 
 
@@ -109,7 +118,7 @@ def _parse_dns_response(
         )
     # Validate flags
     flags = int.from_bytes(response[2:4], "big")
-    # Mask out authenticated, truncated and recursion bits, they don't stop us parsing.
+    # Mask out authenticated, truncated and recursion bits, unimportant to parsing.
     flags &= 0xF87F
     # Check that the response bit is set, the query is standard and no error occurred.
     if flags != 0x8000:
@@ -146,7 +155,10 @@ def _parse_dns_response(
             # Check for a type A answer.
             if int.from_bytes(response[pointer : pointer + 2], "big") == TYPE_A:
                 # Check for an IN class answer.
-                if int.from_bytes(response[pointer + 2 : pointer + 4], "big"):
+                if (
+                    int.from_bytes(response[pointer + 2 : pointer + 4], "big")
+                    == CLASS_IN
+                ):
                     _debug_print(
                         debug=debug,
                         message="Type A, class IN found in answer {x} of {y}.".format(
@@ -156,10 +168,13 @@ def _parse_dns_response(
                     # Set pointer to start of resource record.
                     pointer += 8
                     # Confirm that the resource record is 4 bytes (an IPv4 address).
-                    if int.from_bytes(response[pointer : pointer + 2], "big") == 4:
+                    if (
+                        int.from_bytes(response[pointer : pointer + 2], "big")
+                        == DATA_LEN
+                    ):
                         ipv4 = response[pointer + 2 : pointer + 6]
                         # Low probability that the response was truncated inside the 4 byte address.
-                        if len(ipv4) != 4:
+                        if len(ipv4) != DATA_LEN:
                             raise ValueError("IPv4 address is not 4 bytes.")
                         _debug_print(
                             debug=debug,
@@ -198,8 +213,8 @@ class DNS:
         self._sock.settimeout(1)
 
         self._dns_server = dns_address
-        self._request_id = 0  # Request ID.
-        self._request_length = 0  # Length of last query.
+        self._query_id = 0  # Request ID.
+        self._query_length = 0  # Length of last query.
 
     def gethostbyname(self, hostname):
         """Translate a host name to IPv4 address format.
@@ -212,7 +227,7 @@ class DNS:
             return INVALID_SERVER
 
         # build DNS request packet
-        self._request_id, self._request_length, buffer = _build_dns_query(hostname)
+        self._query_id, self._query_length, buffer = _build_dns_query(hostname)
 
         # Send DNS request packet
         self._sock.bind((None, DNS_PORT))
@@ -221,9 +236,9 @@ class DNS:
         self._sock.send(buffer)
 
         # Read and parse the DNS response
-        addr = -1
+        ipaddress = -1
         for _ in range(5):
-            # wait for a response
+            #  wait for a response
             socket_timeout = time.monotonic() + 1.0
             packet_size = self._sock.available()
             while packet_size == 0:
@@ -242,10 +257,10 @@ class DNS:
                 message="DNS Packet Received: {}".format(buffer),
             )
             try:
-                addr = _parse_dns_response(
+                ipaddress = _parse_dns_response(
                     response=buffer,
-                    query_id=self._request_id,
-                    query_length=self._request_length,
+                    query_id=self._query_id,
+                    query_length=self._query_length,
                     debug=self._debug,
                 )
                 break
@@ -255,4 +270,4 @@ class DNS:
                     message="* DNS ERROR: Failed to resolve DNS response, retrying…",
                 )
         self._sock.close()
-        return addr
+        return ipaddress
