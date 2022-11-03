@@ -13,6 +13,11 @@ ethernet modules.
 * Author(s): MCQN Ltd, Brent Rubell
 
 """
+try:
+    from typing import Tuple
+except ImportError:
+    pass
+
 import time
 from random import getrandbits
 from micropython import const
@@ -44,6 +49,29 @@ def _debug_print(*, debug: bool, message: str) -> None:
         print(message)
 
 
+def _build_dns_header() -> Tuple[int, bytearray]:
+    """Builds DNS header."""
+    # generate a random, 16-bit, request identifier
+    request_id = getrandbits(16)
+    request_header = bytearray(
+        [
+            request_id >> 8,
+            request_id & 0xFF,
+            0x01,
+            0x00,
+            0x00,
+            0x01,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+        ]
+    )
+    return request_id, request_header
+
+
 class DNS:
     """W5K DNS implementation.
 
@@ -73,7 +101,7 @@ class DNS:
             return INVALID_SERVER
         self._host = hostname
         # build DNS request packet
-        self._build_dns_header()
+        self._request_id, self._pkt_buf = _build_dns_header()
         self._build_dns_question()
 
         # Send DNS request packet
