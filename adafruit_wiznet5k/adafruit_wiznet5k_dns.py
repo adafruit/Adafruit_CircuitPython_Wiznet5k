@@ -81,6 +81,18 @@ class DNS:
         retries = 0
         addr = -1
         while (retries < 5) and (addr == -1):
+            # wait for a response
+            start_time = time.monotonic()
+            packet_sz = self._sock.available()
+            while packet_sz <= 0:
+                packet_sz = self._sock.available()
+                if (time.monotonic() - start_time) > 1.0:
+                    if self._debug:
+                        print("* DNS ERROR: Did not receive DNS response!")
+                    return -1
+                time.sleep(0.05)
+            # recv packet into buf
+            self._pkt_buf = self._sock.recv()
             addr = self._parse_dns_response()
             if addr == -1 and self._debug:
                 print("* DNS ERROR: Failed to resolve DNS response, retrying...")
@@ -96,18 +108,6 @@ class DNS:
         Returns desired hostname address if obtained, -1 otherwise.
 
         """
-        # wait for a response
-        start_time = time.monotonic()
-        packet_sz = self._sock.available()
-        while packet_sz <= 0:
-            packet_sz = self._sock.available()
-            if (time.monotonic() - start_time) > 1.0:
-                if self._debug:
-                    print("* DNS ERROR: Did not receive DNS response!")
-                return -1
-            time.sleep(0.05)
-        # recv packet into buf
-        self._pkt_buf = self._sock.recv()
 
         if self._debug:
             print("DNS Packet Received: ", self._pkt_buf)
