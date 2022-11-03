@@ -10,6 +10,9 @@ from micropython import const
 import adafruit_wiznet5k.adafruit_wiznet5k_dns as wiz_dns
 from adafruit_wiznet5k.adafruit_wiznet5k_socket import socket
 
+#
+DEFAULT_DEBUG_ON = False
+
 
 @pytest.fixture
 def wiznet(mocker):
@@ -127,7 +130,7 @@ class TestDnsGetHostByName:
             return_value=request_id,
         )
         # Set up mock server calls.
-        dns_server = wiz_dns.DNS(wiznet, "8.8.8.8", debug=False)
+        dns_server = wiz_dns.DNS(wiznet, "8.8.8.8", debug=DEFAULT_DEBUG_ON)
         dns_server._sock.available.return_value = len(dns_bytes_recv)
         dns_server._sock.recv.return_value = dns_bytes_recv
 
@@ -138,7 +141,6 @@ class TestDnsGetHostByName:
         dns_server._sock.connect.assert_called_once()
         dns_server._sock.send.assert_called_once_with(dns_bytes_sent)
 
-    @pytest.mark.skip
     @pytest.mark.parametrize(
         "dns_bytes_recv, response, _",
         (
@@ -167,53 +169,46 @@ class TestDnsGetHostByName:
             return_value=0x9321,
         )
         # Set up mock server calls.
-        dns_server = wiz_dns.DNS(wiznet, "8.8.8.8", debug=True)
+        dns_server = wiz_dns.DNS(wiznet, "8.8.8.8", debug=DEFAULT_DEBUG_ON)
         dns_server._sock.available.return_value = len(dns_bytes_recv)
         dns_server._sock.recv.return_value = dns_bytes_recv
 
         # Check that the correct response was received.
         assert dns_server.gethostbyname(bytes("apple.com", "utf-8")) == response
 
-    @pytest.mark.parametrize(
-        "request_id, request_length, dns_bytes_recv, ipv4",
-        (
-            (
-                0x3476,  # Has CNAME answers
-                31,
-                bytearray(
-                    b"\x34\x76\x81\x80\x00\x01\x00\x04\x00\x00\x00\x00\x03\x77\x77\x77\x05\x61"
-                    b"\x70\x70\x6c\x65\x03\x63\x6f\x6d\x00\x00\x01\x00\x01\xc0\x0c\x00\x05\x00"
-                    b"\x01\x00\x00\x02\xf3\x00\x1b\x03\x77\x77\x77\x05\x61\x70\x70\x6c\x65\x03"
-                    b"\x63\x6f\x6d\x07\x65\x64\x67\x65\x6b\x65\x79\x03\x6e\x65\x74\x00\xc0\x2b"
-                    b"\x00\x05\x00\x01\x00\x00\x0a\xf2\x00\x2f\x03\x77\x77\x77\x05\x61\x70\x70"
-                    b"\x6c\x65\x03\x63\x6f\x6d\x07\x65\x64\x67\x65\x6b\x65\x79\x03\x6e\x65\x74"
-                    b"\x0b\x67\x6c\x6f\x62\x61\x6c\x72\x65\x64\x69\x72\x06\x61\x6b\x61\x64\x6e"
-                    b"\x73\xc0\x41\xc0\x52\x00\x05\x00\x01\x00\x00\x01\x7d\x00\x18\x05\x65\x36"
-                    b"\x38\x35\x38\x04\x64\x73\x63\x78\x0a\x61\x6b\x61\x6d\x61\x69\x65\x64\x67"
-                    b"\x65\xc0\x41\xc0\x8d\x00\x01\x00\x01\x00\x00\x00\x14\x00\x04\x17\x38\x9c"
-                    b"\x56"
-                ),
-                b"\x178\x9cV",
-            ),
-            (
-                0x9912,
-                36,
-                bytearray(
-                    b"\x99\x12\x81\x80\x00\x01\x00\x02\x00\x00\x00\x00\x05\x6c\x65\x61\x72\x6e"
-                    b"\x08\x61\x64\x61\x66\x72\x75\x69\x74\x03\x63\x6f\x6d\x00\x00\x01\x00\x01"
-                    b"\xc0\x0c\x00\x01\x00\x01\x00\x00\x01\x2c\x00\x04\x68\x14\x27\xf0\xc0\x0c"
-                    b"\x00\x01\x00\x01\x00\x00\x01\x2c\x00\x04\x68\x14\x26\xf0"
-                ),
-                b"\x68\x14\x27\xf0",
-            ),
-        ),
-    )
-    def test_parse_response(self, request_id, request_length, dns_bytes_recv, ipv4):
-        ip_address = wiz_dns._parse_dns_response(
-            response=dns_bytes_recv,
-            query_id=request_id,
-            query_length=request_length,
-            debug=True,
-        )
-        assert ip_address == ipv4
-        assert isinstance(ip_address, bytearray)
+        # Check that the correct number of calls to _sock.available were made.
+        dns_server._sock.available.assert_called()
+        assert len(dns_server._sock.available.call_args_list) == 5
+
+    def test_retries_with_no_data_on_socket(self, wiznet, wrench):
+        """Confirm correct calls made to socket when no data available."""
+        # Pylint does not understand that the wrench fixture is required.
+        # pylint: disable=unused-argument
+
+        dns_server = wiz_dns.DNS(wiznet, "8.8.8.8", debug=DEFAULT_DEBUG_ON)
+        dns_server._sock.available.return_value = 0
+        dns_server._sock.recv.return_value = b""
+        dns_server.gethostbyname(bytes("domain.name", "utf-8"))
+
+        # Check how many times the socket was polled for data before giving up.
+        dns_server._sock.available.assert_called()
+        assert len(dns_server._sock.available.call_args_list) == 21
+        # Check that no attempt made to read data from the socket.
+        dns_server._sock.recv.assert_not_called()
+
+    def test_retries_with_bad_data_on_socket(self, wiznet, wrench):
+        """Confirm correct calls made to socket when bad data available."""
+        # Pylint does not understand that the wrench fixture is required.
+        # pylint: disable=unused-argument
+
+        dns_server = wiz_dns.DNS(wiznet, "8.8.8.8", debug=DEFAULT_DEBUG_ON)
+        dns_server._sock.available.return_value = 7
+        dns_server._sock.recv.return_value = b"\x99\x12\x81\x80\x00\x01\x00"
+        dns_server.gethostbyname(bytes("domain.name", "utf-8"))
+
+        # Check how many times the socket was polled for data before giving up.
+        dns_server._sock.available.assert_called()
+        assert len(dns_server._sock.available.call_args_list) == 5
+        # Check how many attempts were made to read data from the socket.
+        dns_server._sock.recv.assert_called()
+        assert len(dns_server._sock.recv.call_args_list) == 5

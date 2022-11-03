@@ -246,13 +246,15 @@ class DNS:
                 debug=self._debug,
                 message="DNS Packet Received: {}".format(self._pkt_buf),
             )
-            addr = _parse_dns_response(
-                response=self._pkt_buf,
-                query_id=self._request_id,
-                query_length=self._request_length,
-                debug=self._debug,
-            )
-            if addr == -1:
+            try:
+                addr = _parse_dns_response(
+                    response=self._pkt_buf,
+                    query_id=self._request_id,
+                    query_length=self._request_length,
+                    debug=self._debug,
+                )
+            except ValueError:
+                addr = -1
                 _debug_print(
                     debug=self._debug,
                     message="* DNS ERROR: Failed to resolve DNS response, retrying…",
