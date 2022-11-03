@@ -200,7 +200,6 @@ class DNS:
         self._dns_server = dns_address
         self._request_id = 0  # Request ID.
         self._request_length = 0  # Length of last query.
-        self._pkt_buf = bytearray()
 
     def gethostbyname(self, hostname):
         """Translate a host name to IPv4 address format.
@@ -213,15 +212,13 @@ class DNS:
             return INVALID_SERVER
 
         # build DNS request packet
-        self._request_id, self._request_length, self._pkt_buf = _build_dns_query(
-            hostname
-        )
+        self._request_id, self._request_length, buffer = _build_dns_query(hostname)
 
         # Send DNS request packet
         self._sock.bind((None, DNS_PORT))
         self._sock.connect((self._dns_server, DNS_PORT))
         _debug_print(debug=self._debug, message="* DNS: Sending request packet...")
-        self._sock.send(self._pkt_buf)
+        self._sock.send(buffer)
 
         # Read and parse the DNS response
         addr = -1
@@ -239,14 +236,14 @@ class DNS:
                     return -1
                 time.sleep(0.05)
             # recv packet into buf
-            self._pkt_buf = self._sock.recv()
+            buffer = self._sock.recv()
             _debug_print(
                 debug=self._debug,
-                message="DNS Packet Received: {}".format(self._pkt_buf),
+                message="DNS Packet Received: {}".format(buffer),
             )
             try:
                 addr = _parse_dns_response(
-                    response=self._pkt_buf,
+                    response=buffer,
                     query_id=self._request_id,
                     query_length=self._request_length,
                     debug=self._debug,

@@ -54,7 +54,6 @@ class TestDNSInit:
         assert isinstance(dns_server._sock, socket)
         # assert dns_server._host == b""
         assert dns_server._request_id == 0
-        assert dns_server._pkt_buf == bytearray()
         assert dns_server._request_length == 0
         wrench.assert_called_once_with(type=2)
 
