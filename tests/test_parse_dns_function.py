@@ -9,7 +9,7 @@ from adafruit_wiznet5k.adafruit_wiznet5k_dns import _parse_dns_response
 SHOW_DEBUG_MESSAGES = False
 
 
-@pytest.mark.skip(reason="Not currently under development")
+# @pytest.mark.skip(reason="Not currently under development")
 @pytest.mark.parametrize(
     "request_id, request_length, dns_bytes_recv, ipv4",
     (

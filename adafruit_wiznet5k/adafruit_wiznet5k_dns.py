@@ -19,7 +19,6 @@ try:
     from typing import Tuple
 except ImportError:
     pass
-
 import time
 from random import getrandbits
 from micropython import const
