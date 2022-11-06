@@ -122,7 +122,8 @@ def _parse_dns_response(
     flags &= 0xF87F
     # Check that the response bit is set, the query is standard and no error occurred.
     if flags != 0x8000:
-        raise ValueError("Invalid flags 0x{x:x}, bx{x:b}.".format(x=flags))
+        # noinspection PyStringFormat
+        raise ValueError("Invalid flags {x:#04x}, {x:#016b}.".format(x=flags))
     # Number of questions
     question_count = int.from_bytes(response[4:6], "big")
     # Never more than one question per DNS query in this implementation.
