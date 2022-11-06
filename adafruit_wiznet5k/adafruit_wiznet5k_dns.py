@@ -110,6 +110,9 @@ def _parse_dns_response(
     """
     # Validate request identifier
     response_id = int.from_bytes(response[0:2], "big")
+    _debug_print(
+        debug=debug, message="Parsing packet with ID {x:#x}".format(x=response_id)
+    )
     if response_id != query_id:
         raise ValueError(
             "Response ID 0x{x:x} does not match query ID 0x{y:x}".format(
@@ -141,7 +144,7 @@ def _parse_dns_response(
     try:
         for answer in range(answer_count):
             label_length = response[pointer]
-            if label_length == 0xC0:
+            if label_length >= 0xC0:
                 # Pointer to the domain name, skip over it.
                 pointer += 2
             else:
