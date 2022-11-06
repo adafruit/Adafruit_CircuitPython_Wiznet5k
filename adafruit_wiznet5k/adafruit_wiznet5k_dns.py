@@ -143,15 +143,24 @@ def _parse_dns_response(
     # pylint: disable=too-many-nested-blocks
     try:
         for answer in range(answer_count):
+            # Move the pointer past the name.
             label_length = response[pointer]
-            if label_length >= 0xC0:
-                # Pointer to the domain name, skip over it.
-                pointer += 2
-            else:
-                # Domain name, skip through it.
-                while label_length != 0x00:  # Null represents root of domain name
+            while True:
+                if label_length >= 0xC0:
+                    # Pointer to a section of domain name, skip over it.
+                    pointer += 2
+                    label_length = response[pointer]
+                    if label_length == 0:
+                        # One byte past the end of the name.
+                        break
+                else:
+                    # Section of the domain name, skip through it.
                     pointer += label_length
                     label_length = response[pointer]
+                    if label_length == 0:
+                        # On the null byte at the end of the name. Increment the pointer.
+                        pointer += 1
+                        break
             # Check for a type A answer.
             if int.from_bytes(response[pointer : pointer + 2], "big") == TYPE_A:
                 # Check for an IN class answer.
