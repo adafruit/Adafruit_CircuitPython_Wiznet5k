@@ -199,6 +199,8 @@ def _parse_dns_response(
                     x=answer + 1, y=answer_count
                 ),
             )
+        # No IPv4 address in any answer.
+        raise ValueError()
     except (IndexError, ValueError) as error:
         # IndexError means we ran out of data in an answer, maybe truncated.
         # ValueError means we ran out of answers.
@@ -256,6 +258,7 @@ class DNS:
                         debug=self._debug,
                         message="* DNS ERROR: Did not receive DNS response (socket timeout).",
                     )
+                    self._sock.close()
                     return -1
                 time.sleep(0.05)
             # recv packet into buf
