@@ -148,7 +148,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
     def __init__(
         self,
         spi_bus,
-        cs,
+        cs,  # pylint: disable=invalid-name
         reset=None,
         is_dhcp=True,
         mac=DEFAULT_MAC,
@@ -493,8 +493,8 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             if hasattr(data, "from_bytes"):
                 bus_device.write(bytes([data]))  # pylint: disable=no-member
             else:
-                for i, _ in enumerate(data):
-                    bus_device.write(bytes([data[i]]))  # pylint: disable=no-member
+                for data_comp in data:
+                    bus_device.write(bytes([data_comp]))  # pylint: disable=no-member
 
     # Socket-Register API
 
