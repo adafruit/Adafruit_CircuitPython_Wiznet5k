@@ -148,7 +148,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
     def __init__(
         self,
         spi_bus: busio.SPI,
-        cs: digitalio.DigitalInOut,
+        cs: digitalio.DigitalInOut,  # pylint: disable=invalid-name
         reset: Optional[digitalio.DigitalInOut] = None,
         is_dhcp: bool = True,
         mac: Union[List[int], Tuple[int]] = DEFAULT_MAC,
@@ -602,8 +602,8 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             if hasattr(data, "from_bytes"):
                 bus_device.write(bytes([data]))  # pylint: disable=no-member
             else:
-                for i, _ in enumerate(data):
-                    bus_device.write(bytes([data[i]]))  # pylint: disable=no-member
+                for data_comp in data:
+                    bus_device.write(bytes([data_comp]))  # pylint: disable=no-member
 
     # Socket-Register API
 
