@@ -98,7 +98,7 @@ class DHCP:
         eth: WIZNET5K,
         mac_address: Sequence[Union[int, bytes]],
         hostname: Optional[str] = None,
-        response_timeout: float = 30,
+        response_timeout: float = 30.0,
         debug: bool = False,
     ) -> None:
         """

@@ -15,7 +15,7 @@ A socket compatible interface with the Wiznet5k module.
 from __future__ import annotations
 
 try:
-    from typing import TYPE_CHECKING, Any, Optional, Tuple, List, Union
+    from typing import TYPE_CHECKING, Optional, Tuple, List, Union
 
     if TYPE_CHECKING:
         from adafruit_wiznet5k.adafruit_wiznet5k import WIZNET5K
@@ -149,7 +149,7 @@ class socket:
         self,
         family: int = AF_INET,
         type: int = SOCK_STREAM,
-        proto: Any = 0,
+        proto: int = 0,
         fileno: Optional[int] = None,
         socknum: Optional[int] = None,
     ) -> None:
@@ -157,9 +157,9 @@ class socket:
         :param int family: Socket address (and protocol) family, defaults to AF_INET.
         :param int type: Socket type, use SOCK_STREAM for TCP and SOCK_DGRAM for UDP,
             defaults to SOCK_STREAM.
-        :param Any proto: Unused, retained for compatibility.
-        :param Optional[Any] fileno: Unused, retained for compatibility.
-        :param Optional[Any] socknum: Unused, retained for compatibility.
+        :param int proto: Unused, retained for compatibility.
+        :param Optional[int] fileno: Unused, retained for compatibility.
+        :param Optional[int] socknum: Unused, retained for compatibility.
         """
         if family != AF_INET:
             raise RuntimeError("Only AF_INET family supported by W5K modules.")
@@ -277,11 +277,11 @@ class socket:
             )
             self._buffer = b""
 
-    def listen(self, backlog: Optional[Any] = None) -> None:
+    def listen(self, backlog: Optional[int] = None) -> None:
         """
         Listen on the port specified by bind.
 
-        :param Optional[Any] backlog: Included for compatibility but ignored.
+        :param Optional[int] backlog: Included for compatibility but ignored.
         """
         assert self._listen_port is not None, "Use bind to set the port before listen!"
         _the_interface.socket_listen(self.socknum, self._listen_port)
@@ -385,7 +385,7 @@ class socket:
         # pylint: disable=too-many-branches
         self,
         bufsize: int = 0,
-        flags: Any = 0,
+        flags: int = 0,
     ) -> bytes:
         """
         Read from the connected remote address.
@@ -451,7 +451,7 @@ class socket:
         return ret
 
     def embed_recv(
-        self, bufsize: int = 0, flags: Any = 0
+        self, bufsize: int = 0, flags: int = 0
     ) -> bytes:  # pylint: disable=too-many-branches
         """
         Read from the connected remote address.
@@ -478,13 +478,13 @@ class socket:
         return ret
 
     def recvfrom(
-        self, bufsize: int = 0, flags: Any = 0
+        self, bufsize: int = 0, flags: int = 0
     ) -> Tuple[bytes, Tuple[str, int]]:
         """
         Read some bytes from the connected remote address.
 
         :param int bufsize: Maximum number of bytes to receive.
-        :param Any flags: ignored, present for compatibility.
+        :param int flags: ignored, present for compatibility.
 
         :return Tuple[bytes, Tuple[str, int]]: a tuple (bytes, address)
             where address is a tuple (ip, port)
@@ -497,13 +497,13 @@ class socket:
             ),
         )
 
-    def recv_into(self, buf: bytearray, nbytes: int = 0, flags: Any = 0) -> int:
+    def recv_into(self, buf: bytearray, nbytes: int = 0, flags: int = 0) -> int:
         """
         Read from the connected remote address into the provided buffer.
 
         :param bytearray buf: Data buffer
         :param nbytes: Maximum number of bytes to receive
-        :param Any flags: ignored, present for compatibility.
+        :param int flags: ignored, present for compatibility.
 
         :return int: the number of bytes received
         """
@@ -515,7 +515,7 @@ class socket:
         return nbytes
 
     def recvfrom_into(
-        self, buf: bytearray, nbytes: int = 0, flags: Any = 0
+        self, buf: bytearray, nbytes: int = 0, flags: int = 0
     ) -> Tuple[int, Tuple[str, int]]:
         """
         Read some bytes from the connected remote address into the provided buffer.
@@ -540,7 +540,7 @@ class socket:
         Read a line from the socket.
 
         Attempt to return as many bytes as we can up to but not including a carriage return and
-        linefeed charater pair.
+        linefeed character pair.
 
         :return bytes: The data read from the socket.
         """

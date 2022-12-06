@@ -46,7 +46,7 @@ class NTP:
         """
         :param adafruit_wiznet5k.WIZNET5K iface: Wiznet 5k object.
         :param str ntp_address: The hostname of the NTP server.
-        :param int utc: Numbers of hours to offset time from UTC.
+        :param float utc: Numbers of hours to offset time from UTC.
         :param bool debug: Enable debugging output, defaults to False.
         """
         self._debug = debug

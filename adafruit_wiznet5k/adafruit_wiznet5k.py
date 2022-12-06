@@ -418,7 +418,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
     @property
     def ifconfig(
         self,
-    ) -> Tuple[bytearray, bytearray, bytearray, Tuple[int, int, int, int]]:  # *1
+    ) -> Tuple[bytearray, bytearray, bytearray, Tuple[int, int, int, int]]:
         """
         Network configuration information.
 
@@ -1143,7 +1143,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             )
         return None
 
-    def _read_socket(self, sock: int, address: int) -> Optional[bytearray]:  # *1
+    def _read_socket(self, sock: int, address: int) -> Optional[bytearray]:
         """Read a W5k socket register."""
         if self._chip_type == "w5500":
             cntl_byte = (sock << 5) + 0x08
