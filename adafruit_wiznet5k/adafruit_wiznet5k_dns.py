@@ -259,11 +259,11 @@ class DNS:
         host = self._host.decode("utf-8")
         host = host.split(".")
         # write out each section of host
-        for i, _ in enumerate(host):
+        for data in host:
             # append the sz of the section
-            self._pkt_buf.append(len(host[i]))
+            self._pkt_buf.append(len(data))
             # append the section data
-            self._pkt_buf += host[i]
+            self._pkt_buf += bytes(data, "utf-8")
         # end of the name
         self._pkt_buf.append(0x00)
         # Type A record
