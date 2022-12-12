@@ -13,12 +13,21 @@ ethernet modules.
 * Author(s): MCQN Ltd, Brent Rubell
 
 """
+from __future__ import annotations
+
+try:
+    from typing import TYPE_CHECKING, Union, Tuple
+
+    if TYPE_CHECKING:
+        from adafruit_wiznet5k.adafruit_wiznet5k import WIZNET5K
+except ImportError:
+    pass
+
 import time
 from random import getrandbits
 from micropython import const
 import adafruit_wiznet5k.adafruit_wiznet5k_socket as socket
 from adafruit_wiznet5k.adafruit_wiznet5k_socket import htons
-
 
 QUERY_FLAG = const(0x00)
 OPCODE_STANDARD_QUERY = const(0x00)
@@ -39,12 +48,19 @@ DNS_PORT = const(0x35)  # port used for DNS request
 
 
 class DNS:
-    """W5K DNS implementation.
+    """W5K DNS implementation."""
 
-    :param iface: Network interface
-    """
-
-    def __init__(self, iface, dns_address, debug=False):
+    def __init__(
+        self,
+        iface: WIZNET5K,
+        dns_address: Union[str, Tuple[int, int, int, int]],
+        debug: bool = False,
+    ) -> None:
+        """
+        :param adafruit_wiznet5k.WIZNET5K: Ethernet network connection.
+        :param Union[str, Tuple[int, int, int, int]]: IP address of the DNS server.
+        :param bool debug: Enable debugging messages, defaults to False.
+        """
         self._debug = debug
         self._iface = iface
         socket.set_interface(iface)
@@ -52,16 +68,17 @@ class DNS:
         self._sock.settimeout(1)
 
         self._dns_server = dns_address
-        self._host = 0
+        self._host = b""
         self._request_id = 0  # request identifier
         self._pkt_buf = bytearray()
 
-    def gethostbyname(self, hostname):
-        """Translate a host name to IPv4 address format.
+    def gethostbyname(self, hostname: bytes) -> Union[int, bytes]:
+        """
+        DNS look up of a host name.
 
-        :param str hostname: Desired host name to connect to.
+        :param bytes hostname: Host name to connect to.
 
-        Returns the IPv4 address as a bytearray if successful, -1 otherwise.
+        :return Union[int, bytes] The IPv4 address if successful, -1 otherwise.
         """
         if self._dns_server is None:
             return INVALID_SERVER
@@ -91,10 +108,12 @@ class DNS:
 
     def _parse_dns_response(
         self,
-    ):  # pylint: disable=too-many-return-statements, too-many-branches, too-many-statements, too-many-locals
-        """Receives and parses DNS query response.
-        Returns desired hostname address if obtained, -1 otherwise.
+    ) -> Union[int, bytes]:
+        # pylint: disable=too-many-return-statements, too-many-branches, too-many-statements, too-many-locals
+        """
+        Receive and parse DNS query response.
 
+        :return Union[int, bytes]: Requested hostname IP address if obtained, -1 otherwise.
         """
         # wait for a response
         start_time = time.monotonic()
@@ -117,7 +136,7 @@ class DNS:
         if not xid == self._request_id:
             if self._debug:
                 print(
-                    "* DNS ERROR: Received request identifer {} \
+                    "* DNS ERROR: Received request identifier {} \
                       does not match expected {}".format(
                         xid, self._request_id
                     )
@@ -209,8 +228,8 @@ class DNS:
         # Return address
         return self._pkt_buf[ptr : ptr + 4]
 
-    def _build_dns_header(self):
-        """Builds DNS header."""
+    def _build_dns_header(self) -> None:
+        """Build a DNS header."""
         # generate a random, 16-bit, request identifier
         self._request_id = getrandbits(16)
 
@@ -235,8 +254,8 @@ class DNS:
         self._pkt_buf.append(0x00)
         self._pkt_buf.append(0x00)
 
-    def _build_dns_question(self):
-        """Build DNS question"""
+    def _build_dns_question(self) -> None:
+        """Build a DNS query."""
         host = self._host.decode("utf-8")
         host = host.split(".")
         # write out each section of host
