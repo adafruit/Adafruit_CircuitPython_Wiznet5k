@@ -15,10 +15,16 @@ ethernet modules.
 * Author(s): MCQN Ltd, Brent Rubell, Martin Stephens
 
 """
+from __future__ import annotations
+
 try:
-    from typing import Tuple
+    from typing import TYPE_CHECKING, Union, Tuple
+
+    if TYPE_CHECKING:
+        from adafruit_wiznet5k.adafruit_wiznet5k import WIZNET5K
 except ImportError:
     pass
+
 import time
 from random import getrandbits
 from micropython import const
@@ -210,12 +216,19 @@ def _parse_dns_response(
 
 
 class DNS:
-    """W5K DNS implementation.
+    """W5K DNS implementation."""
 
-    :param iface: Network interface
-    """
-
-    def __init__(self, iface, dns_address, debug=False):
+    def __init__(
+        self,
+        iface: WIZNET5K,
+        dns_address: Union[str, Tuple[int, int, int, int]],
+        debug: bool = False,
+    ) -> None:
+        """
+        :param adafruit_wiznet5k.WIZNET5K: Ethernet network connection.
+        :param Union[str, Tuple[int, int, int, int]]: IP address of the DNS server.
+        :param bool debug: Enable debugging messages, defaults to False.
+        """
         self._debug = debug
         self._iface = iface
         socket.set_interface(iface)
@@ -226,12 +239,13 @@ class DNS:
         self._query_id = 0  # Request ID.
         self._query_length = 0  # Length of last query.
 
-    def gethostbyname(self, hostname):
-        """Translate a host name to IPv4 address format.
+    def gethostbyname(self, hostname: bytes) -> Union[int, bytes]:
+        """
+        DNS look up of a host name.
 
-        :param str hostname: Desired host name to connect to.
+        :param bytes hostname: Host name to connect to.
 
-        Returns the IPv4 address as a bytearray if successful, -1 otherwise.
+        :return Union[int, bytes] The IPv4 address if successful, -1 otherwise.
         """
         if self._dns_server is None:
             return INVALID_SERVER
