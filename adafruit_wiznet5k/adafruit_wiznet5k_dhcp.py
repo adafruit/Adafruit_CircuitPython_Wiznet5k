@@ -65,7 +65,7 @@ DHCP_HTYPE100MB = const(0x02)
 DHCP_HLENETHERNET = const(0x06)
 DHCP_HOPS = const(0x00)
 
-MAGIC_COOKIE = const(0x63825363)
+MAGIC_COOKIE = b"c\x82Sc"  # Four bytes 99.130.83.99
 MAX_DHCP_OPT = const(0x10)
 
 # Default DHCP Server port
@@ -203,10 +203,7 @@ class DHCP:
         # NOTE:  192 octets of 0's, BOOTP legacy
 
         # Magic Cookie
-        _BUFF[236] = (MAGIC_COOKIE >> 24) & 0xFF
-        _BUFF[237] = (MAGIC_COOKIE >> 16) & 0xFF
-        _BUFF[238] = (MAGIC_COOKIE >> 8) & 0xFF
-        _BUFF[239] = MAGIC_COOKIE & 0xFF
+        _BUFF[236:240] = MAGIC_COOKIE
 
         # Option - DHCP Message Type
         _BUFF[240] = 53
@@ -262,10 +259,10 @@ class DHCP:
     # pylint: disable=too-many-branches, too-many-statements
     def parse_dhcp_response(
         self,
-    ) -> Union[Tuple[int, bytes], Tuple[int, int]]:
+    ) -> Union[Tuple[int, bytearray], Tuple[int, int]]:
         """Parse DHCP response from DHCP server.
 
-        :return Union[Tuple[int, bytes], Tuple[int, int]]: DHCP packet type.
+        :return Union[Tuple[int, bytearray], Tuple[int, int]]: DHCP packet type.
         """
         # store packet in buffer
         _BUFF = self._sock.recv()
@@ -288,7 +285,7 @@ class DHCP:
         if _BUFF[28:34] == 0:
             return 0, 0
 
-        if int.from_bytes(_BUFF[235:240], "big") != MAGIC_COOKIE:
+        if _BUFF[236:240] != MAGIC_COOKIE:
             return 0, 0
 
         # -- Parse Packet, VARIABLE -- #
@@ -322,8 +319,8 @@ class DHCP:
                 ptr += 1
                 opt_len = _BUFF[ptr]
                 ptr += 1
-                self.gateway_ip = tuple(_BUFF[ptr : ptr + opt_len])
-                ptr += opt_len
+                self.gateway_ip = tuple(_BUFF[ptr : ptr + 4])
+                ptr += opt_len  # still increment even though we only read 1 addr.
             elif _BUFF[ptr] == DNS_SERVERS:
                 ptr += 1
                 opt_len = _BUFF[ptr]
