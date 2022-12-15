@@ -179,7 +179,7 @@ class DHCP:
         # Transaction ID (xid)
         self._initial_xid = htonl(self._transaction_id)
         self._initial_xid = self._initial_xid.to_bytes(4, "big")
-        _BUFF[4:7] = self._initial_xid
+        _BUFF[4:8] = self._initial_xid
 
         # seconds elapsed
         _BUFF[8] = (int(time_elapsed) & 0xFF00) >> 8
@@ -195,7 +195,7 @@ class DHCP:
         # as they're already set to 0.0.0.0
         # Except when renewing, then fill in ciaddr
         if renew:
-            _BUFF[12:15] = bytes(self.local_ip)
+            _BUFF[12:16] = bytes(self.local_ip)
 
         # chaddr
         _BUFF[28:34] = self._mac_address
