@@ -259,10 +259,10 @@ class DHCP:
     # pylint: disable=too-many-branches, too-many-statements
     def parse_dhcp_response(
         self,
-    ) -> Union[Tuple[int, bytearray], Tuple[int, int]]:
+    ) -> Tuple[int, bytearray]:
         """Parse DHCP response from DHCP server.
 
-        :return Union[Tuple[int, bytearray], Tuple[int, int]]: DHCP packet type.
+        :return Tuple[int, bytearray]: DHCP packet type and ID.
         """
         # store packet in buffer
         _BUFF = self._sock.recv()
@@ -271,23 +271,20 @@ class DHCP:
 
         # -- Parse Packet, FIXED -- #
         # Validate OP
-        assert (
-            _BUFF[0] == DHCP_BOOT_REPLY
-        ), "Malformed Packet - \
-            DHCP message OP is not expected BOOT Reply."
+        if _BUFF[0] != DHCP_BOOT_REPLY:
+            raise ValueError("DHCP message OP is not expected BOOTP Reply.")
 
         xid = _BUFF[4:8]
         if bytes(xid) != self._initial_xid:
-            print("f")
-            return 0, 0
+            raise ValueError("DHCP response ID mismatch.")
 
         self.local_ip = tuple(_BUFF[16:20])
         # Check that there is a server ID.
         if _BUFF[28:34] == b"\x00\x00\x00\x00\x00\x00":
-            return 0, 0
+            raise ValueError("No DHCP server ID in the response.")
 
         if _BUFF[236:240] != MAGIC_COOKIE:
-            return 0, 0
+            raise ValueError("No DHCP Magic Cookie in the response.")
 
         # -- Parse Packet, VARIABLE -- #
         ptr = 240

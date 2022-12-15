@@ -409,19 +409,21 @@ class TestParseDhcpMessage:
         # Transaction ID mismatch.
         dhcp_client._transaction_id = 0x42424242
         dhcp_client._initial_xid = dhcp_client._transaction_id.to_bytes(4, "little")
-        assert dhcp_client.parse_dhcp_response() == (0, 0)
+        with pytest.raises(ValueError):
+            dhcp_client.parse_dhcp_response()
         # Bad OP code.
         self.BAD_DATA[0] = 0
         dhcp_client._transaction_id = 0x7FFFFFFF
         dhcp_client._initial_xid = dhcp_client._transaction_id.to_bytes(4, "little")
-        with pytest.raises(AssertionError):
-            # pylint: disable=expression-not-assigned
-            dhcp_client.parse_dhcp_response() == (0, 0)
+        with pytest.raises(ValueError):
+            dhcp_client.parse_dhcp_response()
         self.BAD_DATA[0] = 2  # Reset to good value
         # No server ID.
         self.BAD_DATA[28:34] = (0, 0, 0, 0, 0, 0)
-        assert dhcp_client.parse_dhcp_response() == (0, 0)
+        with pytest.raises(ValueError):
+            dhcp_client.parse_dhcp_response()
         self.BAD_DATA[28:34] = (1, 1, 1, 1, 1, 1)  # Reset to good value
         # Bad Magic Cookie.
         self.BAD_DATA[236] = 0
-        assert dhcp_client.parse_dhcp_response() == (0, 0)
+        with pytest.raises(ValueError):
+            dhcp_client.parse_dhcp_response()
