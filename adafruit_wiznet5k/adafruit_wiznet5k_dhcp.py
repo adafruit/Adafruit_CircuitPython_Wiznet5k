@@ -277,12 +277,13 @@ class DHCP:
             DHCP message OP is not expected BOOT Reply."
 
         xid = _BUFF[4:8]
-        if bytes(xid) < self._initial_xid:
+        if bytes(xid) != self._initial_xid:
             print("f")
             return 0, 0
 
         self.local_ip = tuple(_BUFF[16:20])
-        if _BUFF[28:34] == 0:
+        # Check that there is a server ID.
+        if _BUFF[28:34] == b"\x00\x00\x00\x00\x00\x00":
             return 0, 0
 
         if _BUFF[236:240] != MAGIC_COOKIE:

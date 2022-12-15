@@ -278,6 +278,7 @@ class TestSendDHCPMessage:
 
 class TestParseDhcpMessage:
 
+    # Basic case, no extra fields, one each of router and DNS.
     GOOD_DATA_01 = bytearray(
         b"\x02\x00\x00\x00\xff\xff\xff\x7f\x00\x00\x00\x00\x00\x00\x00\x00\xc0"
         b"\xa8\x05\x16\x00\x00\x00\x00\x00\x00\x00\x00\x01\x03\x05\x07\t\x0b\x00"
@@ -298,6 +299,7 @@ class TestParseDhcpMessage:
         b"\xff\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
         b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
     )
+    # Complex case, extra field, 2 each router and DNS.
     GOOD_DATA_02 = bytearray(
         b"\x02\x00\x00\x00\x9axV4\x00\x00\x00\x00\x00\x00\x00\x00\x12$@\n\x00\x00"
         b"\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
@@ -382,3 +384,44 @@ class TestParseDhcpMessage:
         assert dhcp_client._lease_time == lease
         assert dhcp_client._t1 == t1
         assert dhcp_client._t2 == t2
+
+    BAD_DATA = bytearray(
+        b"\x02\x00\x00\x00\xff\xff\xff\x7f\x00\x00\x00\x00\x00\x00\x00\x00\x12$@\n\x00\x00"
+        b"\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+        b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+        b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+        b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+        b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+        b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+        b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+        b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+        b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+        b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+        b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+        b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00c\x82Sc"
+    )
+
+    def test_parsing_failures(self, wiznet, wrench):
+        # Test for bad OP code, ID mismatch, no server ID, bad Magic Cookie
+        dhcp_client = wiz_dhcp.DHCP(wiznet, (1, 2, 3, 4, 5, 6))
+        dhcp_client._sock = wrench.socket(type=wrench.SOCK_DGRAM)
+        dhcp_client._sock.recv.return_value = self.BAD_DATA
+        # Transaction ID mismatch.
+        dhcp_client._transaction_id = 0x42424242
+        dhcp_client._initial_xid = dhcp_client._transaction_id.to_bytes(4, "little")
+        assert dhcp_client.parse_dhcp_response() == (0, 0)
+        # Bad OP code.
+        self.BAD_DATA[0] = 0
+        dhcp_client._transaction_id = 0x7FFFFFFF
+        dhcp_client._initial_xid = dhcp_client._transaction_id.to_bytes(4, "little")
+        with pytest.raises(AssertionError):
+            # pylint: disable=expression-not-assigned
+            dhcp_client.parse_dhcp_response() == (0, 0)
+        self.BAD_DATA[0] = 2  # Reset to good value
+        # No server ID.
+        self.BAD_DATA[28:34] = (0, 0, 0, 0, 0, 0)
+        assert dhcp_client.parse_dhcp_response() == (0, 0)
+        self.BAD_DATA[28:34] = (1, 1, 1, 1, 1, 1)  # Reset to good value
+        # Bad Magic Cookie.
+        self.BAD_DATA[236] = 0
+        assert dhcp_client.parse_dhcp_response() == (0, 0)
