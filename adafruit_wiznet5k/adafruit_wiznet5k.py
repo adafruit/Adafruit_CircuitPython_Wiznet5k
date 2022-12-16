@@ -169,7 +169,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         :param bool debug: Enable debugging output, defaults to False.
         """
         self._debug = debug
-        self._chip_type = None
+        self.chip_type = None
         self._device = SPIDevice(spi_bus, cs, baudrate=8000000, polarity=0, phase=0)
         # init c.s.
         self._cs = cs
@@ -282,9 +282,9 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
         :return int: Maximum supported sockets.
         """
-        if self._chip_type == "w5500":
+        if self.chip_type == "w5500":
             return W5200_W5500_MAX_SOCK_NUM
-        if self._chip_type == "w5100s":
+        if self.chip_type == "w5100s":
             return W5100_MAX_SOCK_NUM
         return -1
 
@@ -295,7 +295,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
         :return str: The chip type.
         """
-        return self._chip_type
+        return self.chip_type
 
     @property
     def ip_address(self) -> bytearray:
@@ -393,10 +393,10 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
         :return int: 1 if the link is up, 0 if the link is down.
         """
-        if self._chip_type == "w5500":
+        if self.chip_type == "w5500":
             data = self.read(REG_PHYCFGR, 0x00)
             return data[0] & 0x01
-        if self._chip_type == "w5100s":
+        if self.chip_type == "w5100s":
             data = self.read(REG_PHYCFGR_W5100S, 0x00)
             return data[0] & 0x01
         return 0
@@ -463,7 +463,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
             :return bool: True if a W5500 chip is detected, False if not.
             """
-            self._chip_type = "w5500"
+            self.chip_type = "w5500"
             # assert self.sw_reset() == 0, "Chip not reset properly!"
             self._write_mr(0x08)
             # assert self._read_mr()[0] == 0x08, "Expected 0x08."
@@ -493,7 +493,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
             :return bool: True if a W5100 chip is detected, False if not.
             """
-            self._chip_type = "w5100s"
+            self.chip_type = "w5100s"
             # sw reset
             assert self.sw_reset() == 0, "Chip not reset properly!"
             if self.read(REG_VERSIONR_W5100S, 0x00)[0] != 0x51:
@@ -564,7 +564,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         :return Union[WriteableBuffer, bytearray]: Data read from the chip.
         """
         with self._device as bus_device:
-            if self._chip_type == "w5500":
+            if self.chip_type == "w5500":
                 bus_device.write(bytes([addr >> 8]))  # pylint: disable=no-member
                 bus_device.write(bytes([addr & 0xFF]))  # pylint: disable=no-member
                 bus_device.write(bytes([callback]))  # pylint: disable=no-member
@@ -592,7 +592,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         :param Union[int, Sequence[Union[int, bytes]]] data: Data to write to the register address.
         """
         with self._device as bus_device:
-            if self._chip_type == "w5500":
+            if self.chip_type == "w5500":
                 bus_device.write(bytes([addr >> 8]))  # pylint: disable=no-member
                 bus_device.write(bytes([addr & 0xFF]))  # pylint: disable=no-member
                 bus_device.write(bytes([callback]))  # pylint: disable=no-member
@@ -910,7 +910,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             # Read the starting save address of the received data
             ptr = self._read_snrx_rd(socket_num)
 
-            if self._chip_type == "w5500":
+            if self.chip_type == "w5500":
                 # Read data from the starting address of snrx_rd
                 ctrl_byte = 0x18 + (socket_num << 5)
 
@@ -1001,7 +1001,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         # Read the starting address for saving the transmitting data.
         ptr = self._read_sntx_wr(socket_num)
         offset = ptr & SOCK_MASK
-        if self._chip_type == "w5500":
+        if self.chip_type == "w5500":
             dst_addr = offset + (socket_num * SOCK_SIZE + 0x8000)
 
             txbuf = buffer[:ret]
@@ -1136,10 +1136,10 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
     def _write_socket(self, sock: int, address: int, data: int) -> None:
         """Write to a W5k socket register."""
-        if self._chip_type == "w5500":
+        if self.chip_type == "w5500":
             cntl_byte = (sock << 5) + 0x0C
             return self.write(address, cntl_byte, data)
-        if self._chip_type == "w5100s":
+        if self.chip_type == "w5100s":
             cntl_byte = 0
             return self.write(
                 self._ch_base_msb + sock * CH_SIZE + address, cntl_byte, data
@@ -1148,10 +1148,10 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
     def _read_socket(self, sock: int, address: int) -> Optional[bytearray]:
         """Read a W5k socket register."""
-        if self._chip_type == "w5500":
+        if self.chip_type == "w5500":
             cntl_byte = (sock << 5) + 0x08
             return self.read(address, cntl_byte)
-        if self._chip_type == "w5100s":
+        if self.chip_type == "w5100s":
             cntl_byte = 0
             return self.read(self._ch_base_msb + sock * CH_SIZE + address, cntl_byte)
         return None
