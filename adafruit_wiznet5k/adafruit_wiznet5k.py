@@ -187,7 +187,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
         # attempt to initialize the module
         self._ch_base_msb = 0
-        assert self._w5100_init() == 1, "Failed to initialize WIZnet module."
+        assert self._w5xxx_init() == 1, "Failed to initialize WIZnet module."
         # Set MAC address
         self.mac_address = mac
         self.src_port = 0
@@ -449,7 +449,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
         self._dns = dns_server
 
-    def _w5100_init(self) -> int:
+    def _w5xxx_init(self) -> int:
         """
         Detect and initialize a Wiznet5k ethernet module.
 
@@ -460,7 +460,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         self._cs.value = 1
 
         # Detect if chip is Wiznet W5500
-        if self.detect_w5500() == 1:
+        if self._detect_and_reset_w5500() == 1:
             # perform w5500 initialization
             for i in range(0, W5200_W5500_MAX_SOCK_NUM):
                 ctrl_byte = 0x0C + (i << 5)
@@ -468,20 +468,21 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
                 self.write(0x1F, ctrl_byte, 2)
         else:
             # Detect if chip is Wiznet W5100S
-            if self.detect_w5100s() == 1:
+            if self._detect_and_reset_w5100s() == 1:
                 pass
             else:
                 return 0
         return 1
 
-    def detect_w5500(self) -> int:
+    def _detect_and_reset_w5500(self) -> int:
         """
-        Detect W5500 chip.
+        Detect and reset a W5500 chip. Called at startup to initialize the
+        interface hardware.
 
         :return int: 1 if a W5500 chip is detected, -1 if not.
         """
         self._chip_type = "w5500"
-        assert self.sw_reset() == 0, "Chip not reset properly!"
+        # assert self.sw_reset() == 0, "Chip not reset properly!"
         self._write_mr(0x08)
         # assert self._read_mr()[0] == 0x08, "Expected 0x08."
         if self._read_mr()[0] != 0x08:
@@ -503,9 +504,10 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         # self._ch_base_msb = 0x10
         return 1
 
-    def detect_w5100s(self) -> int:
+    def _detect_and_reset_w5100s(self) -> int:
         """
-        Detect W5100S chip.
+        Detect and reset a W5100S chip. Called at startup to initialize the
+        interface hardware.
 
         :return int: 1 if a W5100 chip is detected, -1 if not.
         """
