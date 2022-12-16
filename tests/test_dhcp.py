@@ -2,10 +2,8 @@
 #
 # SPDX-License-Identifier: MIT
 """Tests to confirm that there are no changes in behaviour to public methods and functions."""
-
 # pylint: disable=no-self-use, redefined-outer-name, protected-access, invalid-name, too-many-arguments
 import pytest
-
 from micropython import const
 import adafruit_wiznet5k.adafruit_wiznet5k_dhcp as wiz_dhcp
 
@@ -277,7 +275,6 @@ class TestSendDHCPMessage:
 
 
 class TestParseDhcpMessage:
-
     # Basic case, no extra fields, one each of router and DNS.
     GOOD_DATA_01 = bytearray(
         b"\x02\x00\x00\x00\xff\xff\xff\x7f\x00\x00\x00\x00\x00\x00\x00\x00\xc0"
@@ -427,3 +424,89 @@ class TestParseDhcpMessage:
         self.BAD_DATA[236] = 0
         with pytest.raises(ValueError):
             dhcp_client.parse_dhcp_response()
+
+
+class TestStateMachine:
+    @pytest.mark.parametrize(
+        "dhcp_state, socket_state",
+        (
+            (wiz_dhcp.STATE_DHCP_START, "Socket"),
+            (wiz_dhcp.STATE_DHCP_DISCOVER, None),
+            (wiz_dhcp.STATE_DHCP_REQUEST, None),
+            (wiz_dhcp.STATE_DHCP_LEASED, None),
+            (wiz_dhcp.STATE_DHCP_REREQUEST, None),
+            (wiz_dhcp.STATE_DHCP_RELEASE, None),
+            (wiz_dhcp.STATE_DHCP_WAIT, None),
+        ),
+    )
+    def test_link_is_down_state_not_disconnected(
+        self, mocker, wiznet, dhcp_state, socket_state
+    ):
+        dhcp_client = wiz_dhcp.DHCP(wiznet, (1, 2, 3, 4, 5, 6))
+        dhcp_client._eth.link_status = False
+        dhcp_client._eth.ifconfig = (
+            (1, 1, 1, 1),
+            (1, 1, 1, 1),
+            (1, 1, 1, 1),
+            (1, 1, 1, 1),
+        )
+        dhcp_client._last_lease_time = 1
+        dhcp_client.dhcp_server_ip = (192, 234, 1, 75)
+        dhcp_client._dhcp_state = dhcp_state
+        # If a socket exists, close() will be called, so add a Mock.
+        if socket_state is not None:
+            dhcp_client._sock = mocker.MagicMock()
+        else:
+            dhcp_client._dhcp_state = None
+        # Test.
+        dhcp_client._dhcp_state_machine()
+        # DHCP state machine in correct state.
+        assert dhcp_client._dhcp_state == wiz_dhcp.STATE_DHCP_DISCONN
+        # Check that configurations are returned to defaults.
+        assert dhcp_client._eth.ifconfig == (
+            (0, 0, 0, 0),
+            (0, 0, 0, 0),
+            (0, 0, 0, 0),
+            (0, 0, 0, 0),
+        )
+        assert dhcp_client._last_lease_time == 0
+        assert dhcp_client.dhcp_server_ip == wiz_dhcp.BROADCAST_SERVER_ADDR
+        assert dhcp_client._sock is None
+
+    def test_link_is_down_state_disconnected(self, wiznet):
+        dhcp_client = wiz_dhcp.DHCP(wiznet, (1, 2, 3, 4, 5, 6))
+        dhcp_client._eth.link_status = False
+        dhcp_client._eth.ifconfig = (
+            (1, 1, 1, 1),
+            (1, 1, 1, 1),
+            (1, 1, 1, 1),
+            (1, 1, 1, 1),
+        )
+        dhcp_client._last_lease_time = 1
+        dhcp_client.dhcp_server_ip = (192, 234, 1, 75)
+        dhcp_client._sock = "socket"
+        dhcp_client._dhcp_state = wiz_dhcp.STATE_DHCP_DISCONN
+        # Test.
+        dhcp_client._dhcp_state_machine()
+        # DHCP state machine in correct state.
+        assert dhcp_client._dhcp_state == wiz_dhcp.STATE_DHCP_DISCONN
+        # Check that configurations are not altered because state has not changed.
+        assert dhcp_client._eth.ifconfig == (
+            (1, 1, 1, 1),
+            (1, 1, 1, 1),
+            (1, 1, 1, 1),
+            (1, 1, 1, 1),
+        )
+        assert dhcp_client._last_lease_time == 1
+        assert dhcp_client.dhcp_server_ip == (192, 234, 1, 75)
+        assert dhcp_client._sock == "socket"
+
+    def test_link_is_up_state_disconnected(self, wiznet, wrench):
+        dhcp_client = wiz_dhcp.DHCP(wiznet, (1, 2, 3, 4, 5, 6))
+        wrench.socket.side_effect = [RuntimeError]
+        dhcp_client._eth.link_status = True
+        dhcp_client._dhcp_state = wiz_dhcp.STATE_DHCP_DISCONN
+        # Test.
+        dhcp_client._dhcp_state_machine()
+        # Assume state is set to START then becomes WAIT after START fails to set a socket
+        assert dhcp_client._dhcp_state == wiz_dhcp.STATE_DHCP_WAIT

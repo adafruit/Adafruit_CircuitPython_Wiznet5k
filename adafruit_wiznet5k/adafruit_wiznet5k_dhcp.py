@@ -421,7 +421,11 @@ class DHCP:
             if self._sock.available():
                 if self._debug:
                     print("* DHCP: Parsing OFFER")
-                msg_type, xid = self.parse_dhcp_response()
+                try:
+                    msg_type, xid = self.parse_dhcp_response()
+                except ValueError as error:
+                    if self._debug:
+                        print(error)
                 if msg_type == DHCP_OFFER:
                     # Check if transaction ID matches, otherwise it may be an offer
                     # for another device
@@ -446,7 +450,11 @@ class DHCP:
             if self._sock.available():
                 if self._debug:
                     print("* DHCP: Parsing ACK")
-                msg_type, xid = self.parse_dhcp_response()
+                try:
+                    msg_type, xid = self.parse_dhcp_response()
+                except ValueError as error:
+                    if self._debug:
+                        print(error)
                 # Check if transaction ID matches, otherwise it may be
                 # for another device
                 if htonl(self._transaction_id) == int.from_bytes(xid, "big"):
