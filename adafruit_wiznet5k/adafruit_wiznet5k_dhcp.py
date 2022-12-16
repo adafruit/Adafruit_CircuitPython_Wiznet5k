@@ -426,25 +426,30 @@ class DHCP:
                 except ValueError as error:
                     if self._debug:
                         print(error)
-                if msg_type == DHCP_OFFER:
-                    # Check if transaction ID matches, otherwise it may be an offer
-                    # for another device
-                    if htonl(self._transaction_id) == int.from_bytes(xid, "big"):
-                        if self._debug:
-                            print(
-                                "* DHCP: Send request to {}".format(self.dhcp_server_ip)
+                else:
+                    if msg_type == DHCP_OFFER:
+                        # Check if transaction ID matches, otherwise it may be an offer
+                        # for another device
+                        if htonl(self._transaction_id) == int.from_bytes(xid, "big"):
+                            if self._debug:
+                                print(
+                                    "* DHCP: Send request to {}".format(
+                                        self.dhcp_server_ip
+                                    )
+                                )
+                            self._transaction_id = (
+                                self._transaction_id + 1
+                            ) & 0x7FFFFFFF
+                            self.send_dhcp_message(
+                                DHCP_REQUEST, (time.monotonic() - self._start_time)
                             )
-                        self._transaction_id = (self._transaction_id + 1) & 0x7FFFFFFF
-                        self.send_dhcp_message(
-                            DHCP_REQUEST, (time.monotonic() - self._start_time)
-                        )
-                        self._dhcp_state = STATE_DHCP_REQUEST
+                            self._dhcp_state = STATE_DHCP_REQUEST
+                        else:
+                            if self._debug:
+                                print("* DHCP: Received OFFER with non-matching xid")
                     else:
                         if self._debug:
-                            print("* DHCP: Received OFFER with non-matching xid")
-                else:
-                    if self._debug:
-                        print("* DHCP: Received DHCP Message is not OFFER")
+                            print("* DHCP: Received DHCP Message is not OFFER")
 
         elif self._dhcp_state == STATE_DHCP_REQUEST:
             if self._sock.available():
@@ -455,39 +460,40 @@ class DHCP:
                 except ValueError as error:
                     if self._debug:
                         print(error)
-                # Check if transaction ID matches, otherwise it may be
-                # for another device
-                if htonl(self._transaction_id) == int.from_bytes(xid, "big"):
-                    if msg_type == DHCP_ACK:
-                        if self._debug:
-                            print("* DHCP: Successful lease")
-                        self._sock.close()
-                        self._sock = None
-                        self._dhcp_state = STATE_DHCP_LEASED
-                        self._last_lease_time = self._start_time
-                        if self._lease_time == 0:
-                            self._lease_time = DEFAULT_LEASE_TIME
-                        if self._t1 == 0:
-                            # T1 is 50% of _lease_time
-                            self._t1 = self._lease_time >> 1
-                        if self._t2 == 0:
-                            # T2 is 87.5% of _lease_time
-                            self._t2 = self._lease_time - (self._lease_time >> 3)
-                        self._renew_in_sec = self._t1
-                        self._rebind_in_sec = self._t2
-                        self._eth.ifconfig = (
-                            self.local_ip,
-                            self.subnet_mask,
-                            self.gateway_ip,
-                            self.dns_server_ip,
-                        )
-                        gc.collect()
+                else:
+                    # Check if transaction ID matches, otherwise it may be
+                    # for another device
+                    if htonl(self._transaction_id) == int.from_bytes(xid, "big"):
+                        if msg_type == DHCP_ACK:
+                            if self._debug:
+                                print("* DHCP: Successful lease")
+                            self._sock.close()
+                            self._sock = None
+                            self._dhcp_state = STATE_DHCP_LEASED
+                            self._last_lease_time = self._start_time
+                            if self._lease_time == 0:
+                                self._lease_time = DEFAULT_LEASE_TIME
+                            if self._t1 == 0:
+                                # T1 is 50% of _lease_time
+                                self._t1 = self._lease_time >> 1
+                            if self._t2 == 0:
+                                # T2 is 87.5% of _lease_time
+                                self._t2 = self._lease_time - (self._lease_time >> 3)
+                            self._renew_in_sec = self._t1
+                            self._rebind_in_sec = self._t2
+                            self._eth.ifconfig = (
+                                self.local_ip,
+                                self.subnet_mask,
+                                self.gateway_ip,
+                                self.dns_server_ip,
+                            )
+                            gc.collect()
+                        else:
+                            if self._debug:
+                                print("* DHCP: Received DHCP Message is not ACK")
                     else:
                         if self._debug:
-                            print("* DHCP: Received DHCP Message is not ACK")
-                else:
-                    if self._debug:
-                        print("* DHCP: Received non-matching xid")
+                            print("* DHCP: Received non-matching xid")
 
         elif self._dhcp_state == STATE_DHCP_WAIT:
             if time.monotonic() > (self._start_time + DHCP_WAIT_TIME):
