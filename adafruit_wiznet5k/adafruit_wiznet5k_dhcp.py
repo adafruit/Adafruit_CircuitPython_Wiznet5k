@@ -81,6 +81,7 @@ DHCP_SERVER_PORT = const(67)
 # DHCP Lease Time, in seconds
 DEFAULT_LEASE_TIME = const(900)
 BROADCAST_SERVER_ADDR = (255, 255, 255, 255)
+UNASSIGNED_IP_ADDR = (0, 0, 0, 0)
 
 # DHCP Response Options
 MSG_TYPE = 53
@@ -138,13 +139,15 @@ class DHCP:
         self._next_resend = 0
         self._retries = 0
         self._max_retries = 0
+        self._blocking = False
+        self._renew = False
 
         # DHCP server configuration
         self.dhcp_server_ip = BROADCAST_SERVER_ADDR
-        self.local_ip = 0
-        self.gateway_ip = 0
-        self.subnet_mask = 0
-        self.dns_server_ip = 0
+        self.local_ip = UNASSIGNED_IP_ADDR
+        self.gateway_ip = UNASSIGNED_IP_ADDR
+        self.subnet_mask = UNASSIGNED_IP_ADDR
+        self.dns_server_ip = UNASSIGNED_IP_ADDR
 
         # Lease configuration
         self._lease_time = 0
@@ -320,74 +323,110 @@ class DHCP:
 
     def _dsm_reset(self):
         """I'll get to it"""
+        if self._sock:
+            self._sock.close()
+            self._sock = None
+        self.dhcp_server_ip = BROADCAST_SERVER_ADDR
+        self._eth.ifconfig = (
+            UNASSIGNED_IP_ADDR,
+            UNASSIGNED_IP_ADDR,
+            UNASSIGNED_IP_ADDR,
+            UNASSIGNED_IP_ADDR,
+        )
+        self.gateway_ip = UNASSIGNED_IP_ADDR
+        self.local_ip = UNASSIGNED_IP_ADDR
+        self.subnet_mask = UNASSIGNED_IP_ADDR
+        self._renew = False
         self._retries = 0
+        self._increment_transaction_id()
+        self._start_time = int(time.monotonic())
+
+    def _increment_transaction_id(self):
+        self._transaction_id = (self._transaction_id + 1) & 0x7FFFFFFF
 
     def _resend_time(self) -> float:
         """I'll get to it"""
         self._retries += 1
-        return self._retries + randint(0, 2) + time.monotonic()
+        return self._retries * 4 + randint(0, 2) + int(time.monotonic())
 
-    def _set_next_state(self, *, next_state: int, max_retries: int) -> None:
+    def _set_next_state(
+        self, *, next_state: int, max_retries: int, send_msg: bool = True
+    ) -> None:
         """I'll get to it"""
-        self._sock.send(_BUFF)
+        if send_msg:
+            self._sock.send(_BUFF)
         self._retries = 0
         self._max_retries = max_retries
         self._next_resend = self._resend_time()
         self._dhcp_state = next_state
 
-    def _arp_check_for_ip_collision(self) -> bool:
+    def _ip_collision(self) -> bool:
         """I'll get to it"""
-        timeout = 0.25
-        arp_packet = bytearray(b"0x00" * 28)
-        # Set ARP headers
-        arp_packet[:8] = (0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x01)
-        arp_packet[8:14] = self._mac_address
-        arp_packet[24:] = self.local_ip
-        for _ in range(3):
-            self._sock.send(arp_packet)
-            stop_time = time.monotonic() + timeout
-            while time.monotonic() < stop_time:
-                if self._sock.available():
-                    buffer = self._sock.recv()
-                    if (
-                        tuple(buffer[18:24]) == self._mac_address
-                        and tuple(buffer[14:18]) == self.local_ip
-                    ):
-                        # Another device is already using this IP address.
-                        return False
-        # No response to ARP request, can accept this IP address.
-        return True
+        if not self._renew:  # Don't check if the lease is being renewed.
+            timeout = 0.25
+            arp_packet = bytearray(b"0x00" * 28)
+            # Set ARP headers
+            arp_packet[:8] = (0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x01)
+            arp_packet[8:14] = self._mac_address
+            arp_packet[24:] = self.local_ip
+            for _ in range(3):
+                self._sock.send(arp_packet)
+                stop_time = time.monotonic() + timeout
+                while time.monotonic() < stop_time:
+                    if self._sock.available():
+                        buffer = self._sock.recv()
+                        if (
+                            tuple(buffer[18:24]) == self._mac_address
+                            and tuple(buffer[14:18]) == self.local_ip
+                        ):
+                            # Another device is already using this IP address.
+                            return True
+        # No response to ARP request or renewing, accept this IP address.
+        return False
 
     def _new_dhcp_state_machine(self, *, blocking: bool = False) -> None:
         """I'll get to it"""
 
         global _BUFF  # pylint: disable=global-variable-not-assigned, global-statement
-        wait_for_link = 5
-        # discover_max_retries = 3
+        self._blocking = blocking
 
-        while blocking:
-            pass  # Dummy for pylint
         # pylint: disable=too-many-nested-blocks
         while True:
             if self._dhcp_state == STATE_BOUND:
-                if time.monotonic() > self._t1:
-                    self._dhcp_state = STATE_RENEWING
-                elif time.monotonic() > self._t2:
+                now = time.monotonic()
+                if now < self._t1:
+                    return
+                if now > self._lease_time:
+                    self._blocking = True
+                    self._dhcp_state = STATE_INIT
+                elif now > self._t2:
                     self._dhcp_state = STATE_REBINDING
                 else:
-                    return
+                    self._dhcp_state = STATE_RENEWING
+
+            if self._dhcp_state == STATE_RENEWING:
+                self._renew = True
+                self._generate_dhcp_message(message_type=DHCP_REQUEST)
+                self._set_next_state(next_state=STATE_REQUESTING, max_retries=3)
+
+            if self._dhcp_state == STATE_REBINDING:
+                self.dhcp_server_ip = BROADCAST_SERVER_ADDR
+                self._renew = True
+                self._generate_dhcp_message(message_type=DHCP_REQUEST)
+                self._set_next_state(next_state=STATE_REQUESTING, max_retries=3)
 
             if self._dhcp_state == STATE_INIT:
                 self._dsm_reset()
+                wait_for_link = 5
                 time_to_stop = time.monotonic() + wait_for_link
                 while not self._eth.link_status:
                     if time.monotonic() > time_to_stop:
                         raise TimeoutError("Ethernet link is down")
-                    time.sleep(1)
-                self._generate_dhcp_message(message_type=DHCP_DISCOVER, time_elapsed=0)
-                self._set_next_state(next_state=STATE_DHCP_DISCOVER, max_retries=3)
+                    time.sleep(0.5)
+                self._generate_dhcp_message(message_type=DHCP_DISCOVER)
+                self._set_next_state(next_state=STATE_SELECTING, max_retries=3)
 
-            if self._dhcp_state == STATE_DHCP_DISCOVER:
+            if self._dhcp_state == STATE_SELECTING:
                 while True:
                     while time.monotonic() < self._next_resend:
                         if self._sock.available():
@@ -400,16 +439,16 @@ class DHCP:
                             else:
                                 if msg_type == DHCP_OFFER:
                                     self._generate_dhcp_message(
-                                        message_type=DHCP_REQUEST, time_elapsed=0
+                                        message_type=DHCP_REQUEST
                                     )
                                     self._set_next_state(
                                         next_state=STATE_REQUESTING, max_retries=3
                                     )
                                     break
-                        if not blocking:
+                        if not self._blocking:
                             break
                     self._next_resend = self._resend_time()
-                    if not blocking:
+                    if not self._blocking:
                         break
 
                 if self._dhcp_state == STATE_REQUESTING:
@@ -429,18 +468,41 @@ class DHCP:
                                         )
                                         break
                                     if msg_type == DHCP_ACK:
-                                        ...
-                            if not blocking:
+                                        if self._ip_collision():
+                                            self._generate_dhcp_message(
+                                                message_type=DHCP_DECLINE
+                                            )
+                                            self._set_next_state(
+                                                next_state=STATE_INIT, max_retries=0
+                                            )
+                                        else:
+                                            if self._lease_time == 0:
+                                                self._lease_time = DEFAULT_LEASE_TIME
+                                            self._t1 = (
+                                                self._start_time + self._lease_time // 2
+                                            )
+                                            self._t2 = (
+                                                self._start_time
+                                                + self._lease_time
+                                                - self._lease_time // 8
+                                            )
+                                            self._lease_time += self._start_time
+                                            self._increment_transaction_id()
+                                            self._renew = False
+                                            self._blocking = False
+                                            self._dhcp_state = STATE_BOUND
+                                    if msg_type == DHCP_NAK:
+                                        self._dhcp_state = STATE_INIT
+                            if not self._blocking:
                                 break
                         self._next_resend = self._resend_time()
-                        if not blocking:
+                        if not self._blocking:
                             break
 
     def _generate_dhcp_message(
         self,
         *,
         message_type: int,
-        time_elapsed: float,
         broadcast: bool = False,
         renew: bool = False,
     ) -> None:
@@ -482,7 +544,7 @@ class DHCP:
         # Transaction ID (xid)
         _BUFF[4:8] = self._transaction_id.to_bytes(4, "big")
         # seconds elapsed
-        _BUFF[8:10] = int(time_elapsed).to_bytes(2, "big")
+        _BUFF[8:10] = int(time.monotonic() - self._start_time).to_bytes(2, "big")
         # flags (only bit 0 is used)
         if broadcast:
             _BUFF[10] = 0b10000000
