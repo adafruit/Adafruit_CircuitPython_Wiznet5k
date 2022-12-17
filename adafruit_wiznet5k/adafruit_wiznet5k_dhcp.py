@@ -137,6 +137,7 @@ class DHCP:
         self._start_time = 0
         self._next_resend = 0
         self._retries = 0
+        self._max_retries = 0
 
         # DHCP server configuration
         self.dhcp_server_ip = BROADCAST_SERVER_ADDR
@@ -326,6 +327,37 @@ class DHCP:
         self._retries += 1
         return self._retries + randint(0, 2) + time.monotonic()
 
+    def _set_next_state(self, *, next_state: int, max_retries: int) -> None:
+        """I'll get to it"""
+        self._sock.send(_BUFF)
+        self._retries = 0
+        self._max_retries = max_retries
+        self._next_resend = self._resend_time()
+        self._dhcp_state = next_state
+
+    def _arp_check_for_ip_collision(self) -> bool:
+        """I'll get to it"""
+        timeout = 0.25
+        arp_packet = bytearray(b"0x00" * 28)
+        # Set ARP headers
+        arp_packet[:8] = (0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x01)
+        arp_packet[8:14] = self._mac_address
+        arp_packet[24:] = self.local_ip
+        for _ in range(3):
+            self._sock.send(arp_packet)
+            stop_time = time.monotonic() + timeout
+            while time.monotonic() < stop_time:
+                if self._sock.available():
+                    buffer = self._sock.recv()
+                    if (
+                        tuple(buffer[18:24]) == self._mac_address
+                        and tuple(buffer[14:18]) == self.local_ip
+                    ):
+                        # Another device is already using this IP address.
+                        return False
+        # No response to ARP request, can accept this IP address.
+        return True
+
     def _new_dhcp_state_machine(self, *, blocking: bool = False) -> None:
         """I'll get to it"""
 
@@ -335,7 +367,7 @@ class DHCP:
 
         while blocking:
             pass  # Dummy for pylint
-
+        # pylint: disable=too-many-nested-blocks
         while True:
             if self._dhcp_state == STATE_BOUND:
                 if time.monotonic() > self._t1:
@@ -353,29 +385,56 @@ class DHCP:
                         raise TimeoutError("Ethernet link is down")
                     time.sleep(1)
                 self._generate_dhcp_message(message_type=DHCP_DISCOVER, time_elapsed=0)
-                self._sock.send(_BUFF)
-                self._retries = 0
-                self._next_resend = self._resend_time()
-                self._dhcp_state = STATE_DHCP_DISCOVER
+                self._set_next_state(next_state=STATE_DHCP_DISCOVER, max_retries=3)
 
             if self._dhcp_state == STATE_DHCP_DISCOVER:
-                while time.monotonic() < self._next_resend:
-                    if self._sock.available():
-                        _BUFF = self._sock.recv()
-                        try:
-                            msg_type = self._parse_dhcp_response()
-                        except ValueError as error:
-                            if self._debug:
-                                print(error)
-                        else:
-                            if msg_type == DHCP_OFFER:
-                                self._generate_dhcp_message(
-                                    message_type=DHCP_REQUEST, time_elapsed=0
-                                )
-                                self._sock.send(_BUFF)
-                                self._retries = 0
-                                self._next_resend = self._resend_time()
-                                self._dhcp_state = STATE_REQUESTING
+                while True:
+                    while time.monotonic() < self._next_resend:
+                        if self._sock.available():
+                            _BUFF = self._sock.recv()
+                            try:
+                                msg_type = self._parse_dhcp_response()
+                            except ValueError as error:
+                                if self._debug:
+                                    print(error)
+                            else:
+                                if msg_type == DHCP_OFFER:
+                                    self._generate_dhcp_message(
+                                        message_type=DHCP_REQUEST, time_elapsed=0
+                                    )
+                                    self._set_next_state(
+                                        next_state=STATE_REQUESTING, max_retries=3
+                                    )
+                                    break
+                        if not blocking:
+                            break
+                    self._next_resend = self._resend_time()
+                    if not blocking:
+                        break
+
+                if self._dhcp_state == STATE_REQUESTING:
+                    while True:
+                        while time.monotonic() < self._next_resend:
+                            if self._sock.available():
+                                _BUFF = self._sock.recv()
+                                try:
+                                    msg_type = self._parse_dhcp_response()
+                                except ValueError as error:
+                                    if self._debug:
+                                        print(error)
+                                else:
+                                    if msg_type == DHCP_NAK:
+                                        self._set_next_state(
+                                            next_state=STATE_INIT, max_retries=0
+                                        )
+                                        break
+                                    if msg_type == DHCP_ACK:
+                                        ...
+                            if not blocking:
+                                break
+                        self._next_resend = self._resend_time()
+                        if not blocking:
+                            break
 
     def _generate_dhcp_message(
         self,
