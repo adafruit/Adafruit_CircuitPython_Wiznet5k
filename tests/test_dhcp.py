@@ -145,70 +145,78 @@ class TestSendDHCPMessage:
         dhcp_client = wiz_dhcp.DHCP(wiznet, (4, 5, 6, 7, 8, 9))
         dhcp_client._sock = wrench.socket(type=wrench.SOCK_DGRAM)
         dhcp_client._transaction_id = 0x6FFFFFFF
-        dhcp_client._generate_dhcp_message(message_type=1, time_elapsed=23.4)
+        dhcp_client._generate_dhcp_message(
+            message_type=wiz_dhcp.DHCP_DISCOVER, time_elapsed=23.4
+        )
         assert wiz_dhcp._BUFF == dhcp_data.DHCP_SEND_01
         assert len(wiz_dhcp._BUFF) == 318
 
     @pytest.mark.parametrize(
-        "mac_address, hostname, state, time_elapsed, renew, local_ip, server_ip, result",
+        "mac_address, hostname, msg_type, time_elapsed, renew, \
+        broadcast_only, local_ip, server_ip, result",
         (
             (
                 (4, 5, 6, 7, 8, 9),
                 None,
-                wiz_dhcp.STATE_DHCP_DISCOVER,
+                wiz_dhcp.DHCP_DISCOVER,
                 23.4,
                 False,
-                0,
-                0,
-                dhcp_data.DHCP_SEND_01,
+                False,
+                (0, 0, 0, 0),
+                (0, 0, 0, 0),
+                dhcp_data.DHCP_SEND_02,
             ),
             (
                 (24, 35, 46, 57, 68, 79),
                 "bert.co.uk",
-                wiz_dhcp.STATE_DHCP_REQUEST,
+                wiz_dhcp.DHCP_REQUEST,
                 35.5,
-                False,
+                True,
+                True,
                 (192, 168, 3, 4),
                 (222, 123, 23, 10),
-                dhcp_data.DHCP_SEND_02,
+                dhcp_data.DHCP_SEND_03,
             ),
             (
                 (255, 97, 36, 101, 42, 99),
                 "clash.net",
-                wiz_dhcp.STATE_DHCP_REQUEST,
+                wiz_dhcp.DHCP_REQUEST,
                 35.5,
+                False,
                 True,
                 (10, 10, 10, 43),
                 (145, 66, 45, 22),
-                dhcp_data.DHCP_SEND_03,
+                dhcp_data.DHCP_SEND_04,
             ),
         ),
     )
-    def test_generate_dhcp_message(
+    def test_generate_dhcp_message_with_options(
         self,
         wiznet,
-        wrench,
         mac_address,
         hostname,
-        state,
+        msg_type,
         time_elapsed,
         renew,
+        broadcast_only,
         local_ip,
         server_ip,
-        # result,
+        result,
     ):
         dhcp_client = wiz_dhcp.DHCP(wiznet, mac_address, hostname=hostname)
-        # Mock out socket to check what is sent
-        dhcp_client._sock = wrench.socket(type=wrench.SOCK_DGRAM)
         # Set client attributes for test
         dhcp_client.local_ip = local_ip
         dhcp_client.dhcp_server_ip = server_ip
         dhcp_client._transaction_id = 0x6FFFFFFF
         # Test
         dhcp_client._generate_dhcp_message(
-            message_type=state, time_elapsed=time_elapsed, renew=renew
+            message_type=msg_type,
+            time_elapsed=time_elapsed,
+            renew=renew,
+            broadcast=broadcast_only,
         )
         assert len(wiz_dhcp._BUFF) == 318
+        assert wiz_dhcp._BUFF == result
 
 
 class TestParseDhcpMessage:
