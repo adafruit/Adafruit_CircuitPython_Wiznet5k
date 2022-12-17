@@ -29,7 +29,7 @@ import time
 from random import randint
 from micropython import const
 import adafruit_wiznet5k.adafruit_wiznet5k_socket as socket
-from adafruit_wiznet5k.adafruit_wiznet5k_socket import htonl, htons
+from adafruit_wiznet5k.adafruit_wiznet5k_socket import htonl
 
 
 # DHCP State Machine
@@ -41,6 +41,14 @@ STATE_DHCP_REREQUEST = const(0x04)
 STATE_DHCP_RELEASE = const(0x05)
 STATE_DHCP_WAIT = const(0x06)
 STATE_DHCP_DISCONN = const(0x07)
+
+STATE_INIT = const(0x01)
+STATE_SELECTING = const(0x02)
+STATE_REQUESTING = const(0x03)
+STATE_BOUND = const(0x04)
+STATE_RENEWING = const(0x05)
+STATE_REBINDING = const(0x06)
+STATE_RELEASING = const(0x07)
 
 # DHCP wait time between attempts
 DHCP_WAIT_TIME = const(60)
@@ -65,7 +73,7 @@ DHCP_HTYPE100MB = const(0x02)
 DHCP_HLENETHERNET = const(0x06)
 DHCP_HOPS = const(0x00)
 
-MAGIC_COOKIE = const(0x63825363)
+MAGIC_COOKIE = b"c\x82Sc"  # Four bytes 99.130.83.99
 MAX_DHCP_OPT = const(0x10)
 
 # Default DHCP Server port
@@ -127,6 +135,8 @@ class DHCP:
         self._initial_xid = 0
         self._transaction_id = 0
         self._start_time = 0
+        self._next_resend = 0
+        self._retries = 0
 
         # DHCP server configuration
         self.dhcp_server_ip = BROADCAST_SERVER_ADDR
@@ -151,225 +161,6 @@ class DHCP:
         self._hostname = bytes(
             (hostname or "WIZnet{}").split(".")[0].format(mac_string)[:42], "utf-8"
         )
-
-    # pylint: disable=too-many-statements
-    def send_dhcp_message(
-        self,
-        state: int,
-        time_elapsed: float,
-        renew: bool = False,
-    ) -> None:
-        """
-        Assemble and send a DHCP message packet to a socket.
-
-        :param int state: DHCP Message state.
-        :param float time_elapsed: Number of seconds elapsed since DHCP process started
-        :param bool renew: Set True for renew and rebind, defaults to False
-        """
-        _BUFF[:] = b"\x00" * len(_BUFF)
-        # OP
-        _BUFF[0] = DHCP_BOOT_REQUEST
-        # HTYPE
-        _BUFF[1] = DHCP_HTYPE10MB
-        # HLEN
-        _BUFF[2] = DHCP_HLENETHERNET
-        # HOPS
-        _BUFF[3] = DHCP_HOPS
-
-        # Transaction ID (xid)
-        self._initial_xid = htonl(self._transaction_id)
-        self._initial_xid = self._initial_xid.to_bytes(4, "big")
-        _BUFF[4:7] = self._initial_xid
-
-        # seconds elapsed
-        _BUFF[8] = (int(time_elapsed) & 0xFF00) >> 8
-        _BUFF[9] = int(time_elapsed) & 0x00FF
-
-        # flags
-        flags = htons(0x8000)
-        flags = flags.to_bytes(2, "big")
-        _BUFF[10] = flags[1]
-        _BUFF[11] = flags[0]
-
-        # NOTE: Skipping ciaddr/yiaddr/siaddr/giaddr
-        # as they're already set to 0.0.0.0
-        # Except when renewing, then fill in ciaddr
-        if renew:
-            _BUFF[12:15] = bytes(self.local_ip)
-
-        # chaddr
-        _BUFF[28:34] = self._mac_address
-
-        # NOTE:  192 octets of 0's, BOOTP legacy
-
-        # Magic Cookie
-        _BUFF[236] = (MAGIC_COOKIE >> 24) & 0xFF
-        _BUFF[237] = (MAGIC_COOKIE >> 16) & 0xFF
-        _BUFF[238] = (MAGIC_COOKIE >> 8) & 0xFF
-        _BUFF[239] = MAGIC_COOKIE & 0xFF
-
-        # Option - DHCP Message Type
-        _BUFF[240] = 53
-        _BUFF[241] = 0x01
-        _BUFF[242] = state
-
-        # Option - Client Identifier
-        _BUFF[243] = 61
-        # Length
-        _BUFF[244] = 0x07
-        # HW Type - ETH
-        _BUFF[245] = 0x01
-        # Client MAC Address
-        for mac, val in enumerate(self._mac_address):
-            _BUFF[246 + mac] = val
-
-        # Option - Host Name
-        _BUFF[252] = 12
-        hostname_len = len(self._hostname)
-        after_hostname = 254 + hostname_len
-        _BUFF[253] = hostname_len
-        _BUFF[254:after_hostname] = self._hostname
-
-        if state == DHCP_REQUEST and not renew:
-            # Set the parsed local IP addr
-            _BUFF[after_hostname] = 50
-            _BUFF[after_hostname + 1] = 0x04
-            _BUFF[after_hostname + 2 : after_hostname + 6] = bytes(self.local_ip)
-            # Set the parsed dhcp server ip addr
-            _BUFF[after_hostname + 6] = 54
-            _BUFF[after_hostname + 7] = 0x04
-            _BUFF[after_hostname + 8 : after_hostname + 12] = bytes(self.dhcp_server_ip)
-
-        _BUFF[after_hostname + 12] = 55
-        _BUFF[after_hostname + 13] = 0x06
-        # subnet mask
-        _BUFF[after_hostname + 14] = 1
-        # routers on subnet
-        _BUFF[after_hostname + 15] = 3
-        # DNS
-        _BUFF[after_hostname + 16] = 6
-        # domain name
-        _BUFF[after_hostname + 17] = 15
-        # renewal (T1) value
-        _BUFF[after_hostname + 18] = 58
-        # rebinding (T2) value
-        _BUFF[after_hostname + 19] = 59
-        _BUFF[after_hostname + 20] = 255
-
-        # Send DHCP packet
-        self._sock.send(_BUFF)
-
-    # pylint: disable=too-many-branches, too-many-statements
-    def parse_dhcp_response(
-        self,
-    ) -> Union[Tuple[int, bytes], Tuple[int, int]]:
-        """Parse DHCP response from DHCP server.
-
-        :return Union[Tuple[int, bytes], Tuple[int, int]]: DHCP packet type.
-        """
-        # store packet in buffer
-        _BUFF = self._sock.recv()
-        if self._debug:
-            print("DHCP Response: ", _BUFF)
-
-        # -- Parse Packet, FIXED -- #
-        # Validate OP
-        assert (
-            _BUFF[0] == DHCP_BOOT_REPLY
-        ), "Malformed Packet - \
-            DHCP message OP is not expected BOOT Reply."
-
-        xid = _BUFF[4:8]
-        if bytes(xid) < self._initial_xid:
-            print("f")
-            return 0, 0
-
-        self.local_ip = tuple(_BUFF[16:20])
-        if _BUFF[28:34] == 0:
-            return 0, 0
-
-        if int.from_bytes(_BUFF[235:240], "big") != MAGIC_COOKIE:
-            return 0, 0
-
-        # -- Parse Packet, VARIABLE -- #
-        ptr = 240
-        while _BUFF[ptr] != OPT_END:
-            if _BUFF[ptr] == MSG_TYPE:
-                ptr += 1
-                opt_len = _BUFF[ptr]
-                ptr += opt_len
-                msg_type = _BUFF[ptr]
-                ptr += 1
-            elif _BUFF[ptr] == SUBNET_MASK:
-                ptr += 1
-                opt_len = _BUFF[ptr]
-                ptr += 1
-                self.subnet_mask = tuple(_BUFF[ptr : ptr + opt_len])
-                ptr += opt_len
-            elif _BUFF[ptr] == DHCP_SERVER_ID:
-                ptr += 1
-                opt_len = _BUFF[ptr]
-                ptr += 1
-                self.dhcp_server_ip = tuple(_BUFF[ptr : ptr + opt_len])
-                ptr += opt_len
-            elif _BUFF[ptr] == LEASE_TIME:
-                ptr += 1
-                opt_len = _BUFF[ptr]
-                ptr += 1
-                self._lease_time = int.from_bytes(_BUFF[ptr : ptr + opt_len], "big")
-                ptr += opt_len
-            elif _BUFF[ptr] == ROUTERS_ON_SUBNET:
-                ptr += 1
-                opt_len = _BUFF[ptr]
-                ptr += 1
-                self.gateway_ip = tuple(_BUFF[ptr : ptr + opt_len])
-                ptr += opt_len
-            elif _BUFF[ptr] == DNS_SERVERS:
-                ptr += 1
-                opt_len = _BUFF[ptr]
-                ptr += 1
-                self.dns_server_ip = tuple(_BUFF[ptr : ptr + 4])
-                ptr += opt_len  # still increment even though we only read 1 addr.
-            elif _BUFF[ptr] == T1_VAL:
-                ptr += 1
-                opt_len = _BUFF[ptr]
-                ptr += 1
-                self._t1 = int.from_bytes(_BUFF[ptr : ptr + opt_len], "big")
-                ptr += opt_len
-            elif _BUFF[ptr] == T2_VAL:
-                ptr += 1
-                opt_len = _BUFF[ptr]
-                ptr += 1
-                self._t2 = int.from_bytes(_BUFF[ptr : ptr + opt_len], "big")
-                ptr += opt_len
-            elif _BUFF[ptr] == 0:
-                break
-            else:
-                # We're not interested in this option
-                ptr += 1
-                opt_len = _BUFF[ptr]
-                ptr += 1
-                # no-op
-                ptr += opt_len
-
-        if self._debug:
-            print(
-                "Msg Type: {}\nSubnet Mask: {}\nDHCP Server IP: {}\nDNS Server IP: {}\
-                  \nGateway IP: {}\nLocal IP: {}\nT1: {}\nT2: {}\nLease Time: {}".format(
-                    msg_type,
-                    self.subnet_mask,
-                    self.dhcp_server_ip,
-                    self.dns_server_ip,
-                    self.gateway_ip,
-                    self.local_ip,
-                    self._t1,
-                    self._t2,
-                    self._lease_time,
-                )
-            )
-
-        gc.collect()
-        return msg_type, xid
 
     # pylint: disable=too-many-branches, too-many-statements
     def _dhcp_state_machine(self) -> None:
@@ -410,23 +201,23 @@ class DHCP:
                 ):
                     if self._debug:
                         print("* DHCP: Send discover to {}".format(self.dhcp_server_ip))
-                    self.send_dhcp_message(
-                        STATE_DHCP_DISCOVER, (time.monotonic() - self._start_time)
-                    )
+                    # self.send_dhcp_message(
+                    #     STATE_DHCP_DISCOVER, (time.monotonic() - self._start_time)
+                    # )
                     self._dhcp_state = STATE_DHCP_DISCOVER
                 else:
                     if self._debug:
                         print("* DHCP: Send request to {}".format(self.dhcp_server_ip))
-                    self.send_dhcp_message(
-                        DHCP_REQUEST, (time.monotonic() - self._start_time), True
-                    )
+                    # self.send_dhcp_message(
+                    #     DHCP_REQUEST, (time.monotonic() - self._start_time), True
+                    # )
                     self._dhcp_state = STATE_DHCP_REQUEST
 
         elif self._dhcp_state == STATE_DHCP_DISCOVER:
             if self._sock.available():
                 if self._debug:
                     print("* DHCP: Parsing OFFER")
-                msg_type, xid = self.parse_dhcp_response()
+                msg_type, xid = None, None  # self.parse_dhcp_response()
                 if msg_type == DHCP_OFFER:
                     # Check if transaction ID matches, otherwise it may be an offer
                     # for another device
@@ -436,9 +227,9 @@ class DHCP:
                                 "* DHCP: Send request to {}".format(self.dhcp_server_ip)
                             )
                         self._transaction_id = (self._transaction_id + 1) & 0x7FFFFFFF
-                        self.send_dhcp_message(
-                            DHCP_REQUEST, (time.monotonic() - self._start_time)
-                        )
+                        # self.send_dhcp_message(
+                        #     DHCP_REQUEST, (time.monotonic() - self._start_time)
+                        # )
                         self._dhcp_state = STATE_DHCP_REQUEST
                     else:
                         if self._debug:
@@ -451,7 +242,7 @@ class DHCP:
             if self._sock.available():
                 if self._debug:
                     print("* DHCP: Parsing ACK")
-                msg_type, xid = self.parse_dhcp_response()
+                msg_type, xid = None, None  # self.parse_dhcp_response()
                 # Check if transaction ID matches, otherwise it may be
                 # for another device
                 if htonl(self._transaction_id) == int.from_bytes(xid, "big"):
@@ -525,3 +316,185 @@ class DHCP:
     def maintain_dhcp_lease(self) -> None:
         """Maintain DHCP lease"""
         self._dhcp_state_machine()
+
+    def _dsm_reset(self):
+        """I'll get to it"""
+        self._retries = 0
+
+    def _resend_time(self) -> float:
+        """I'll get to it"""
+        self._retries += 1
+        return self._retries + randint(0, 2) + time.monotonic()
+
+    def _new_dhcp_state_machine(self, *, blocking: bool = False) -> None:
+        """I'll get to it"""
+
+        global _BUFF  # pylint: disable=global-variable-not-assigned, global-statement
+        wait_for_link = 5
+        # discover_max_retries = 3
+
+        while blocking:
+            pass  # Dummy for pylint
+
+        while True:
+            if self._dhcp_state == STATE_BOUND:
+                if time.monotonic() > self._t1:
+                    self._dhcp_state = STATE_RENEWING
+                elif time.monotonic() > self._t2:
+                    self._dhcp_state = STATE_REBINDING
+                else:
+                    return
+
+            if self._dhcp_state == STATE_INIT:
+                self._dsm_reset()
+                time_to_stop = time.monotonic() + wait_for_link
+                while not self._eth.link_status:
+                    if time.monotonic() > time_to_stop:
+                        raise TimeoutError("Ethernet link is down")
+                    time.sleep(1)
+                self._generate_dhcp_message(message_type=DHCP_DISCOVER, time_elapsed=0)
+                self._sock.send(_BUFF)
+                self._retries = 0
+                self._next_resend = self._resend_time()
+                self._dhcp_state = STATE_DHCP_DISCOVER
+
+            if self._dhcp_state == STATE_DHCP_DISCOVER:
+                while True:
+                    if self._sock.available():
+                        _BUFF = self._sock.recv()
+                        self._parse_dhcp_response()
+
+    def _generate_dhcp_message(
+        self,
+        *,
+        message_type: int,
+        time_elapsed: float,
+        broadcast: bool = False,
+        renew: bool = False,
+    ) -> None:
+        """
+        Assemble a DHCP message packet.
+
+        :param int time_elapsed: Time in seconds since transaction began.
+        :param float time_elapsed: Number of seconds elapsed since DHCP process started.
+        :param bool renew: Set True for renew and rebind, defaults to False.
+        :param bool broadcast: Used to set the flag requiring a broadcast reply from the
+            DHCP server.
+        """
+        _BUFF[:] = b"\x00" * len(_BUFF)
+        # OP.HTYPE.HLEN.HOPS
+        _BUFF[0:4] = (DHCP_BOOT_REQUEST, DHCP_HTYPE10MB, DHCP_HLENETHERNET, DHCP_HOPS)
+        # Transaction ID (xid)
+        _BUFF[4:8] = self._transaction_id.to_bytes(4, "big")
+        # seconds elapsed
+        _BUFF[8:10] = int(time_elapsed).to_bytes(2, "big")
+        # flags (only bit 0 is used)
+        if broadcast:
+            _BUFF[10] = 0b10000000
+        if renew:
+            _BUFF[12:16] = bytes(self.local_ip)
+        # chaddr
+        _BUFF[28:34] = self._mac_address
+        # Magic Cookie
+        _BUFF[236:240] = MAGIC_COOKIE
+
+        # Option - DHCP Message Type
+        _BUFF[240] = 53
+        _BUFF[241] = 1
+        _BUFF[242] = message_type
+        # Option - Host Name
+        _BUFF[243] = 12
+        hostname_len = len(self._hostname)
+        _BUFF[244] = hostname_len
+        after_hostname = hostname_len + 245
+        _BUFF[245:after_hostname] = self._hostname
+        # Mark end of message
+        _BUFF[after_hostname] = 0xFF
+
+    def _parse_dhcp_response(
+        self,
+    ) -> int:
+        """Parse DHCP response from DHCP server.
+
+        :return Tuple[int, bytearray]: DHCP packet type and ID.
+        """
+
+        def option_data(pointer: int) -> Tuple[int, int, bytes]:
+            """Helper function to extract DHCP option data from a
+            response.
+
+            :param int pointer: Pointer to start of DHCP option.
+
+            :returns Tuple[int, int, bytes]: Pointer to next option,
+                option type and option data.
+            """
+            global _BUFF  # pylint: disable=global-variable-not-assigned
+            data_type = _BUFF[pointer]
+            pointer += 1
+            data_length = _BUFF[pointer]
+            pointer += 1
+            data_end = pointer + data_length
+            data = _BUFF[pointer:data_end]
+            return data_end, data_type, data
+
+        global _BUFF  # pylint: disable=global-variable-not-assigned
+        # Validate OP
+        if _BUFF[0] != DHCP_BOOT_REPLY:
+            raise ValueError("DHCP message OP is not expected BOOTP Reply.")
+        # Confirm transaction IDs match.
+        xid = _BUFF[4:8]
+        if xid != self._transaction_id.to_bytes(4, "big"):
+            raise ValueError("DHCP response ID mismatch.")
+        # Set the IP address to Claddr
+        self.local_ip = tuple(_BUFF[16:20])
+        # Check that there is a client ID.
+        if _BUFF[28:34] == b"\x00\x00\x00\x00\x00\x00":
+            raise ValueError("No client ID in the response.")
+        # Check for the magic cookie.
+        if _BUFF[236:240] != MAGIC_COOKIE:
+            raise ValueError("No DHCP Magic Cookie in the response.")
+
+        # Parse options
+        msg_type = None
+        ptr = 240
+        while _BUFF[ptr] != OPT_END:
+            ptr, data_type, data = option_data(ptr)
+            if data_type == MSG_TYPE:
+                msg_type = data[0]
+            elif data_type == SUBNET_MASK:
+                self.subnet_mask = tuple(data)
+            elif data_type == DHCP_SERVER_ID:
+                self.dhcp_server_ip = tuple(data)
+            elif data_type == LEASE_TIME:
+                self._lease_time = int.from_bytes(data, "big")
+            elif data_type == ROUTERS_ON_SUBNET:
+                self.gateway_ip = tuple(data[:4])
+            elif data_type == DNS_SERVERS:
+                self.dns_server_ip = tuple(data[:4])
+            elif data_type == T1_VAL:
+                self._t1 = int.from_bytes(data, "big")
+            elif data_type == T2_VAL:
+                self._t2 = int.from_bytes(data, "big")
+            elif data_type == 0:
+                break
+
+        if self._debug:
+            print(
+                "Msg Type: {}\nSubnet Mask: {}\nDHCP Server IP: {}\nDNS Server IP: {}\
+                  \nGateway IP: {}\nLocal IP: {}\nT1: {}\nT2: {}\nLease Time: {}".format(
+                    msg_type,
+                    self.subnet_mask,
+                    self.dhcp_server_ip,
+                    self.dns_server_ip,
+                    self.gateway_ip,
+                    self.local_ip,
+                    self._t1,
+                    self._t2,
+                    self._lease_time,
+                )
+            )
+
+        gc.collect()
+        if msg_type is None:
+            raise ValueError("No valid message type in response.")
+        return msg_type
