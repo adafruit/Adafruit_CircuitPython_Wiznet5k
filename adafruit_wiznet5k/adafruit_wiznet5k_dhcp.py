@@ -359,10 +359,23 @@ class DHCP:
                 self._dhcp_state = STATE_DHCP_DISCOVER
 
             if self._dhcp_state == STATE_DHCP_DISCOVER:
-                while True:
+                while time.monotonic() < self._next_resend:
                     if self._sock.available():
                         _BUFF = self._sock.recv()
-                        self._parse_dhcp_response()
+                        try:
+                            msg_type = self._parse_dhcp_response()
+                        except ValueError as error:
+                            if self._debug:
+                                print(error)
+                        else:
+                            if msg_type == DHCP_OFFER:
+                                self._generate_dhcp_message(
+                                    message_type=DHCP_REQUEST, time_elapsed=0
+                                )
+                                self._sock.send(_BUFF)
+                                self._retries = 0
+                                self._next_resend = self._resend_time()
+                                self._dhcp_state = STATE_REQUESTING
 
     def _generate_dhcp_message(
         self,
@@ -381,6 +394,29 @@ class DHCP:
         :param bool broadcast: Used to set the flag requiring a broadcast reply from the
             DHCP server.
         """
+
+        def option_data(
+            pointer: int, option_code: int, option_data: Union[Tuple[int, ...], bytes]
+        ) -> int:
+            """Helper function to set DHCP option data for a DHCP
+            message.
+
+            :param int pointer: Pointer to start of DHCP option.
+            :param int option_code: Type of option to add.
+            :param Tuple[int] option_data: The data for the option.
+
+            :returns int: Pointer to next option.
+            """
+            global _BUFF  # pylint: disable=global-variable-not-assigned
+            _BUFF[pointer] = option_code
+            data_length = len(option_data)
+            pointer += 1
+            _BUFF[pointer] = data_length
+            pointer += 1
+            data_end = pointer + data_length
+            _BUFF[pointer:data_end] = option_data
+            return data_end
+
         _BUFF[:] = b"\x00" * len(_BUFF)
         # OP.HTYPE.HLEN.HOPS
         _BUFF[0:4] = (DHCP_BOOT_REQUEST, DHCP_HTYPE10MB, DHCP_HLENETHERNET, DHCP_HOPS)
@@ -398,18 +434,31 @@ class DHCP:
         # Magic Cookie
         _BUFF[236:240] = MAGIC_COOKIE
 
+        # Set DHCP options.
+        pointer = 240
+
         # Option - DHCP Message Type
-        _BUFF[240] = 53
-        _BUFF[241] = 1
-        _BUFF[242] = message_type
+        pointer = option_data(
+            pointer=pointer, option_code=53, option_data=(message_type,)
+        )
         # Option - Host Name
-        _BUFF[243] = 12
-        hostname_len = len(self._hostname)
-        _BUFF[244] = hostname_len
-        after_hostname = hostname_len + 245
-        _BUFF[245:after_hostname] = self._hostname
-        # Mark end of message
-        _BUFF[after_hostname] = 0xFF
+        pointer = option_data(
+            pointer=pointer, option_code=12, option_data=self._hostname
+        )
+        if message_type == DHCP_REQUEST:
+            # Request subnet mask, router and DNS server.
+            pointer = option_data(
+                pointer=pointer, option_code=55, option_data=(1, 3, 6)
+            )
+            # Set Requested IP Address to offered IP address.
+            pointer = option_data(
+                pointer=pointer, option_code=50, option_data=self.local_ip
+            )
+            # Set Server ID to chosen DHCP server IP address.
+            pointer = option_data(
+                pointer=pointer, option_code=54, option_data=self.dhcp_server_ip
+            )
+        _BUFF[pointer] = 0xFF
 
     def _parse_dhcp_response(
         self,

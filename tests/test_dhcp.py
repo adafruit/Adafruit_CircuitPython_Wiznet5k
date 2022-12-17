@@ -140,7 +140,7 @@ class TestDHCPInit:
 
 
 class TestSendDHCPMessage:
-    def test_generate_message_with_defaults(self, wiznet, wrench):
+    def test_generate_message_discover_with_defaults(self, wiznet, wrench):
         assert len(wiz_dhcp._BUFF) == 318
         dhcp_client = wiz_dhcp.DHCP(wiznet, (4, 5, 6, 7, 8, 9))
         dhcp_client._sock = wrench.socket(type=wrench.SOCK_DGRAM)
@@ -169,7 +169,7 @@ class TestSendDHCPMessage:
             (
                 (24, 35, 46, 57, 68, 79),
                 "bert.co.uk",
-                wiz_dhcp.DHCP_REQUEST,
+                wiz_dhcp.DHCP_DISCOVER,
                 35.5,
                 True,
                 True,
@@ -180,7 +180,7 @@ class TestSendDHCPMessage:
             (
                 (255, 97, 36, 101, 42, 99),
                 "clash.net",
-                wiz_dhcp.DHCP_REQUEST,
+                wiz_dhcp.DHCP_DISCOVER,
                 35.5,
                 False,
                 True,
@@ -190,7 +190,63 @@ class TestSendDHCPMessage:
             ),
         ),
     )
-    def test_generate_dhcp_message_with_options(
+    def test_generate_dhcp_message_discover_with_non_defaults(
+        self,
+        wiznet,
+        mac_address,
+        hostname,
+        msg_type,
+        time_elapsed,
+        renew,
+        broadcast_only,
+        local_ip,
+        server_ip,
+        result,
+    ):
+        dhcp_client = wiz_dhcp.DHCP(wiznet, mac_address, hostname=hostname)
+        # Set client attributes for test
+        dhcp_client.local_ip = local_ip
+        dhcp_client.dhcp_server_ip = server_ip
+        dhcp_client._transaction_id = 0x6FFFFFFF
+        # Test
+        dhcp_client._generate_dhcp_message(
+            message_type=msg_type,
+            time_elapsed=time_elapsed,
+            renew=renew,
+            broadcast=broadcast_only,
+        )
+        assert len(wiz_dhcp._BUFF) == 318
+        assert wiz_dhcp._BUFF == result
+
+    @pytest.mark.parametrize(
+        "mac_address, hostname, msg_type, time_elapsed, renew, \
+        broadcast_only, local_ip, server_ip, result",
+        (
+            (
+                (255, 97, 36, 101, 42, 99),
+                "helicopter.org",
+                wiz_dhcp.DHCP_REQUEST,
+                16.3,
+                False,
+                True,
+                (10, 10, 10, 43),
+                (145, 66, 45, 22),
+                dhcp_data.DHCP_SEND_05,
+            ),
+            (
+                (75, 63, 166, 4, 200, 101),
+                None,
+                wiz_dhcp.DHCP_REQUEST,
+                72.4,
+                False,
+                True,
+                (100, 101, 102, 4),
+                (245, 166, 5, 11),
+                dhcp_data.DHCP_SEND_06,
+            ),
+        ),
+    )
+    def test_generate_dhcp_message_with_request_options(
         self,
         wiznet,
         mac_address,
