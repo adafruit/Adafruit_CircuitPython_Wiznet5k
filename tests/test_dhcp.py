@@ -1,9 +1,13 @@
 # SPDX-FileCopyrightText: 2022 Martin Stephens
 #
 # SPDX-License-Identifier: MIT
-"""Tests to confirm that there are no changes in behaviour to public methods and functions."""
+"""Tests to confirm that there are no changes in behaviour to methods and functions.
+These test are not exhaustive, but are a sanity check while making changes to the module."""
+import time
+
 # pylint: disable=no-self-use, redefined-outer-name, protected-access, invalid-name, too-many-arguments
 import pytest
+from freezegun import freeze_time
 from micropython import const
 import dummy_dhcp_data as dhcp_data
 import adafruit_wiznet5k.adafruit_wiznet5k_dhcp as wiz_dhcp
@@ -139,15 +143,15 @@ class TestDHCPInit:
         )
 
 
+@freeze_time("2022-10-20")
 class TestSendDHCPMessage:
     def test_generate_message_discover_with_defaults(self, wiznet, wrench):
         assert len(wiz_dhcp._BUFF) == 318
         dhcp_client = wiz_dhcp.DHCP(wiznet, (4, 5, 6, 7, 8, 9))
         dhcp_client._sock = wrench.socket(type=wrench.SOCK_DGRAM)
         dhcp_client._transaction_id = 0x6FFFFFFF
-        dhcp_client._generate_dhcp_message(
-            message_type=wiz_dhcp.DHCP_DISCOVER, time_elapsed=23.4
-        )
+        dhcp_client._start_time = time.monotonic() - 23.4
+        dhcp_client._generate_dhcp_message(message_type=wiz_dhcp.DHCP_DISCOVER)
         assert wiz_dhcp._BUFF == dhcp_data.DHCP_SEND_01
         assert len(wiz_dhcp._BUFF) == 318
 
@@ -208,10 +212,10 @@ class TestSendDHCPMessage:
         dhcp_client.local_ip = local_ip
         dhcp_client.dhcp_server_ip = server_ip
         dhcp_client._transaction_id = 0x6FFFFFFF
+        dhcp_client._start_time = time.monotonic() - time_elapsed
         # Test
         dhcp_client._generate_dhcp_message(
             message_type=msg_type,
-            time_elapsed=time_elapsed,
             renew=renew,
             broadcast=broadcast_only,
         )
@@ -264,12 +268,10 @@ class TestSendDHCPMessage:
         dhcp_client.local_ip = local_ip
         dhcp_client.dhcp_server_ip = server_ip
         dhcp_client._transaction_id = 0x6FFFFFFF
+        dhcp_client._start_time = time.monotonic() - time_elapsed
         # Test
         dhcp_client._generate_dhcp_message(
-            message_type=msg_type,
-            time_elapsed=time_elapsed,
-            renew=renew,
-            broadcast=broadcast_only,
+            message_type=msg_type, renew=renew, broadcast=broadcast_only
         )
         assert len(wiz_dhcp._BUFF) == 318
         assert wiz_dhcp._BUFF == result
@@ -363,3 +365,50 @@ class TestParseDhcpMessage:
         bad_data[236] = 0
         with pytest.raises(ValueError):
             dhcp_client._parse_dhcp_response()
+
+
+class TestResetDsmReset:
+    def test_socket_reset(self, wiznet, wrench):
+        dhcp_client = wiz_dhcp.DHCP(wiznet, (1, 2, 3, 4, 5, 6))
+
+        dhcp_client._dsm_reset()
+        assert dhcp_client._sock is None
+
+        dhcp_client._sock = wrench.socket(type=wrench.SOCK_DGRAM)
+
+        dhcp_client._dsm_reset()
+        assert dhcp_client._sock is None
+
+    @freeze_time("2022-11-10")
+    def test_reset_dsm_parameters(self, wiznet):
+        dhcp_client = wiz_dhcp.DHCP(wiznet, (1, 2, 3, 4, 5, 6))
+        dhcp_client.dhcp_server_ip = (1, 2, 3, 4)
+        dhcp_client.local_ip = (2, 3, 4, 5)
+        dhcp_client.subnet_mask = (3, 4, 5, 6)
+        dhcp_client.dns_server_ip = (7, 8, 8, 10)
+        dhcp_client._renew = True
+        dhcp_client._retries = 4
+        dhcp_client._transaction_id = 3
+        dhcp_client._start_time = None
+
+        dhcp_client._dsm_reset()
+
+        assert dhcp_client.dhcp_server_ip == wiz_dhcp.BROADCAST_SERVER_ADDR
+        assert dhcp_client.local_ip == wiz_dhcp.UNASSIGNED_IP_ADDR
+        assert dhcp_client.subnet_mask == wiz_dhcp.UNASSIGNED_IP_ADDR
+        assert dhcp_client.dns_server_ip == wiz_dhcp.UNASSIGNED_IP_ADDR
+        assert dhcp_client._renew is False
+        assert dhcp_client._retries == 0
+        assert dhcp_client._transaction_id == 4
+        assert dhcp_client._start_time == time.monotonic()
+
+
+class TestSocketRelease:
+    def test_socket_set_to_none(self, wiznet, wrench):
+        dhcp_client = wiz_dhcp.DHCP(wiznet, (1, 2, 3, 4, 5, 6))
+        dhcp_client._socket_release()
+        assert dhcp_client._sock is None
+
+        dhcp_client._sock = wrench.socket(type=wrench.SOCK_DGRAM)
+        dhcp_client._socket_release()
+        assert dhcp_client._sock is None
