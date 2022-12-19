@@ -18,31 +18,29 @@ DEFAULT_DEBUG_ON = True
 
 @pytest.fixture
 def wiznet(mocker):
+    """Mock WIZNET5K so that the DHCP class can be tested without hardware."""
     return mocker.patch("adafruit_wiznet5k.adafruit_wiznet5k.WIZNET5K", autospec=True)
 
 
 @pytest.fixture
 def wrench(mocker):
+    """Mock socket module to allow test data to be read and written by the DHCP module."""
     return mocker.patch(
         "adafruit_wiznet5k.adafruit_wiznet5k_dhcp.socket", autospec=True
     )
 
 
-@pytest.mark.skip()
 class TestDHCPInit:
     def test_constants(self):
+        """Test all the constants in the DHCP module."""
         # DHCP State Machine
-        assert wiz_dhcp.STATE_DHCP_START == const(0x00)
-        assert wiz_dhcp.STATE_DHCP_DISCOVER == const(0x01)
-        assert wiz_dhcp.STATE_DHCP_REQUEST == const(0x02)
-        assert wiz_dhcp.STATE_DHCP_LEASED == const(0x03)
-        assert wiz_dhcp.STATE_DHCP_REREQUEST == const(0x04)
-        assert wiz_dhcp.STATE_DHCP_RELEASE == const(0x05)
-        assert wiz_dhcp.STATE_DHCP_WAIT == const(0x06)
-        assert wiz_dhcp.STATE_DHCP_DISCONN == const(0x07)
-
-        # DHCP wait time between attempts
-        assert wiz_dhcp.DHCP_WAIT_TIME == const(60)
+        assert wiz_dhcp.STATE_INIT == const(0x01)
+        assert wiz_dhcp.STATE_SELECTING == const(0x02)
+        assert wiz_dhcp.STATE_REQUESTING == const(0x03)
+        assert wiz_dhcp.STATE_BOUND == const(0x04)
+        assert wiz_dhcp.STATE_RENEWING == const(0x05)
+        assert wiz_dhcp.STATE_REBINDING == const(0x06)
+        assert wiz_dhcp.STATE_RELEASING == const(0x07)
 
         # DHCP Message Types
         assert wiz_dhcp.DHCP_DISCOVER == const(1)
@@ -72,6 +70,7 @@ class TestDHCPInit:
         # DHCP Lease Time, in seconds
         assert wiz_dhcp.DEFAULT_LEASE_TIME == const(900)
         assert wiz_dhcp.BROADCAST_SERVER_ADDR == (255, 255, 255, 255)
+        assert wiz_dhcp.UNASSIGNED_IP_ADDR == (0, 0, 0, 0)
 
         # DHCP Response Options
         assert wiz_dhcp.MSG_TYPE == 53
@@ -96,6 +95,7 @@ class TestDHCPInit:
         ),
     )
     def test_dhcp_setup_default(self, mocker, wiznet, wrench, mac_address):
+        """Test intial settings from DHCP.__init__."""
         # Test with mac address as tuple, list and bytes with default values.
         mock_randint = mocker.patch(
             "adafruit_wiznet5k.adafruit_wiznet5k_dhcp.randint", autospec=True
@@ -108,20 +108,16 @@ class TestDHCPInit:
         assert dhcp_client._mac_address == mac_address
         wrench.set_interface.assert_called_once_with(wiznet)
         assert dhcp_client._sock is None
-        assert dhcp_client._dhcp_state == wiz_dhcp.STATE_DHCP_START
-        assert dhcp_client._initial_xid == 0
+        assert dhcp_client._dhcp_state == wiz_dhcp.STATE_INIT
         mock_randint.assert_called_once()
         assert dhcp_client._transaction_id == 0x1234567
         assert dhcp_client._start_time == 0
         assert dhcp_client.dhcp_server_ip == wiz_dhcp.BROADCAST_SERVER_ADDR
-        assert dhcp_client.local_ip == 0
-        assert dhcp_client.gateway_ip == 0
-        assert dhcp_client.subnet_mask == 0
-        assert dhcp_client.dns_server_ip == 0
+        assert dhcp_client.local_ip == wiz_dhcp.UNASSIGNED_IP_ADDR
+        assert dhcp_client.gateway_ip == wiz_dhcp.UNASSIGNED_IP_ADDR
+        assert dhcp_client.subnet_mask == wiz_dhcp.UNASSIGNED_IP_ADDR
+        assert dhcp_client.dns_server_ip == wiz_dhcp.UNASSIGNED_IP_ADDR
         assert dhcp_client._lease_time == 0
-        assert dhcp_client._last_lease_time == 0
-        assert dhcp_client._renew_in_sec == 0
-        assert dhcp_client._rebind_in_sec == 0
         assert dhcp_client._t1 == 0
         assert dhcp_client._t2 == 0
         mac_string = "".join("{:02X}".format(o) for o in mac_address)
@@ -130,6 +126,7 @@ class TestDHCPInit:
         )
 
     def test_dhcp_setup_other_args(self, wiznet):
+        """Test instantiating DHCP with none default values."""
         mac_address = (7, 8, 9, 10, 11, 12)
         dhcp_client = wiz_dhcp.DHCP(
             wiznet, mac_address, hostname="fred.com", response_timeout=25.0, debug=True
@@ -145,7 +142,8 @@ class TestDHCPInit:
 
 @freeze_time("2022-10-20")
 class TestSendDHCPMessage:
-    def test_generate_message_discover_with_defaults(self, wiznet, wrench):
+    def test_generate_message_with_default_attributes(self, wiznet, wrench):
+        """Test the _generate_message function with default values."""
         assert len(wiz_dhcp._BUFF) == 318
         dhcp_client = wiz_dhcp.DHCP(wiznet, (4, 5, 6, 7, 8, 9))
         dhcp_client._sock = wrench.socket(type=wrench.SOCK_DGRAM)
@@ -207,6 +205,8 @@ class TestSendDHCPMessage:
         server_ip,
         result,
     ):
+        """Test the generate_dhcp_message function with different message types and
+        none default attributes."""
         dhcp_client = wiz_dhcp.DHCP(wiznet, mac_address, hostname=hostname)
         # Set client attributes for test
         dhcp_client.local_ip = local_ip

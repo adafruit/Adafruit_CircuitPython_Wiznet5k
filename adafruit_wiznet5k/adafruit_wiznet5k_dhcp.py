@@ -355,7 +355,7 @@ class DHCP:
         """I'll get to it"""
         self._retries += 1
         if exponential:
-            delay = int(self._retries * interval + randint(0, 2) + time.monotonic())
+            delay = int(self._retries * interval + randint(-1, 1) + time.monotonic())
         else:
             delay = interval
         return delay + int(time.monotonic())
@@ -386,31 +386,35 @@ class DHCP:
                         if self._debug:
                             print(error)
                     else:
-                        if msg_type == DHCP_OFFER:
+                        if (
+                            self._dhcp_state == STATE_SELECTING
+                            and msg_type == DHCP_OFFER
+                        ):
                             self._send_message_set_next_state(
                                 message_type=DHCP_REQUEST,
                                 next_state=STATE_REQUESTING,
                                 max_retries=3,
                             )
                             return
-                        if msg_type == DHCP_NAK:
-                            self._dhcp_state = STATE_INIT
-                            return
-                        if msg_type == DHCP_ACK:
-                            if self._lease_time == 0:
-                                self._lease_time = DEFAULT_LEASE_TIME
-                            self._t1 = self._start_time + self._lease_time // 2
-                            self._t2 = (
-                                self._start_time
-                                + self._lease_time
-                                - self._lease_time // 8
-                            )
-                            self._lease_time += self._start_time
-                            self._increment_transaction_id()
-                            self._renew = False
-                            self._sock.close()
-                            self._sock = None
-                            self._dhcp_state = STATE_BOUND
+                        if self._dhcp_state == STATE_REQUESTING:
+                            if msg_type == DHCP_NAK:
+                                self._dhcp_state = STATE_INIT
+                                return
+                            if msg_type == DHCP_ACK:
+                                if self._lease_time == 0:
+                                    self._lease_time = DEFAULT_LEASE_TIME
+                                self._t1 = self._start_time + self._lease_time // 2
+                                self._t2 = (
+                                    self._start_time
+                                    + self._lease_time
+                                    - self._lease_time // 8
+                                )
+                                self._lease_time += self._start_time
+                                self._increment_transaction_id()
+                                self._renew = False
+                                self._sock.close()
+                                self._sock = None
+                                self._dhcp_state = STATE_BOUND
                             return
                 if not self._blocking:
                     return
