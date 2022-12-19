@@ -84,6 +84,7 @@ class TestDHCPInit:
         assert wiz_dhcp.OPT_END == 255
 
         # Packet buffer
+        assert wiz_dhcp.BUFF_LENGTH == 318
         assert wiz_dhcp._BUFF == bytearray(318)
 
     @pytest.mark.parametrize(
@@ -352,7 +353,6 @@ class TestParseDhcpMessage:
         # Bad OP code.
         bad_data[0] = 0
         dhcp_client._transaction_id = 0x7FFFFFFF
-        dhcp_client._initial_xid = dhcp_client._transaction_id.to_bytes(4, "little")
         with pytest.raises(ValueError):
             dhcp_client._parse_dhcp_response()
         bad_data[0] = 2  # Reset to good value
@@ -360,7 +360,7 @@ class TestParseDhcpMessage:
         bad_data[28:34] = (0, 0, 0, 0, 0, 0)
         with pytest.raises(ValueError):
             dhcp_client._parse_dhcp_response()
-        bad_data[28:34] = (1, 1, 1, 1, 1, 1)  # Reset to good value
+        bad_data[28:34] = (1, 1, 1, 1, 1, 1)  # Reset to a good value for next test.
         # Bad Magic Cookie.
         bad_data[236] = 0
         with pytest.raises(ValueError):
@@ -412,3 +412,49 @@ class TestSocketRelease:
         dhcp_client._sock = wrench.socket(type=wrench.SOCK_DGRAM)
         dhcp_client._socket_release()
         assert dhcp_client._sock is None
+
+
+class TestSmallHelperFunctions:
+    def test_increment_transaction_id(self, wiznet):
+        dhcp_client = wiz_dhcp.DHCP(wiznet, (1, 2, 3, 4, 5, 6))
+        # Test that transaction_id increments.
+        dhcp_client._transaction_id = 4
+        dhcp_client._increment_transaction_id()
+        assert dhcp_client._transaction_id == 5
+        # Test that transaction_id rolls over from 0x7fffffff to zero
+        dhcp_client._transaction_id = 0x7FFFFFFF
+        dhcp_client._increment_transaction_id()
+        assert dhcp_client._transaction_id == 0
+
+    @freeze_time("2022-10-10")
+    @pytest.mark.parametrize("rand_int", (-1, 0, 1))
+    def test_next_retry_time_default_attrs(self, mocker, wiznet, rand_int):
+        dhcp_client = wiz_dhcp.DHCP(wiznet, (1, 2, 3, 4, 5, 6))
+        mocker.patch(
+            "adafruit_wiznet5k.adafruit_wiznet5k_dhcp.randint",
+            autospec=True,
+            return_value=rand_int,
+        )
+        now = time.monotonic()
+        for retry in range(3):
+            dhcp_client._retries = retry
+            assert dhcp_client._next_retry_time() == int(
+                2**retry * 4 + rand_int + now
+            )
+            assert dhcp_client._retries == retry + 1
+
+    @freeze_time("2022-10-10")
+    @pytest.mark.parametrize("interval", (2, 7, 10))
+    def test_next_retry_time_optional_attrs(self, mocker, wiznet, interval):
+        dhcp_client = wiz_dhcp.DHCP(wiznet, (1, 2, 3, 4, 5, 6))
+        mocker.patch(
+            "adafruit_wiznet5k.adafruit_wiznet5k_dhcp.randint",
+            autospec=True,
+            return_value=0,
+        )
+        now = time.monotonic()
+        for retry in range(3):
+            dhcp_client._retries = retry
+            assert dhcp_client._next_retry_time(interval=interval) == int(
+                2**retry * interval + now
+            )
