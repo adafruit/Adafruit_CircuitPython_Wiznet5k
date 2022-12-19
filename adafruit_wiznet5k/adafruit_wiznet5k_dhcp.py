@@ -10,7 +10,7 @@
 
 Pure-Python implementation of Jordan Terrell's DHCP library v0.3
 
-* Author(s): Jordan Terrell, Brent Rubell
+* Author(s): Jordan Terrell, Brent Rubell, Martin Stephens
 
 """
 from __future__ import annotations
@@ -36,7 +36,6 @@ STATE_REQUESTING = const(0x03)
 STATE_BOUND = const(0x04)
 STATE_RENEWING = const(0x05)
 STATE_REBINDING = const(0x06)
-STATE_RELEASING = const(0x07)
 
 # DHCP Message Types
 DHCP_DISCOVER = const(1)
@@ -85,7 +84,40 @@ _BUFF = bytearray(BUFF_LENGTH)
 
 
 class DHCP:
-    """W5k DHCP Client implementation."""
+    """Wiznet5k DHCP Client.
+
+    Implements a DHCP client using a finite state machine (FSM). This allows the DHCP client
+    to run in a non-blocking mode suitable for CircuitPython.
+
+    The DHCP client obtains a lease and maintains it. The process of obtaining the initial
+    lease is best run in a blocking mode, as several messages must be exchanged with the DHCP
+    server. Once the lease has been allocated, lease maintenance can be performed in
+    non-blocking mode as nothing needs to be done until it is time to reallocate the
+    lease. Renewing or rebinding is a simpler process which may be repeated periodically
+    until successful. If the lease expires, the client attempts to obtain a new lease in
+    blocking mode when the maintenance routine is run.
+
+    In most circumstances, call `DHCP.request_lease` in blocking mode to obtain a
+    lease, then periodically call `DHCP.maintain_lease` in non-blocking mode so that the
+    FSM can check whether the lease needs to be renewed, and can then renew it.
+
+    Since DHCP uses UDP, messages may be lost. The DHCP protocol uses exponential backoff
+    for retrying. Retries occur after 4, 8, and 16 seconds (the final retry isfollowed by
+    a wait of 32 seconds) so it will take about a minute to decide that no DHCP server
+    is available.
+
+    Use of DHCP relay agents is not implemented. The DHCP server must be on the same
+    physical network as the client.
+
+    The DHCP client cannot check whether the allocated IP address is already in use because
+    the ARP protocol is not available. Therefore, it is possible that the IP address has been
+    statically assigned to another device. In most cases, the DHCP server will make this
+    check before allocating an address, but some do not.
+
+    The DHCPRELEASE message is not implemented. The DHCP protocol does not require it and
+    DHCP servers can handle disappearing clients and clients that ask for 'replacement'
+    IP addressed.
+    """
 
     # pylint: disable=too-many-arguments, too-many-instance-attributes, invalid-name
     def __init__(
@@ -442,7 +474,15 @@ class DHCP:
     ) -> int:
         """Parse DHCP response from DHCP server.
 
-        :return Tuple[int, bytearray]: DHCP packet type and ID.
+        Check that the message is for this client. Extract data from the fixed positions
+         in the first 236 bytes of the message, then cycle through the options for
+         additional data.
+
+        :returns Tuple[int, bytearray]: DHCP packet type and ID.
+
+        :raises ValueError: Checks that the message is a reply, the transaction ID
+        matches, a client ID exists and the 'magic cookie' is set. If any of these tests
+        fail or no message type is found in the options, raises a ValueError.
         """
         # pylint: disable=too-many-branches
         def option_data(pointer: int) -> Tuple[int, int, bytes]:
@@ -475,7 +515,7 @@ class DHCP:
         self.local_ip = tuple(_BUFF[16:20])
         # Check that there is a client ID.
         if _BUFF[28:34] == b"\x00\x00\x00\x00\x00\x00":
-            raise ValueError("No client ID in the response.")
+            raise ValueError("No client hardware MAC address in the response.")
         # Check for the magic cookie.
         if _BUFF[236:240] != MAGIC_COOKIE:
             raise ValueError("No DHCP Magic Cookie in the response.")

@@ -40,7 +40,6 @@ class TestDHCPInit:
         assert wiz_dhcp.STATE_BOUND == const(0x04)
         assert wiz_dhcp.STATE_RENEWING == const(0x05)
         assert wiz_dhcp.STATE_REBINDING == const(0x06)
-        assert wiz_dhcp.STATE_RELEASING == const(0x07)
 
         # DHCP Message Types
         assert wiz_dhcp.DHCP_DISCOVER == const(1)
