@@ -69,10 +69,10 @@ class NTP:
         :return time.struct_time: The local time.
         """
         self._sock.bind((None, 50001))
-        max_retries = 3
-        for _ in range(max_retries):
+        max_retries = 4
+        for retry in range(max_retries):
             self._sock.sendto(self._pkt_buf_, (self._ntp_server, 123))
-            end_time = time.monotonic() + 1
+            end_time = time.monotonic() + 0.2 * 2**retry
             while time.monotonic() < end_time:
                 data = self._sock.recv()
                 if data:
