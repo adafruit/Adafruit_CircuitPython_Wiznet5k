@@ -52,97 +52,97 @@ import adafruit_wiznet5k.adafruit_wiznet5k_dhcp as dhcp
 import adafruit_wiznet5k.adafruit_wiznet5k_dns as dns
 
 # Wiznet5k Registers
-REG_MR = const(0x0000)  # Mode
-REG_GAR = const(0x0001)  # Gateway IP Address
-REG_SUBR = const(0x0005)  # Subnet Mask Address
-REG_VERSIONR_W5500 = const(0x0039)  # W5500 Silicon Version
-REG_VERSIONR_W5100S = const(0x0080)  # W5100S Silicon Version
-REG_SHAR = const(0x0009)  # Source Hardware Address
-REG_SIPR = const(0x000F)  # Source IP Address
-REG_PHYCFGR = const(0x002E)  # W5500 PHY Configuration
-REG_PHYCFGR_W5100S = const(0x003C)  # W5100S PHY Configuration
+_REG_MR = const(0x0000)  # Mode
+_REG_GAR = const(0x0001)  # Gateway IP Address
+_REG_SUBR = const(0x0005)  # Subnet Mask Address
+_REG_VERSIONR_W5500 = const(0x0039)  # W5500 Silicon Version
+_REG_VERSIONR_W5100S = const(0x0080)  # W5100S Silicon Version
+_REG_SHAR = const(0x0009)  # Source Hardware Address
+_REG_SIPR = const(0x000F)  # Source IP Address
+_REG_PHYCFGR = const(0x002E)  # W5500 PHY Configuration
+_REG_PHYCFGR_W5100S = const(0x003C)  # W5100S PHY Configuration
 
 # Wiznet5k Socket Registers
-REG_SNMR = const(0x0000)  # Socket n Mode
-REG_SNCR = const(0x0001)  # Socket n Command
-REG_SNIR = const(0x0002)  # Socket n Interrupt
-REG_SNSR = const(0x0003)  # Socket n Status
-REG_SNPORT = const(0x0004)  # Socket n Source Port
-REG_SNDIPR = const(0x000C)  # Destination IP Address
-REG_SNDPORT = const(0x0010)  # Destination Port
-REG_SNRX_RSR = const(0x0026)  # RX Free Size
-REG_SNRX_RD = const(0x0028)  # Read Size Pointer
-REG_SNTX_FSR = const(0x0020)  # Socket n TX Free Size
-REG_SNTX_WR = const(0x0024)  # TX Write Pointer
+_REG_SNMR = const(0x0000)  # Socket n Mode
+_REG_SNCR = const(0x0001)  # Socket n Command
+_REG_SNIR = const(0x0002)  # Socket n Interrupt
+_REG_SNSR = const(0x0003)  # Socket n Status
+_REG_SNPORT = const(0x0004)  # Socket n Source Port
+_REG_SNDIPR = const(0x000C)  # Destination IP Address
+_REG_SNDPORT = const(0x0010)  # Destination Port
+_REG_SNRX_RSR = const(0x0026)  # RX Free Size
+_REG_SNRX_RD = const(0x0028)  # Read Size Pointer
+_REG_SNTX_FSR = const(0x0020)  # Socket n TX Free Size
+_REG_SNTX_WR = const(0x0024)  # TX Write Pointer
 
 # SNSR Commands
 SNSR_SOCK_CLOSED = const(0x00)
-SNSR_SOCK_INIT = const(0x13)
+_SNSR_SOCK_INIT = const(0x13)
 SNSR_SOCK_LISTEN = const(0x14)
-SNSR_SOCK_SYNSENT = const(0x15)
+_SNSR_SOCK_SYNSENT = const(0x15)
 SNSR_SOCK_SYNRECV = const(0x16)
 SNSR_SOCK_ESTABLISHED = const(0x17)
-SNSR_SOCK_FIN_WAIT = const(0x18)
-SNSR_SOCK_CLOSING = const(0x1A)
-SNSR_SOCK_TIME_WAIT = const(0x1B)
-SNSR_SOCK_CLOSE_WAIT = const(0x1C)
-SNSR_SOCK_LAST_ACK = const(0x1D)
-SNSR_SOCK_UDP = const(0x22)
-SNSR_SOCK_IPRAW = const(0x32)
-SNSR_SOCK_MACRAW = const(0x42)
-SNSR_SOCK_PPPOE = const(0x5F)
+_SNSR_SOCK_FIN_WAIT = const(0x18)
+_SNSR_SOCK_CLOSING = const(0x1A)
+_SNSR_SOCK_TIME_WAIT = const(0x1B)
+_SNSR_SOCK_CLOSE_WAIT = const(0x1C)
+_SNSR_SOCK_LAST_ACK = const(0x1D)
+_SNSR_SOCK_UDP = const(0x22)
+_SNSR_SOCK_IPRAW = const(0x32)
+_SNSR_SOCK_MACRAW = const(0x42)
+_SNSR_SOCK_PPPOE = const(0x5F)
 
 # Sock Commands (CMD)
-CMD_SOCK_OPEN = const(0x01)
-CMD_SOCK_LISTEN = const(0x02)
-CMD_SOCK_CONNECT = const(0x04)
-CMD_SOCK_DISCON = const(0x08)
-CMD_SOCK_CLOSE = const(0x10)
-CMD_SOCK_SEND = const(0x20)
-CMD_SOCK_SEND_MAC = const(0x21)
-CMD_SOCK_SEND_KEEP = const(0x22)
-CMD_SOCK_RECV = const(0x40)
+_CMD_SOCK_OPEN = const(0x01)
+_CMD_SOCK_LISTEN = const(0x02)
+_CMD_SOCK_CONNECT = const(0x04)
+_CMD_SOCK_DISCON = const(0x08)
+_CMD_SOCK_CLOSE = const(0x10)
+_CMD_SOCK_SEND = const(0x20)
+_CMD_SOCK_SEND_MAC = const(0x21)
+_CMD_SOCK_SEND_KEEP = const(0x22)
+_CMD_SOCK_RECV = const(0x40)
 
 # Socket n Interrupt Register
-SNIR_SEND_OK = const(0x10)
-SNIR_TIMEOUT = const(0x08)
-SNIR_RECV = const(0x04)
-SNIR_DISCON = const(0x02)
-SNIR_CON = const(0x01)
+_SNIR_SEND_OK = const(0x10)
+_SNIR_TIMEOUT = const(0x08)
+_SNIR_RECV = const(0x04)
+_SNIR_DISCON = const(0x02)
+_SNIR_CON = const(0x01)
 
-CH_SIZE = const(0x100)
-SOCK_SIZE = const(0x800)  # MAX W5k socket size
-SOCK_MASK = const(0x7FF)
+_CH_SIZE = const(0x100)
+_SOCK_SIZE = const(0x800)  # MAX W5k socket size
+_SOCK_MASK = const(0x7FF)
 # Register commands
-MR_RST = const(0x80)  # Mode Register RST
+_MR_RST = const(0x80)  # Mode Register RST
 # Socket mode register
-SNMR_CLOSE = const(0x00)
-SNMR_TCP = const(0x21)
+_SNMR_CLOSE = const(0x00)
+_SNMR_TCP = const(0x21)
 SNMR_UDP = const(0x02)
-SNMR_IPRAW = const(0x03)
-SNMR_MACRAW = const(0x04)
-SNMR_PPPOE = const(0x05)
+_SNMR_IPRAW = const(0x03)
+_SNMR_MACRAW = const(0x04)
+_SNMR_PPPOE = const(0x05)
 
-MAX_PACKET = const(4000)
-LOCAL_PORT = const(0x400)
+_MAX_PACKET = const(4000)
+_LOCAL_PORT = const(0x400)
 # Default hardware MAC address
-DEFAULT_MAC = (0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED)
+_DEFAULT_MAC = (0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED)
 
 # Maximum number of sockets to support, differs between chip versions.
-W5200_W5500_MAX_SOCK_NUM = const(0x08)
-W5100_MAX_SOCK_NUM = const(0x04)
-SOCKET_INVALID = const(255)
+_W5200_W5500_MAX_SOCK_NUM = const(0x08)
+_W5100_MAX_SOCK_NUM = const(0x04)
+_SOCKET_INVALID = const(255)
 
 # Source ports in use
-SRC_PORTS = [0] * W5200_W5500_MAX_SOCK_NUM
+_SRC_PORTS = [0] * _W5200_W5500_MAX_SOCK_NUM
 
 
 class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-attributes
     """Interface for WIZNET5K module."""
 
-    TCP_MODE = const(0x21)
-    UDP_MODE = const(0x02)
-    TLS_MODE = const(0x03)  # This is NOT currently implemented
+    _TCP_MODE = const(0x21)
+    _UDP_MODE = const(0x02)
+    _TLS_MODE = const(0x03)  # This is NOT currently implemented
 
     # pylint: disable=too-many-arguments
     def __init__(
@@ -151,7 +151,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         cs: digitalio.DigitalInOut,  # pylint: disable=invalid-name
         reset: Optional[digitalio.DigitalInOut] = None,
         is_dhcp: bool = True,
-        mac: Union[List[int], Tuple[int]] = DEFAULT_MAC,
+        mac: Union[List[int], Tuple[int]] = _DEFAULT_MAC,
         hostname: Optional[str] = None,
         dhcp_timeout: float = 30.0,
         debug: bool = False,
@@ -183,7 +183,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
         # Buffer for reading params from module
         self._pbuff = bytearray(8)
-        self._rxbuf = bytearray(MAX_PACKET)
+        self._rxbuf = bytearray(_MAX_PACKET)
 
         # attempt to initialize the module
         self._ch_base_msb = 0
@@ -283,9 +283,9 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         :return int: Maximum supported sockets.
         """
         if self._chip_type == "w5500":
-            return W5200_W5500_MAX_SOCK_NUM
+            return _W5200_W5500_MAX_SOCK_NUM
         if self._chip_type == "w5100s":
-            return W5100_MAX_SOCK_NUM
+            return _W5100_MAX_SOCK_NUM
         return -1
 
     @property
@@ -304,7 +304,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
         :return bytearray: IP address as four bytes.
         """
-        return self.read(REG_SIPR, 0x00, 4)
+        return self.read(_REG_SIPR, 0x00, 4)
 
     def pretty_ip(
         self,
@@ -341,7 +341,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         Ethernet hardware's MAC address.
 
         :return bytearray: Six byte MAC address."""
-        return self.read(REG_SHAR, 0x00, 6)
+        return self.read(_REG_SHAR, 0x00, 6)
 
     @mac_address.setter
     def mac_address(self, address: Sequence[Union[int, bytes]]) -> None:
@@ -350,7 +350,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
         :param tuple address: Hardware MAC address.
         """
-        self.write(REG_SHAR, 0x04, address)
+        self.write(_REG_SHAR, 0x04, address)
 
     def pretty_mac(
         self,
@@ -384,7 +384,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         if socket_num >= self.max_sockets:
             return self._pbuff
         for octet in range(0, 4):
-            self._pbuff[octet] = self._read_socket(socket_num, REG_SNDIPR + octet)[0]
+            self._pbuff[octet] = self._read_socket(socket_num, _REG_SNDIPR + octet)[0]
         return self.pretty_ip(self._pbuff)
 
     @property
@@ -394,10 +394,10 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         :return int: 1 if the link is up, 0 if the link is down.
         """
         if self._chip_type == "w5500":
-            data = self.read(REG_PHYCFGR, 0x00)
+            data = self.read(_REG_PHYCFGR, 0x00)
             return data[0] & 0x01
         if self._chip_type == "w5100s":
-            data = self.read(REG_PHYCFGR_W5100S, 0x00)
+            data = self.read(_REG_PHYCFGR_W5100S, 0x00)
             return data[0] & 0x01
         return 0
 
@@ -412,7 +412,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         if socket_num >= self.max_sockets:
             return self._pbuff
         for octet in range(2):
-            self._pbuff[octet] = self._read_socket(socket_num, REG_SNDPORT + octet)[0]
+            self._pbuff[octet] = self._read_socket(socket_num, _REG_SNDPORT + octet)[0]
         return int((self._pbuff[0] << 8) | self._pbuff[0])
 
     @property
@@ -426,8 +426,8 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             The IP address, subnet mask, gateway address and DNS server address."""
         return (
             self.ip_address,
-            self.read(REG_SUBR, 0x00, 4),
-            self.read(REG_GAR, 0x00, 4),
+            self.read(_REG_SUBR, 0x00, 4),
+            self.read(_REG_GAR, 0x00, 4),
             self._dns,
         )
 
@@ -443,9 +443,9 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         """
         ip_address, subnet_mask, gateway_address, dns_server = params
 
-        self.write(REG_SIPR, 0x04, ip_address)
-        self.write(REG_SUBR, 0x04, subnet_mask)
-        self.write(REG_GAR, 0x04, gateway_address)
+        self.write(_REG_SIPR, 0x04, ip_address)
+        self.write(_REG_SUBR, 0x04, subnet_mask)
+        self.write(_REG_GAR, 0x04, gateway_address)
 
         self._dns = dns_server
 
@@ -462,7 +462,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         # Detect if chip is Wiznet W5500
         if self.detect_w5500() == 1:
             # perform w5500 initialization
-            for i in range(0, W5200_W5500_MAX_SOCK_NUM):
+            for i in range(0, _W5200_W5500_MAX_SOCK_NUM):
                 ctrl_byte = 0x0C + (i << 5)
                 self.write(0x1E, ctrl_byte, 2)
                 self.write(0x1F, ctrl_byte, 2)
@@ -497,7 +497,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         if self._read_mr()[0] != 0x00:
             return -1
 
-        if self.read(REG_VERSIONR_W5500, 0x00)[0] != 0x04:
+        if self.read(_REG_VERSIONR_W5500, 0x00)[0] != 0x04:
             return -1
         # self._chip_type = "w5500"
         # self._ch_base_msb = 0x10
@@ -512,7 +512,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         self._chip_type = "w5100s"
         # sw reset
         assert self.sw_reset() == 0, "Chip not reset properly!"
-        if self.read(REG_VERSIONR_W5100S, 0x00)[0] != 0x51:
+        if self.read(_REG_VERSIONR_W5100S, 0x00)[0] != 0x51:
             return -1
 
         self._ch_base_msb = 0x0400
@@ -536,12 +536,12 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
     def _read_mr(self) -> bytearray:
         """Read from the Mode Register (MR)."""
-        res = self.read(REG_MR, 0x00)
+        res = self.read(_REG_MR, 0x00)
         return res
 
     def _write_mr(self, data: int) -> None:
         """Write to the mode register (MR)."""
-        self.write(REG_MR, 0x04, data)
+        self.write(_REG_MR, 0x04, data)
 
     def read(
         self,
@@ -607,7 +607,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
     # Socket-Register API
 
-    def socket_available(self, socket_num: int, sock_type: int = SNMR_TCP) -> int:
+    def socket_available(self, socket_num: int, sock_type: int = _SNMR_TCP) -> int:
         """
         Number of bytes available to be read from the socket.
 
@@ -627,7 +627,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
         res = self._get_rx_rcv_size(socket_num)
 
-        if sock_type == SNMR_TCP:
+        if sock_type == _SNMR_TCP:
             return res
         if res > 0:
             if self.udp_datasize[socket_num]:
@@ -663,7 +663,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         socket_num: int,
         dest: Union[bytes, bytearray],
         port: int,
-        conn_mode: int = SNMR_TCP,
+        conn_mode: int = _SNMR_TCP,
     ) -> int:
         """
         Open and verify a connection from a socket to a destination IP address
@@ -691,9 +691,9 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         # set socket destination IP and port
         self._write_sndipr(socket_num, dest)
         self._write_sndport(socket_num, port)
-        self._send_socket_cmd(socket_num, CMD_SOCK_CONNECT)
+        self._send_socket_cmd(socket_num, _CMD_SOCK_CONNECT)
 
-        if conn_mode == SNMR_TCP:
+        if conn_mode == _SNMR_TCP:
             # wait for tcp connection establishment
             while self.socket_status(socket_num)[0] != SNSR_SOCK_ESTABLISHED:
                 time.sleep(0.001)
@@ -722,7 +722,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         if self._debug:
             print("*** Get socket")
 
-        sock = SOCKET_INVALID
+        sock = _SOCKET_INVALID
         for _sock in range(self.max_sockets):
             status = self.socket_status(_sock)[0]
             if status == SNSR_SOCK_CLOSED:
@@ -734,7 +734,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         return sock
 
     def socket_listen(
-        self, socket_num: int, port: int, conn_mode: int = SNMR_TCP
+        self, socket_num: int, port: int, conn_mode: int = _SNMR_TCP
     ) -> None:
         """
         Listen on a socket's port.
@@ -758,10 +758,14 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         if res == 1:
             raise RuntimeError("Failed to initialize the socket.")
         # Send listen command
-        self._send_socket_cmd(socket_num, CMD_SOCK_LISTEN)
+        self._send_socket_cmd(socket_num, _CMD_SOCK_LISTEN)
         # Wait until ready
         status = [SNSR_SOCK_CLOSED]
-        while status[0] not in (SNSR_SOCK_LISTEN, SNSR_SOCK_ESTABLISHED, SNSR_SOCK_UDP):
+        while status[0] not in (
+            SNSR_SOCK_LISTEN,
+            SNSR_SOCK_ESTABLISHED,
+            _SNSR_SOCK_UDP,
+        ):
             status = self._read_snsr(socket_num)
             if status[0] == SNSR_SOCK_CLOSED:
                 raise RuntimeError("Listening socket closed.")
@@ -793,7 +797,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             )
         return next_socknum, (dest_ip, dest_port)
 
-    def socket_open(self, socket_num: int, conn_mode: int = SNMR_TCP) -> int:
+    def socket_open(self, socket_num: int, conn_mode: int = _SNMR_TCP) -> int:
         """
         Open an IP socket.
 
@@ -810,11 +814,11 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         status = self._read_snsr(socket_num)[0]
         if status in (
             SNSR_SOCK_CLOSED,
-            SNSR_SOCK_TIME_WAIT,
-            SNSR_SOCK_FIN_WAIT,
-            SNSR_SOCK_CLOSE_WAIT,
-            SNSR_SOCK_CLOSING,
-            SNSR_SOCK_UDP,
+            _SNSR_SOCK_TIME_WAIT,
+            _SNSR_SOCK_FIN_WAIT,
+            _SNSR_SOCK_CLOSE_WAIT,
+            _SNSR_SOCK_CLOSING,
+            _SNSR_SOCK_UDP,
         ):
             if self._debug:
                 print("* Opening W5k Socket, protocol={}".format(conn_mode))
@@ -828,13 +832,13 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
                 self._write_sock_port(socket_num, self.src_port)
             else:
                 s_port = randint(49152, 65535)
-                while s_port in SRC_PORTS:
+                while s_port in _SRC_PORTS:
                     s_port = randint(49152, 65535)
                 self._write_sock_port(socket_num, s_port)
-                SRC_PORTS[socket_num] = s_port
+                _SRC_PORTS[socket_num] = s_port
 
             # open socket
-            self._write_sncr(socket_num, CMD_SOCK_OPEN)
+            self._write_sncr(socket_num, _CMD_SOCK_OPEN)
             self._read_sncr(socket_num)
             assert (
                 self._read_snsr((socket_num))[0] == 0x13
@@ -851,7 +855,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         """
         if self._debug:
             print("*** Closing socket #%d" % socket_num)
-        self._write_sncr(socket_num, CMD_SOCK_CLOSE)
+        self._write_sncr(socket_num, _CMD_SOCK_CLOSE)
         self._read_sncr(socket_num)
 
     def socket_disconnect(self, socket_num: int) -> None:
@@ -862,7 +866,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         """
         if self._debug:
             print("*** Disconnecting socket #%d" % socket_num)
-        self._write_sncr(socket_num, CMD_SOCK_DISCON)
+        self._write_sncr(socket_num, _CMD_SOCK_DISCON)
         self._read_sncr(socket_num)
 
     def socket_read(
@@ -889,7 +893,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         if ret == 0:
             # no data on socket?
             status = self._read_snmr(socket_num)
-            if status in (SNSR_SOCK_LISTEN, SNSR_SOCK_CLOSED, SNSR_SOCK_CLOSE_WAIT):
+            if status in (SNSR_SOCK_LISTEN, SNSR_SOCK_CLOSED, _SNSR_SOCK_CLOSE_WAIT):
                 # remote end closed its side of the connection, EOF state
                 ret = 0
                 resp = 0
@@ -914,13 +918,13 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
                 resp = self.read(ptr, ctrl_byte, ret)
             else:
                 # if self._chip_type == "w5100s":
-                offset = ptr & SOCK_MASK
-                src_addr = offset + (socket_num * SOCK_SIZE + 0x6000)
-                if offset + ret > SOCK_SIZE:
-                    size = SOCK_SIZE - offset
+                offset = ptr & _SOCK_MASK
+                src_addr = offset + (socket_num * _SOCK_SIZE + 0x6000)
+                if offset + ret > _SOCK_SIZE:
+                    size = _SOCK_SIZE - offset
                     resp1 = self.read(src_addr, 0x00, size)
                     size = ret - size
-                    src_addr = socket_num * SOCK_SIZE + 0x6000
+                    src_addr = socket_num * _SOCK_SIZE + 0x6000
                     resp2 = self.read(src_addr, 0x00, size)
                     resp = resp1 + resp2
                 else:
@@ -932,7 +936,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             self._write_snrx_rd(socket_num, ptr)
 
             # Notify the W5k of the updated Sn_Rx_RD
-            self._write_sncr(socket_num, CMD_SOCK_RECV)
+            self._write_sncr(socket_num, _CMD_SOCK_RECV)
             self._read_sncr(socket_num)
         return ret, resp
 
@@ -978,8 +982,8 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         status = 0
         ret = 0
         free_size = 0
-        if len(buffer) > SOCK_SIZE:
-            ret = SOCK_SIZE
+        if len(buffer) > _SOCK_SIZE:
+            ret = _SOCK_SIZE
         else:
             ret = len(buffer)
         stamp = time.monotonic()
@@ -989,7 +993,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         while free_size < ret:
             free_size = self._get_tx_free_size(socket_num)
             status = self.socket_status(socket_num)[0]
-            if status not in (SNSR_SOCK_ESTABLISHED, SNSR_SOCK_CLOSE_WAIT) or (
+            if status not in (SNSR_SOCK_ESTABLISHED, _SNSR_SOCK_CLOSE_WAIT) or (
                 timeout and time.monotonic() - stamp > timeout
             ):
                 ret = 0
@@ -997,9 +1001,9 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
         # Read the starting address for saving the transmitting data.
         ptr = self._read_sntx_wr(socket_num)
-        offset = ptr & SOCK_MASK
+        offset = ptr & _SOCK_MASK
         if self._chip_type == "w5500":
-            dst_addr = offset + (socket_num * SOCK_SIZE + 0x8000)
+            dst_addr = offset + (socket_num * _SOCK_SIZE + 0x8000)
 
             txbuf = buffer[:ret]
             cntl_byte = 0x14 + (socket_num << 5)
@@ -1007,15 +1011,15 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
         else:
             # if self._chip_type == "w5100s":
-            dst_addr = offset + (socket_num * SOCK_SIZE + 0x4000)
+            dst_addr = offset + (socket_num * _SOCK_SIZE + 0x4000)
 
-            if offset + ret > SOCK_SIZE:
-                size = SOCK_SIZE - offset
+            if offset + ret > _SOCK_SIZE:
+                size = _SOCK_SIZE - offset
                 txbuf = buffer[0:size]
                 self.write(dst_addr, 0x00, txbuf)
                 txbuf = buffer[size:ret]
                 size = ret - size
-                dst_addr = socket_num * SOCK_SIZE + 0x4000
+                dst_addr = socket_num * _SOCK_SIZE + 0x4000
                 self.write(dst_addr, 0x00, txbuf)
             else:
                 txbuf = buffer[:ret]
@@ -1025,25 +1029,25 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         ptr = (ptr + ret) & 0xFFFF
         self._write_sntx_wr(socket_num, ptr)
 
-        self._write_sncr(socket_num, CMD_SOCK_SEND)
+        self._write_sncr(socket_num, _CMD_SOCK_SEND)
         self._read_sncr(socket_num)
 
         # check data was  transferred correctly
         while (
-            self._read_socket(socket_num, REG_SNIR)[0] & SNIR_SEND_OK
-        ) != SNIR_SEND_OK:
+            self._read_socket(socket_num, _REG_SNIR)[0] & _SNIR_SEND_OK
+        ) != _SNIR_SEND_OK:
             if self.socket_status(socket_num)[0] in (
                 SNSR_SOCK_CLOSED,
-                SNSR_SOCK_TIME_WAIT,
-                SNSR_SOCK_FIN_WAIT,
-                SNSR_SOCK_CLOSE_WAIT,
-                SNSR_SOCK_CLOSING,
+                _SNSR_SOCK_TIME_WAIT,
+                _SNSR_SOCK_FIN_WAIT,
+                _SNSR_SOCK_CLOSE_WAIT,
+                _SNSR_SOCK_CLOSING,
             ) or (timeout and time.monotonic() - stamp > timeout):
                 # self.socket_close(socket_num)
                 return 0
             time.sleep(0.01)
 
-        self._write_snir(socket_num, SNIR_SEND_OK)
+        self._write_snir(socket_num, _SNIR_SEND_OK)
         return ret
 
     # Socket-Register Methods
@@ -1068,17 +1072,17 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         return int.from_bytes(val, "big")
 
     def _read_snrx_rd(self, sock: int) -> int:
-        self._pbuff[0] = self._read_socket(sock, REG_SNRX_RD)[0]
-        self._pbuff[1] = self._read_socket(sock, REG_SNRX_RD + 1)[0]
+        self._pbuff[0] = self._read_socket(sock, _REG_SNRX_RD)[0]
+        self._pbuff[1] = self._read_socket(sock, _REG_SNRX_RD + 1)[0]
         return self._pbuff[0] << 8 | self._pbuff[1]
 
     def _write_snrx_rd(self, sock: int, data: int) -> None:
-        self._write_socket(sock, REG_SNRX_RD, data >> 8 & 0xFF)
-        self._write_socket(sock, REG_SNRX_RD + 1, data & 0xFF)
+        self._write_socket(sock, _REG_SNRX_RD, data >> 8 & 0xFF)
+        self._write_socket(sock, _REG_SNRX_RD + 1, data & 0xFF)
 
     def _write_sntx_wr(self, sock: int, data: int) -> None:
-        self._write_socket(sock, REG_SNTX_WR, data >> 8 & 0xFF)
-        self._write_socket(sock, REG_SNTX_WR + 1, data & 0xFF)
+        self._write_socket(sock, _REG_SNTX_WR, data >> 8 & 0xFF)
+        self._write_socket(sock, _REG_SNTX_WR + 1, data & 0xFF)
 
     def _read_sntx_wr(self, sock: int) -> int:
         self._pbuff[0] = self._read_socket(sock, 0x0024)[0]
@@ -1086,50 +1090,50 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         return self._pbuff[0] << 8 | self._pbuff[1]
 
     def _read_sntx_fsr(self, sock: int) -> Optional[bytearray]:
-        data = self._read_socket(sock, REG_SNTX_FSR)
-        data += self._read_socket(sock, REG_SNTX_FSR + 1)
+        data = self._read_socket(sock, _REG_SNTX_FSR)
+        data += self._read_socket(sock, _REG_SNTX_FSR + 1)
         return data
 
     def _read_snrx_rsr(self, sock: int) -> Optional[bytearray]:
-        data = self._read_socket(sock, REG_SNRX_RSR)
-        data += self._read_socket(sock, REG_SNRX_RSR + 1)
+        data = self._read_socket(sock, _REG_SNRX_RSR)
+        data += self._read_socket(sock, _REG_SNRX_RSR + 1)
         return data
 
     def _write_sndipr(self, sock: int, ip_addr: bytearray) -> None:
         """Write to socket destination IP Address."""
         for octet in range(0, 4):
-            self._write_socket(sock, REG_SNDIPR + octet, ip_addr[octet])
+            self._write_socket(sock, _REG_SNDIPR + octet, ip_addr[octet])
 
     def _write_sndport(self, sock: int, port: int) -> None:
         """Write to socket destination port."""
-        self._write_socket(sock, REG_SNDPORT, port >> 8)
-        self._write_socket(sock, REG_SNDPORT + 1, port & 0xFF)
+        self._write_socket(sock, _REG_SNDPORT, port >> 8)
+        self._write_socket(sock, _REG_SNDPORT + 1, port & 0xFF)
 
     def _read_snsr(self, sock: int) -> Optional[bytearray]:
         """Read Socket n Status Register."""
-        return self._read_socket(sock, REG_SNSR)
+        return self._read_socket(sock, _REG_SNSR)
 
     def _write_snmr(self, sock: int, protocol: int) -> None:
         """Write to Socket n Mode Register."""
-        self._write_socket(sock, REG_SNMR, protocol)
+        self._write_socket(sock, _REG_SNMR, protocol)
 
     def _write_snir(self, sock: int, data: int) -> None:
         """Write to Socket n Interrupt Register."""
-        self._write_socket(sock, REG_SNIR, data)
+        self._write_socket(sock, _REG_SNIR, data)
 
     def _write_sock_port(self, sock: int, port: int) -> None:
         """Write to the socket port number."""
-        self._write_socket(sock, REG_SNPORT, port >> 8)
-        self._write_socket(sock, REG_SNPORT + 1, port & 0xFF)
+        self._write_socket(sock, _REG_SNPORT, port >> 8)
+        self._write_socket(sock, _REG_SNPORT + 1, port & 0xFF)
 
     def _write_sncr(self, sock: int, data: int) -> None:
-        self._write_socket(sock, REG_SNCR, data)
+        self._write_socket(sock, _REG_SNCR, data)
 
     def _read_sncr(self, sock: int) -> Optional[bytearray]:
-        return self._read_socket(sock, REG_SNCR)
+        return self._read_socket(sock, _REG_SNCR)
 
     def _read_snmr(self, sock: int) -> Optional[bytearray]:
-        return self._read_socket(sock, REG_SNMR)
+        return self._read_socket(sock, _REG_SNMR)
 
     def _write_socket(self, sock: int, address: int, data: int) -> None:
         """Write to a W5k socket register."""
@@ -1139,7 +1143,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         if self._chip_type == "w5100s":
             cntl_byte = 0
             return self.write(
-                self._ch_base_msb + sock * CH_SIZE + address, cntl_byte, data
+                self._ch_base_msb + sock * _CH_SIZE + address, cntl_byte, data
             )
         return None
 
@@ -1150,5 +1154,5 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             return self.read(address, cntl_byte)
         if self._chip_type == "w5100s":
             cntl_byte = 0
-            return self.read(self._ch_base_msb + sock * CH_SIZE + address, cntl_byte)
+            return self.read(self._ch_base_msb + sock * _CH_SIZE + address, cntl_byte)
         return None
