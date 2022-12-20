@@ -452,18 +452,65 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
         self._dns = dns_server
 
-    def _w5100_init(self) -> int:
+    def _w5xxx_init(self) -> int:
         """
         Detect and initialize a Wiznet5k ethernet module.
 
         :return int: 1 if the initialization succeeds, 0 if it fails.
         """
+
+        def _detect_and_reset_w5500() -> bool:
+            """
+            Detect and reset a W5500 chip. Called at startup to initialize the
+            interface hardware.
+
+            :return bool: True if a W5500 chip is detected, False if not.
+            """
+            self._chip_type = "w5500"
+            # assert self.sw_reset() == 0, "Chip not reset properly!"
+            self._write_mr(0x08)
+            # assert self._read_mr()[0] == 0x08, "Expected 0x08."
+            if self._read_mr()[0] != 0x08:
+                return False
+
+            self._write_mr(0x10)
+            # assert self._read_mr()[0] == 0x10, "Expected 0x10."
+            if self._read_mr()[0] != 0x10:
+                return False
+
+            self._write_mr(0x00)
+            # assert self._read_mr()[0] == 0x00, "Expected 0x00."
+            if self._read_mr()[0] != 0x00:
+                return False
+
+            if self.read(REG_VERSIONR_W5500, 0x00)[0] != 0x04:
+                return False
+            # self._chip_type = "w5500"
+            # self._ch_base_msb = 0x10
+            return True
+
+        def _detect_and_reset_w5100s() -> bool:
+            """
+            Detect and reset a W5100S chip. Called at startup to initialize the
+            interface hardware.
+
+            :return bool: True if a W5100 chip is detected, False if not.
+            """
+            self._chip_type = "w5100s"
+            # sw reset
+            assert self.sw_reset() == 0, "Chip not reset properly!"
+            if self.read(REG_VERSIONR_W5100S, 0x00)[0] != 0x51:
+                return False
+
+            self._ch_base_msb = 0x0400
+            return True
+
         time.sleep(1)
         self._cs.switch_to_output()
         self._cs.value = 1
 
         # Detect if chip is Wiznet W5500
-        if self.detect_w5500() == 1:
+        if _detect_and_reset_w5500():
             # perform w5500 initialization
             for i in range(0, W5200_W5500_MAX_SOCK_NUM):
                 ctrl_byte = 0x0C + (i << 5)
@@ -471,56 +518,10 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
                 self.write(0x1F, ctrl_byte, 2)
         else:
             # Detect if chip is Wiznet W5100S
-            if self.detect_w5100s() == 1:
+            if _detect_and_reset_w5100s():
                 pass
             else:
                 return 0
-        return 1
-
-    def detect_w5500(self) -> int:
-        """
-        Detect W5500 chip.
-
-        :return int: 1 if a W5500 chip is detected, -1 if not.
-        """
-        self._chip_type = "w5500"
-        if self.sw_reset() != 0:
-            raise RuntimeError("Chip not reset properly!")
-        self._write_mr(0x08)
-        # assert self._read_mr()[0] == 0x08, "Expected 0x08."
-        if self._read_mr()[0] != 0x08:
-            return -1
-
-        self._write_mr(0x10)
-        # assert self._read_mr()[0] == 0x10, "Expected 0x10."
-        if self._read_mr()[0] != 0x10:
-            return -1
-
-        self._write_mr(0x00)
-        # assert self._read_mr()[0] == 0x00, "Expected 0x00."
-        if self._read_mr()[0] != 0x00:
-            return -1
-
-        if self.read(REG_VERSIONR_W5500, 0x00)[0] != 0x04:
-            return -1
-        # self._chip_type = "w5500"
-        # self._ch_base_msb = 0x10
-        return 1
-
-    def detect_w5100s(self) -> int:
-        """
-        Detect W5100S chip.
-
-        :return int: 1 if a W5100 chip is detected, -1 if not.
-        """
-        self._chip_type = "w5100s"
-        # sw reset
-        if self.sw_reset() != 0:
-            raise RuntimeError("Chip not reset properly!")
-        if self.read(REG_VERSIONR_W5100S, 0x00)[0] != 0x51:
-            return -1
-
-        self._ch_base_msb = 0x0400
         return 1
 
     def sw_reset(self) -> int:
