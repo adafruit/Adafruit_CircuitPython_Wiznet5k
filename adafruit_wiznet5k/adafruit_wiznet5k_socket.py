@@ -283,7 +283,7 @@ class socket:
 
         :param Optional[int] backlog: Included for compatibility but ignored.
         """
-        if (self._listen_port is None):
+        if self._listen_port is None:
             raise AssertionError("Use bind to set the port before listen!")
         _the_interface.socket_listen(self.socknum, self._listen_port)
         self._buffer = b""
@@ -341,8 +341,10 @@ class socket:
         :param Optional[int] conntype: Raises an exception if set to 3, unused otherwise, defaults
             to None.
         """
-        if (conntype == 0x03):
-            raise AssertionError("Error: SSL/TLS is not currently supported by CircuitPython.")
+        if conntype == 0x03:
+            raise AssertionError(
+                "Error: SSL/TLS is not currently supported by CircuitPython."
+            )
         host, port = address
 
         if hasattr(host, "split"):
@@ -565,7 +567,7 @@ class socket:
 
     def disconnect(self) -> None:
         """Disconnect a TCP socket."""
-        if (self._sock_type != SOCK_STREAM):
+        if self._sock_type != SOCK_STREAM:
             raise AssertionError("Socket must be a TCP socket.")
         _the_interface.socket_disconnect(self.socknum)
 
