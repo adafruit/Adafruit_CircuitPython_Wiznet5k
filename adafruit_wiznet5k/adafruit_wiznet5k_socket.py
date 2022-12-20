@@ -101,7 +101,7 @@ def getaddrinfo(
     :return List[Tuple[int, int, int, str, Tuple[str, int]]]: Address info entries.
     """
     if not isinstance(port, int):
-        raise RuntimeError("Port must be an integer")
+        raise ValueError("Port must be an integer")
     if is_ipv4(host):
         return [(AF_INET, socktype, proto, "", (host, port))]
     return [(AF_INET, socktype, proto, "", (gethostbyname(host), port))]
@@ -284,7 +284,7 @@ class socket:
         :param Optional[int] backlog: Included for compatibility but ignored.
         """
         if self._listen_port is None:
-            raise AssertionError("Use bind to set the port before listen!")
+            raise RuntimeError("Use bind to set the port before listen!")
         _the_interface.socket_listen(self.socknum, self._listen_port)
         self._buffer = b""
 
@@ -342,7 +342,7 @@ class socket:
             to None.
         """
         if conntype == 0x03:
-            raise AssertionError(
+            raise NotImplementedError(
                 "Error: SSL/TLS is not currently supported by CircuitPython."
             )
         host, port = address
@@ -568,7 +568,7 @@ class socket:
     def disconnect(self) -> None:
         """Disconnect a TCP socket."""
         if self._sock_type != SOCK_STREAM:
-            raise AssertionError("Socket must be a TCP socket.")
+            raise RuntimeError("Socket must be a TCP socket.")
         _the_interface.socket_disconnect(self.socknum)
 
     def close(self) -> None:

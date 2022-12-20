@@ -188,7 +188,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         # attempt to initialize the module
         self._ch_base_msb = 0
         if self._w5100_init() != 1:
-            raise AssertionError("Failed to initialize WIZnet module.")
+            raise RuntimeError("Failed to initialize WIZnet module.")
         # Set MAC address
         self.mac_address = mac
         self.src_port = 0
@@ -216,7 +216,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             if ret != 0:
                 self._dhcp_client = None
             if ret != 0:
-                raise AssertionError("Failed to configure DHCP Server!")
+                raise RuntimeError("Failed to configure DHCP Server!")
 
     def set_dhcp(
         self, hostname: Optional[str] = None, response_timeout: float = 30
@@ -275,7 +275,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         if self._debug:
             print("* Resolved IP: ", ret)
         if ret == -1:
-            raise AssertionError("Failed to resolve hostname!")
+            raise RuntimeError("Failed to resolve hostname!")
         return ret
 
     @property
@@ -485,7 +485,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         """
         self._chip_type = "w5500"
         if self.sw_reset() != 0:
-            raise AssertionError("Chip not reset properly!")
+            raise RuntimeError("Chip not reset properly!")
         self._write_mr(0x08)
         # assert self._read_mr()[0] == 0x08, "Expected 0x08."
         if self._read_mr()[0] != 0x08:
@@ -516,7 +516,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         self._chip_type = "w5100s"
         # sw reset
         if self.sw_reset() != 0:
-            raise AssertionError("Chip not reset properly!")
+            raise RuntimeError("Chip not reset properly!")
         if self.read(REG_VERSIONR_W5100S, 0x00)[0] != 0x51:
             return -1
 
@@ -629,7 +629,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
                 )
             )
         if socket_num > self.max_sockets:
-            raise AssertionError("Provided socket exceeds max_sockets.")
+            raise ValueError("Provided socket exceeds max_sockets.")
 
         res = self._get_rx_rcv_size(socket_num)
 
@@ -683,7 +683,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             defaults to SNMR_TCP.
         """
         if not self.link_status:
-            raise AssertionError("Ethernet cable disconnected!")
+            raise ConnectionError("Ethernet cable disconnected!")
         if self._debug:
             print(
                 "* w5k socket connect, protocol={}, port={}, ip={}".format(
@@ -693,7 +693,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         # initialize a socket and set the mode
         res = self.socket_open(socket_num, conn_mode=conn_mode)
         if res == 1:
-            raise RuntimeError("Failed to initialize a connection with the socket.")
+            raise ConnectionError("Failed to initialize a connection with the socket.")
 
         # set socket destination IP and port
         self._write_sndipr(socket_num, dest)
@@ -707,7 +707,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
                 if self._debug:
                     print("SN_SR:", self.socket_status(socket_num)[0])
                 if self.socket_status(socket_num)[0] == SNSR_SOCK_CLOSED:
-                    raise RuntimeError("Failed to establish connection.")
+                    raise ConnectionError("Failed to establish connection.")
         elif conn_mode == SNMR_UDP:
             self.udp_datasize[socket_num] = 0
         return 1
@@ -752,7 +752,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             UDP, defaults to SNMR_TCP.
         """
         if not self.link_status:
-            raise AssertionError("Ethernet cable disconnected!")
+            raise ConnectionError("Ethernet cable disconnected!")
         if self._debug:
             print(
                 "* Listening on port={}, ip={}".format(
@@ -813,7 +813,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         :return int: 1 if the socket was opened, 0 if not.
         """
         if not self.link_status:
-            raise AssertionError("Ethernet cable disconnected!")
+            raise ConnectionError("Ethernet cable disconnected!")
         if self._debug:
             print("*** Opening socket %d" % socket_num)
         status = self._read_snsr(socket_num)[0]
@@ -846,7 +846,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             self._write_sncr(socket_num, CMD_SOCK_OPEN)
             self._read_sncr(socket_num)
             if self._read_snsr((socket_num))[0] not in [0x13, 0x22]:
-                raise AssertionError("Could not open socket in TCP or UDP mode.")
+                raise RuntimeError("Could not open socket in TCP or UDP mode.")
             return 0
         return 1
 
@@ -888,9 +888,9 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         """
 
         if not self.link_status:
-            raise AssertionError("Ethernet cable disconnected!")
+            raise ConnectionError("Ethernet cable disconnected!")
         if socket_num > self.max_sockets:
-            raise AssertionError("Provided socket exceeds max_sockets.")
+            raise ValueError("Provided socket exceeds max_sockets.")
 
         # Check if there is data available on the socket
         ret = self._get_rx_rcv_size(socket_num)
@@ -984,7 +984,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         :return int: The number of bytes written to the buffer.
         """
         if not self.link_status:
-            raise AssertionError("Ethernet cable disconnected!")
+            raise ConnectionError("Ethernet cable disconnected!")
         assert socket_num <= self.max_sockets, "Provided socket exceeds max_sockets."
         status = 0
         ret = 0

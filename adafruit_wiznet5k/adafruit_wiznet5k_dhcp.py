@@ -275,7 +275,7 @@ class DHCP:
         # -- Parse Packet, FIXED -- #
         # Validate OP
         if _BUFF[0] != DHCP_BOOT_REPLY:
-            raise AssertionError(
+            raise RuntimeError(
                 "Malformed Packet - \
             DHCP message OP is not expected BOOT Reply."
             )
