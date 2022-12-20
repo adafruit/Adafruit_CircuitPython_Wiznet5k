@@ -274,10 +274,9 @@ class DHCP:
 
         # -- Parse Packet, FIXED -- #
         # Validate OP
-        assert (
-            _BUFF[0] == DHCP_BOOT_REPLY
-        ), "Malformed Packet - \
-            DHCP message OP is not expected BOOT Reply."
+        if (_BUFF[0] != DHCP_BOOT_REPLY):
+            raise AssertionError("Malformed Packet - \
+            DHCP message OP is not expected BOOT Reply.")
 
         xid = _BUFF[4:8]
         if bytes(xid) < self._initial_xid:
