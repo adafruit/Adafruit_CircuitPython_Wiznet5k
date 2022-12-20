@@ -872,7 +872,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         self._write_sncr(socket_num, CMD_SOCK_DISCON)
         self._read_sncr(socket_num)
 
-    def socket_read(
+    def socket_read(  # pylint: disable=too-many-branches
         self, socket_num: int, length: int
     ) -> Tuple[int, Union[int, bytearray]]:
         """
@@ -886,6 +886,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             was unsuccessful then both items equal an error code, 0 for no data waiting and -1
             for no connection to the socket.
         """
+
         if not self.link_status:
             raise AssertionError("Ethernet cable disconnected!")
         if socket_num > self.max_sockets:
