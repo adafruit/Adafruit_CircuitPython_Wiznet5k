@@ -187,7 +187,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
         # attempt to initialize the module
         self._ch_base_msb = 0
-        if self._w5100_init() != 1:
+        if self._w5xxx_init() != 1:
             raise RuntimeError("Failed to initialize WIZnet module.")
         # Set MAC address
         self.mac_address = mac
