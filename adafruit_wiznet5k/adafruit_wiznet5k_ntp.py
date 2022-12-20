@@ -69,13 +69,19 @@ class NTP:
         :return time.struct_time: The local time.
         """
         self._sock.bind((None, 50001))
-        self._sock.sendto(self._pkt_buf_, (self._ntp_server, 123))
-        while True:
-            data = self._sock.recv()
-            if data:
-                sec = data[40:44]
-                int_cal = int.from_bytes(sec, "big")
-                # UTC offset may be a float as some offsets are half hours so force int.
-                cal = int(int_cal - 2208988800 + self._utc * 3600)
-                cal = time.localtime(cal)
-                return cal
+        max_retries = 3
+        for _ in range(max_retries):
+            self._sock.sendto(self._pkt_buf_, (self._ntp_server, 123))
+            end_time = time.monotonic() + 1
+            while time.monotonic() < end_time:
+                data = self._sock.recv()
+                if data:
+                    sec = data[40:44]
+                    int_cal = int.from_bytes(sec, "big")
+                    # UTC offset may be a float as some offsets are half hours so force int.
+                    cal = int(int_cal - 2208988800 + self._utc * 3600)
+                    cal = time.localtime(cal)
+                    return cal
+        raise TimeoutError(
+            "No reply from NTP server after {} attempts.".format(max_retries)
+        )
