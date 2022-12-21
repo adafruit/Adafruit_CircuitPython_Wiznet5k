@@ -12,7 +12,6 @@ from micropython import const
 import dummy_dhcp_data as dhcp_data
 import adafruit_wiznet5k.adafruit_wiznet5k_dhcp as wiz_dhcp
 
-#
 DEFAULT_DEBUG_ON = True
 
 
@@ -497,3 +496,48 @@ class TestSmallHelperFunctions:
         with pytest.raises(TimeoutError):
             dhcp_client._socket_setup()
         assert dhcp_client._sock is None
+
+    @pytest.mark.parametrize(
+        "next_state, msg_type, retries",
+        (
+            (wiz_dhcp.STATE_SELECTING, wiz_dhcp.DHCP_DISCOVER, 2),
+            (wiz_dhcp.STATE_REQUESTING, wiz_dhcp.DHCP_REQUEST, 3),
+        ),
+    )
+    def test_send_message_set_next_state_good_data(
+        self, mocker, wiznet, next_state, msg_type, retries
+    ):
+        mocker.patch.object(wiz_dhcp.DHCP, "_generate_dhcp_message")
+        mocker.patch.object(wiz_dhcp.DHCP, "_next_retry_time_and_retry")
+        message = bytearray(b"HelloWorld")
+        wiz_dhcp._BUFF = bytearray(message)
+        dhcp_client = wiz_dhcp.DHCP(wiznet, (1, 2, 3, 4, 5, 6))
+        dhcp_client._sock = mocker.Mock()
+        dhcp_client._send_message_set_next_state(
+            next_state=next_state, max_retries=retries
+        )
+        assert dhcp_client._retries == 0
+        assert dhcp_client._max_retries == retries
+        assert dhcp_client._dhcp_state == next_state
+        dhcp_client._generate_dhcp_message.assert_called_once_with(
+            message_type=msg_type
+        )
+        dhcp_client._sock.send.assert_called_once_with(message)
+        dhcp_client._next_retry_time_and_retry.assert_called_once()
+
+    @pytest.mark.parametrize(
+        "next_state",
+        (
+            wiz_dhcp.STATE_INIT,
+            wiz_dhcp.STATE_REBINDING,
+            wiz_dhcp.STATE_RENEWING,
+            wiz_dhcp.STATE_BOUND,
+        ),
+    )
+    def test_send_message_set_next_state_bad_state(self, wiznet, next_state):
+        # Test with all states that should not call this function.
+        dhcp_client = wiz_dhcp.DHCP(wiznet, (1, 2, 3, 4, 5, 6))
+        with pytest.raises(ValueError):
+            dhcp_client._send_message_set_next_state(
+                next_state=next_state, max_retries=4
+            )

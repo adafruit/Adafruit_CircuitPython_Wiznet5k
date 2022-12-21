@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: 2009 Jordan Terrell (blog.jordanterrell.com)
 # SPDX-FileCopyrightText: 2020 Brent Rubell for Adafruit Industries
 # SPDX-FileCopyrightText: 2021 Patrick Van Oosterwijck @ Silicognition LLC
+# SPDX-FileCopyrightText: 2022 Martin Stephens
 #
 # SPDX-License-Identifier: MIT
 
@@ -105,9 +106,6 @@ class DHCP:
     for retrying. Retries occur after 4, 8, and 16 seconds (the final retry is followed by
     a wait of 32 seconds) so it will take about a minute to decide that no DHCP server
     is available.
-
-    Use of DHCP relay agents is not implemented. The DHCP server must be on the same
-    physical network as the client.
 
     The DHCP client cannot check whether the allocated IP address is already in use because
     the ARP protocol is not available. Therefore, it is possible that the IP address
@@ -218,7 +216,7 @@ class DHCP:
         Attempt to initialise a UDP socket. If the finite state machine (FSM) is in
         blocking mode, repeat failed attempts until a socket is initialised or
         the operation times out, then raise an exception. If the FSM is in non-blocking
-        mode, ignore the error and continue.
+        mode, ignore the error and return.
 
         :param int timeout: Time to keep retrying if the FSM is in blocking mode.
             Defaults to 5.
@@ -277,20 +275,36 @@ class DHCP:
     def _send_message_set_next_state(
         self,
         *,
-        message_type: int,
         next_state: int,
         max_retries: int,
     ) -> None:
-        """I'll get to it"""
+        """Generate a DHCP message and update the finite state machine state (FSM).
+
+        Creates and sends a DHCP message, resets retry parameters and updates the
+        FSM state.
+
+        :param int next_state: The state that the FSM will be set to.
+        :param int max_retries: Maximum attempts to resend the DHCP message.
+
+        :raises ValueError: If the next FSM state does not handle DHCP messages.
+        """
+        if next_state not in (STATE_SELECTING, STATE_REQUESTING):
+            raise ValueError("The next state must be SELECTING or REQUESTING.")
+        if next_state == STATE_SELECTING:
+            message_type = DHCP_DISCOVER
+        else:
+            message_type = DHCP_REQUEST
         self._generate_dhcp_message(message_type=message_type)
         self._sock.send(_BUFF)
         self._retries = 0
         self._max_retries = max_retries
         self._next_resend = self._next_retry_time_and_retry()
+        self._retries = 0
         self._dhcp_state = next_state
 
     def _handle_dhcp_message(self) -> None:
         # pylint: disable=too-many-branches
+        global _BUFF  # pylint: disable=global-statement
         while True:
             while time.monotonic() < self._next_resend:
                 if self._sock.available():
@@ -306,7 +320,6 @@ class DHCP:
                             and msg_type == DHCP_OFFER
                         ):
                             self._send_message_set_next_state(
-                                message_type=DHCP_REQUEST,
                                 next_state=STATE_REQUESTING,
                                 max_retries=3,
                             )
@@ -365,7 +378,6 @@ class DHCP:
                 self._socket_setup()
                 self._start_time = time.monotonic()
                 self._send_message_set_next_state(
-                    message_type=DHCP_REQUEST,
                     next_state=STATE_REQUESTING,
                     max_retries=3,
                 )
@@ -375,7 +387,6 @@ class DHCP:
                 self.dhcp_server_ip = BROADCAST_SERVER_ADDR
                 self._socket_setup()
                 self._send_message_set_next_state(
-                    message_type=DHCP_REQUEST,
                     next_state=STATE_REQUESTING,
                     max_retries=3,
                 )
@@ -383,7 +394,6 @@ class DHCP:
             if self._dhcp_state == STATE_INIT:
                 self._dsm_reset()
                 self._send_message_set_next_state(
-                    message_type=DHCP_DISCOVER,
                     next_state=STATE_SELECTING,
                     max_retries=3,
                 )
@@ -412,11 +422,11 @@ class DHCP:
 
         :param int message_type: Type of message to generate.
         :param bool broadcast: Used to set the flag requiring a broadcast reply from the
-            DHCP server. Defaults to False to match DHCP standard.
+            DHCP server. Defaults to False which matches the DHCP standard.
         :param bool renew: Set True for renewing and rebinding operations, defaults to False.
         """
 
-        def option_data(
+        def option_writer(
             pointer: int, option_code: int, option_data: Union[Tuple[int, ...], bytes]
         ) -> int:
             """Helper function to set DHCP option data for a DHCP
@@ -438,14 +448,15 @@ class DHCP:
             _BUFF[pointer:data_end] = option_data
             return data_end
 
-        _BUFF[:] = b"\x00" * BUFF_LENGTH
+        global _BUFF  # pylint: disable=global-variable-not-assigned
+        _BUFF[:] = bytearray(b"\x00" * BUFF_LENGTH)
         # OP.HTYPE.HLEN.HOPS
         _BUFF[0:4] = (DHCP_BOOT_REQUEST, DHCP_HTYPE10MB, DHCP_HLENETHERNET, DHCP_HOPS)
         # Transaction ID (xid)
         _BUFF[4:8] = self._transaction_id.to_bytes(4, "big")
-        # seconds elapsed
+        # Seconds elapsed
         _BUFF[8:10] = int(time.monotonic() - self._start_time).to_bytes(2, "big")
-        # flags (only bit 0 is used)
+        # Flags (only bit 0 is used, all other bits must be 0)
         if broadcast:
             _BUFF[10] = 0b10000000
         if renew:
@@ -459,24 +470,24 @@ class DHCP:
         pointer = 240
 
         # Option - DHCP Message Type
-        pointer = option_data(
+        pointer = option_writer(
             pointer=pointer, option_code=53, option_data=(message_type,)
         )
         # Option - Host Name
-        pointer = option_data(
+        pointer = option_writer(
             pointer=pointer, option_code=12, option_data=self._hostname
         )
         if message_type == DHCP_REQUEST:
             # Request subnet mask, router and DNS server.
-            pointer = option_data(
+            pointer = option_writer(
                 pointer=pointer, option_code=55, option_data=(1, 3, 6)
             )
             # Set Requested IP Address to offered IP address.
-            pointer = option_data(
+            pointer = option_writer(
                 pointer=pointer, option_code=50, option_data=self.local_ip
             )
             # Set Server ID to chosen DHCP server IP address.
-            pointer = option_data(
+            pointer = option_writer(
                 pointer=pointer, option_code=54, option_data=self.dhcp_server_ip
             )
         _BUFF[pointer] = 0xFF
@@ -497,7 +508,7 @@ class DHCP:
         fail or no message type is found in the options, raises a ValueError.
         """
         # pylint: disable=too-many-branches
-        def option_data(pointer: int) -> Tuple[int, int, bytes]:
+        def option_reader(pointer: int) -> Tuple[int, int, bytes]:
             """Helper function to extract DHCP option data from a
             response.
 
@@ -507,13 +518,13 @@ class DHCP:
                 option type, and option data.
             """
             global _BUFF  # pylint: disable=global-variable-not-assigned
-            data_type = _BUFF[pointer]
+            option_type = _BUFF[pointer]
             pointer += 1
             data_length = _BUFF[pointer]
             pointer += 1
             data_end = pointer + data_length
-            data = _BUFF[pointer:data_end]
-            return data_end, data_type, data
+            option_data = _BUFF[pointer:data_end]
+            return data_end, option_type, option_data
 
         global _BUFF  # pylint: disable=global-variable-not-assigned
         # Validate OP
@@ -536,7 +547,7 @@ class DHCP:
         msg_type = None
         ptr = 240
         while _BUFF[ptr] != OPT_END:
-            ptr, data_type, data = option_data(ptr)
+            ptr, data_type, data = option_reader(ptr)
             if data_type == MSG_TYPE:
                 msg_type = data[0]
             elif data_type == SUBNET_MASK:
