@@ -437,7 +437,7 @@ class TestSmallHelperFunctions:
         now = time.monotonic()
         for retry in range(3):
             dhcp_client._retries = retry
-            assert dhcp_client._next_retry_time() == int(
+            assert dhcp_client._next_retry_time_and_retry() == int(
                 2**retry * 4 + rand_int + now
             )
             assert dhcp_client._retries == retry + 1
@@ -454,6 +454,46 @@ class TestSmallHelperFunctions:
         now = time.monotonic()
         for retry in range(3):
             dhcp_client._retries = retry
-            assert dhcp_client._next_retry_time(interval=interval) == int(
+            assert dhcp_client._next_retry_time_and_retry(interval=interval) == int(
                 2**retry * interval + now
             )
+
+    def test_setup_socket_with_no_error(self, wiznet, wrench):
+        dhcp_client = wiz_dhcp.DHCP(wiznet, (1, 2, 3, 4, 5, 6))
+        dhcp_client._socket_setup()
+        wrench.socket.assert_called_once()
+        dhcp_client._sock.settimeout.assert_called_once_with(
+            dhcp_client._response_timeout
+        )
+        dhcp_client._sock.bind.assert_called_once_with((None, 68))
+        dhcp_client._sock.connect.assert_called_once_with(
+            (wiz_dhcp.BROADCAST_SERVER_ADDR, 67)
+        )
+
+    def test_setup_socket_with_error_then_ok_blocking(self, mocker, wiznet, wrench):
+        dhcp_client = wiz_dhcp.DHCP(wiznet, (1, 2, 3, 4, 5, 6))
+        dhcp_client._blocking = True
+        wrench.socket.side_effect = [RuntimeError, mocker.Mock()]
+        assert dhcp_client._socket_setup() is None
+        # Function should ignore the error, then set the socket and call settimeout
+        dhcp_client._sock.settimeout.assert_called_once_with(
+            dhcp_client._response_timeout
+        )
+
+    def test_setup_socket_with_error_then_ok_nonblocking(self, mocker, wiznet, wrench):
+        dhcp_client = wiz_dhcp.DHCP(wiznet, (1, 2, 3, 4, 5, 6))
+        dhcp_client._blocking = False
+        wrench.socket.side_effect = [RuntimeError, mocker.Mock()]
+        assert dhcp_client._socket_setup() is None
+        # Function should ignore the error, then return, _sock is None
+        assert dhcp_client._sock is None
+
+    @freeze_time("2022-10-02", auto_tick_seconds=2)
+    def test_setup_socket_with_error_then_timeout(self, wiznet, wrench):
+        dhcp_client = wiz_dhcp.DHCP(wiznet, (1, 2, 3, 4, 5, 6))
+        dhcp_client._blocking = True
+        wrench.socket.side_effect = [RuntimeError, RuntimeError]
+        # Function should timeout, raise an exception and not set a socket
+        with pytest.raises(TimeoutError):
+            dhcp_client._socket_setup()
+        assert dhcp_client._sock is None

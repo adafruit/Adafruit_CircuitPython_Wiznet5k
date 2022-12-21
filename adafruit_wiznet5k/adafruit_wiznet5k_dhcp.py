@@ -102,7 +102,7 @@ class DHCP:
     FSM can check whether the lease needs to be renewed, and can then renew it.
 
     Since DHCP uses UDP, messages may be lost. The DHCP protocol uses exponential backoff
-    for retrying. Retries occur after 4, 8, and 16 seconds (the final retry isfollowed by
+    for retrying. Retries occur after 4, 8, and 16 seconds (the final retry is followed by
     a wait of 32 seconds) so it will take about a minute to decide that no DHCP server
     is available.
 
@@ -110,13 +110,13 @@ class DHCP:
     physical network as the client.
 
     The DHCP client cannot check whether the allocated IP address is already in use because
-    the ARP protocol is not available. Therefore, it is possible that the IP address has been
-    statically assigned to another device. In most cases, the DHCP server will make this
-    check before allocating an address, but some do not.
+    the ARP protocol is not available. Therefore, it is possible that the IP address
+    allocated by the server has been manually assigned to another device. In most cases,
+    the DHCP server will make this check before allocating an address, but some do not.
 
     The DHCPRELEASE message is not implemented. The DHCP protocol does not require it and
     DHCP servers can handle disappearing clients and clients that ask for 'replacement'
-    IP addressed.
+    IP addresses.
     """
 
     # pylint: disable=too-many-arguments, too-many-instance-attributes, invalid-name
@@ -213,7 +213,19 @@ class DHCP:
             self._sock = None
 
     def _socket_setup(self, timeout: int = 5) -> None:
-        """I'll get to it."""
+        """Initialise a UDP socket.
+
+        Attempt to initialise a UDP socket. If the finite state machine (FSM) is in
+        blocking mode, repeat failed attempts until a socket is initialised or
+        the operation times out, then raise an exception. If the FSM is in non-blocking
+        mode, ignore the error and continue.
+
+        :param int timeout: Time to keep retrying if the FSM is in blocking mode.
+            Defaults to 5.
+
+        :raises TimeoutError: If the FSM is in blocking mode and a socket cannot be
+            initialised.
+        """
         self._socket_release()
         stop_time = time.monotonic() + timeout
         while not time.monotonic() > stop_time:
@@ -222,17 +234,17 @@ class DHCP:
             except RuntimeError:
                 if self._debug:
                     print("DHCP client failed to allocate socket")
-                    if self._blocking:
-                        print("Retrying…")
-                    else:
-                        return
+                if self._blocking:
+                    print("Retrying…")
+                else:
+                    return
             else:
                 self._sock.settimeout(self._response_timeout)
                 self._sock.bind((None, 68))
                 self._sock.connect((self.dhcp_server_ip, DHCP_SERVER_PORT))
                 return
-        raise RuntimeError(
-            "DHCP client failed to allocate socket. Retried for {} seconds.".format(
+        raise TimeoutError(
+            "DHCP client failed to allocate a socket. Retried for {} seconds.".format(
                 timeout
             )
         )
@@ -241,7 +253,7 @@ class DHCP:
         """Increment the transaction ID and roll over from 0x7fffffff to 0."""
         self._transaction_id = (self._transaction_id + 1) & 0x7FFFFFFF
 
-    def _next_retry_time(self, *, interval: int = 4) -> int:
+    def _next_retry_time_and_retry(self, *, interval: int = 4) -> int:
         """Calculate a retry stop time.
 
         The interval is calculated as an exponential fallback with a random variation to
@@ -274,7 +286,7 @@ class DHCP:
         self._sock.send(_BUFF)
         self._retries = 0
         self._max_retries = max_retries
-        self._next_resend = self._next_retry_time()
+        self._next_resend = self._next_retry_time_and_retry()
         self._dhcp_state = next_state
 
     def _handle_dhcp_message(self) -> None:
@@ -321,7 +333,7 @@ class DHCP:
                             return
                 if not self._blocking:
                     return
-            self._next_resend = self._next_retry_time()
+            self._next_resend = self._next_retry_time_and_retry()
             if self._retries > self._max_retries:
                 raise RuntimeError(
                     "No response from DHCP server after {}".format(self._max_retries)
