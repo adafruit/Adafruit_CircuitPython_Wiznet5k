@@ -50,12 +50,7 @@ def htonl(x: int) -> int:
 
     :return int: 32-bit positive integer in network byte order.
     """
-    return (
-        ((x) << 24 & 0xFF000000)
-        | ((x) << 8 & 0x00FF0000)
-        | ((x) >> 8 & 0x0000FF00)
-        | ((x) >> 24 & 0x000000FF)
-    )
+    return int.from_bytes(x.to_bytes(4, "little"), "big")
 
 
 def htons(x: int) -> int:
@@ -66,7 +61,7 @@ def htons(x: int) -> int:
 
     :return int: 16-bit positive integer in network byte order.
     """
-    return (((x) << 8) & 0xFF00) | (((x) >> 8) & 0xFF)
+    return ((x << 8) & 0xFF00) | ((x >> 8) & 0xFF)
 
 
 SOCK_STREAM = const(0x21)  # TCP
@@ -319,6 +314,7 @@ class socket:
         current_socknum = self._socknum
         # Create a new socket object and swap socket nums, so we can continue listening
         client_sock = socket()
+        # TODO: See if this can be done with setattr
         client_sock._socknum = current_socknum  # pylint: disable=protected-access
         self._socknum = new_listen_socknum  # pylint: disable=protected-access
         self.bind((None, self._listen_port))
@@ -517,11 +513,7 @@ class socket:
                     self._buffer += _the_interface.socket_read(self._socknum, avail)[1]
                 elif self._sock_type == SOCK_DGRAM:
                     self._buffer += _the_interface.read_udp(self._socknum, avail)[1]
-            if (
-                not avail
-                and self._timeout > 0
-                and time.monotonic() - stamp > self._timeout
-            ):
+            if not avail and 0 < self._timeout < time.monotonic() - stamp:
                 self.close()
                 raise RuntimeError("Didn't receive response, failing out...")
         firstline, self._buffer = self._buffer.split(b"\r\n", 1)
@@ -552,7 +544,7 @@ class socket:
         :param float value: Socket read timeout in seconds.
 
         """
-        # TODO: Implement None and 0.0 as valid.
+        # TODO: Implement None and 0.0 as valid once all socket funcs can handle them.
         if value < 0:
             raise ValueError("Timeout period should be non-negative.")
         self._timeout = value
@@ -577,5 +569,5 @@ class socket:
 
     @property
     def proto(self):
-        """Socket protocol."""
-        return
+        """Socket protocol (always 0x00 in this implementation)."""
+        return 0
