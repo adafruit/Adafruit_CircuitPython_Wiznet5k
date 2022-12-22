@@ -117,16 +117,16 @@ class DNS:
         """
         # wait for a response
         start_time = time.monotonic()
-        packet_sz = self._sock.available()
+        packet_sz = self._sock._available()  # pylint: disable=protected-access
         while packet_sz <= 0:
-            packet_sz = self._sock.available()
+            packet_sz = self._sock._available()  # pylint: disable=protected-access
             if (time.monotonic() - start_time) > 1.0:
                 if self._debug:
                     print("* DNS ERROR: Did not receive DNS response!")
                 return -1
             time.sleep(0.05)
         # recv packet into buf
-        self._pkt_buf = self._sock.recv()
+        self._pkt_buf = self._sock.recv(512)  # > UDP payload length
 
         if self._debug:
             print("DNS Packet Received: ", self._pkt_buf)
