@@ -108,16 +108,16 @@ def gethostbyname(hostname: str) -> str:
 
     :param str hostname: Hostname to lookup.
 
-    :return str: IPv4 address (a string of the form '255.255.255.255').
+    :return str: IPv4 address (a string of the form '0.0.0.0').
     """
-    addr = _the_interface.get_host_by_name(hostname)
-    addr = "{}.{}.{}.{}".format(addr[0], addr[1], addr[2], addr[3])
-    return addr
+    address = _the_interface.get_host_by_name(hostname)
+    address = "{}.{}.{}.{}".format(address[0], address[1], address[2], address[3])
+    return address
 
 
 def is_ipv4(host: str) -> bool:
     """
-    Check if a hostname is an IPv4 address (a string of the form '255.255.255.255').
+    Check if a hostname is an IPv4 address (a string of the form '0.0.0.0').
 
     :param str host: Hostname to check.
 
@@ -146,6 +146,7 @@ class socket:
         type: int = SOCK_STREAM,
         proto: int = 0,
         fileno: Optional[int] = None,
+        # TODO: Remove socknum
         socknum: Optional[int] = None,
     ) -> None:
         """
@@ -323,37 +324,20 @@ class socket:
             raise RuntimeError("Failed to open new listening socket")
         return client_sock, addr
 
-    def connect(
-        self,
-        address: Tuple[Union[str, Tuple[int, int, int, int]], int],
-        conntype: Optional[int] = None,
-    ) -> None:
+    def connect(self, address: Tuple[str, int]) -> None:
         """
-        Connect to a remote socket.
+        Connect to a remote socket at address.
 
-        :param Tuple[Union[str, Tuple[int, int, int, int]], int] address: Remote socket as
-            a (host, port) tuple. The host may be a tuple in the form (0, 0, 0, 0) or a string.
-        :param Optional[int] conntype: Raises an exception if set to 3, unused otherwise, defaults
-            to None.
+        :param Tuple[str, int] address: Remote socket as a (host, port) tuple.
         """
-        assert (
-            conntype != 0x03
-        ), "Error: SSL/TLS is not currently supported by CircuitPython."
-        host, port = address
-
-        if hasattr(host, "split"):
-            try:
-                host = tuple(map(int, host.split(".")))
-            except ValueError:
-                host = _the_interface.get_host_by_name(host)
         if self._listen_port is not None:
             _the_interface.src_port = self._listen_port
         result = _the_interface.socket_connect(
-            self._socknum, host, port, conn_mode=self._sock_type
+            self._socknum, bytes(gethostbyname(address[0])), address[1], self._sock_type
         )
         _the_interface.src_port = 0
         if not result:
-            raise RuntimeError("Failed to connect to host", host)
+            raise RuntimeError("Failed to connect to host ", address[0])
         self._buffer = b""
 
     def send(self, data: Union[bytes, bytearray]) -> int:
