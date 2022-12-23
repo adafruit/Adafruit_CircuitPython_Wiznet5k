@@ -356,17 +356,22 @@ class socket:
             raise RuntimeError("Failed to connect to host", host)
         self._buffer = b""
 
-    def send(self, data: Union[bytes, bytearray]) -> None:
+    def send(self, data: Union[bytes, bytearray]) -> int:
         """
         Send data to the socket.
 
-        The socket must be connected to a remote socket.
+        Send data to the socket. The socket must be connected to a remote socket.
+        Applications are responsible for checking that all data has been sent; if
+        only some of the data was transmitted, the application needs to attempt
+        delivery of the remaining data.
 
         :param bytearray data: Data to send to the socket.
+
+        :returns int: Number of bytes sent.
         """
-        # TODO: Should return number of bytes sent (can of worms opened)
-        _the_interface.socket_write(self._socknum, data, self._timeout)
+        bytes_sent = _the_interface.socket_write(self._socknum, data, self._timeout)
         gc.collect()
+        return bytes_sent
 
     def sendto(self, data: bytearray, address: [Tuple[str, int]]) -> None:
         """
@@ -387,12 +392,12 @@ class socket:
         flags: int = 0,
     ) -> bytes:
         """
-        Read from the connected remote address.
+        Receive data from the socket.
 
         :param int bufsize: Maximum number of bytes to receive.
         :param int flags: ignored, present for compatibility.
 
-        :returns bytes: Data from the remote address.
+        :returns bytes: Data from the socket.
         """
         stop_time = time.monotonic() + self._timeout
         if self._timeout != 0.0:
@@ -438,14 +443,12 @@ class socket:
         gc.collect()
         return ret
 
-    def recvfrom(
-        self, bufsize: int = 0, flags: int = 0
-    ) -> Tuple[bytes, Tuple[str, int]]:
+    def recvfrom(self, bufsize: int, flags: int = 0) -> Tuple[bytes, Tuple[str, int]]:
         """
-        Read some bytes from the connected remote address.
+        Receive data from the socket.
 
         :param int bufsize: Maximum number of bytes to receive.
-        :param int flags: ignored, present for compatibility.
+        :param int flags: Ignored, present for compatibility.
 
         :return Tuple[bytes, Tuple[str, int]]: a tuple (bytes, address)
             where address is a tuple (ip, port)
@@ -458,38 +461,39 @@ class socket:
             ),
         )
 
-    def recv_into(self, buf: bytearray, nbytes: int = 0, flags: int = 0) -> int:
+    def recv_into(self, buffer: bytearray, nbytes: int = 0, flags: int = 0) -> int:
         """
-        Read from the connected remote address into the provided buffer.
+        Receive up to nbytes bytes from the socket, storing the data into a buffer
+        rather than creating a new bytestring.
 
-        :param bytearray buf: Data buffer
-        :param nbytes: Maximum number of bytes to receive
+        :param bytearray buffer: Data buffer to read into.
+        :param nbytes: Maximum number of bytes to receive (if 0, use length of buffer).
         :param int flags: ignored, present for compatibility.
 
         :return int: the number of bytes received
         """
         if nbytes == 0:
-            nbytes = len(buf)
-        ret = self.recv(nbytes)
-        nbytes = len(ret)
-        buf[:nbytes] = ret
+            nbytes = len(buffer)
+        bytes_received = self.recv(nbytes)
+        nbytes = len(bytes_received)
+        buffer[:nbytes] = bytes_received
         return nbytes
 
     def recvfrom_into(
-        self, buf: bytearray, nbytes: int = 0, flags: int = 0
+        self, buffer: bytearray, nbytes: int = 0, flags: int = 0
     ) -> Tuple[int, Tuple[str, int]]:
         """
-        Read some bytes from the connected remote address into the provided buffer.
+        Receive data from the socket, writing it into buffer instead of creating a new bytestring.
 
-        :param bytearray buf: Data buffer.
+        :param bytearray buffer: Data buffer.
         :param int nbytes: Maximum number of bytes to receive.
         :param int flags: Unused, present for compatibility.
 
-        :return Tuple[int, Tuple[str, int]]: A tuple (nbytes, address) where address is a
-            tuple (ip, port)
+        :return Tuple[int, Tuple[str, int]]: A tuple (nbytes, address) where nbytes is the
+        number of bytes received and address is a tuple (IPv4 address, port).
         """
         return (
-            self.recv_into(buf, nbytes),
+            self.recv_into(buffer, nbytes),
             (
                 _the_interface.remote_ip(self._socknum),
                 _the_interface.remote_port(self._socknum),
@@ -499,6 +503,8 @@ class socket:
     def _readline(self) -> bytes:
         """
         Read a line from the socket.
+
+        Deprecated, will be removed in the future.
 
         Attempt to return as many bytes as we can up to but not including a carriage return and
         linefeed character pair.
