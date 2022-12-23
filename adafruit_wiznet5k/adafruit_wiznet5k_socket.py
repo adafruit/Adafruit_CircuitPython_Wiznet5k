@@ -273,11 +273,11 @@ class socket:
             )
             self._buffer = b""
 
-    def listen(self, backlog: Optional[int] = None) -> None:
+    def listen(self, backlog: int = 0) -> None:
         """
-        Listen on the port specified by bind.
+        Enable a server to accept connections.
 
-        :param Optional[int] backlog: Included for compatibility but ignored.
+        :param int backlog: Included for compatibility but ignored.
         """
         assert self._listen_port is not None, "Use bind to set the port before listen!"
         _the_interface.socket_listen(self._socknum, self._listen_port)
@@ -285,8 +285,7 @@ class socket:
 
     def accept(
         self,
-    ) -> Optional[Tuple[socket, Tuple[Union[str, bytearray], Union[int, bytearray]],]]:
-        # wiznet5k.adafruit_wiznet5k_socket.socket,
+    ) -> Tuple[socket, Tuple[str, int]]:
         """
         Accept a connection.
 
@@ -296,17 +295,18 @@ class socket:
         socket object to send and receive data on the connection, and address is
         the address bound to the socket on the other end of the connection.
 
-        :return Optional[Tuple[socket.socket, Tuple[Union[str, bytearray], Union[int, bytearray]]]:
-            If successful (socket object, (IP address, port)). If errors occur, the IP address
-            and / or the port may be returned as bytearrays.
+        :returns OptionalTuple[socket, Tuple[str, int]]: TThe return value is a pair
+        (conn, address) where conn is a new socket object to send and receive data on
+        the connection, and address is the address bound to the socket on the other
+        end of the connection.
         """
         stamp = time.monotonic()
         while self._status not in (
             wiznet5k.adafruit_wiznet5k.SNSR_SOCK_SYNRECV,
             wiznet5k.adafruit_wiznet5k.SNSR_SOCK_ESTABLISHED,
         ):
-            if self._timeout > 0 and time.monotonic() - stamp > self._timeout:
-                return None
+            if 0 < self._timeout < time.monotonic() - stamp:
+                raise TimeoutError("Failed to accept connection.")
             if self._status == wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSED:
                 self.close()
                 self.listen()
@@ -316,8 +316,12 @@ class socket:
         # Create a new socket object and swap socket nums, so we can continue listening
         client_sock = socket()
         # TODO: See if this can be done with setattr
-        client_sock._socknum = current_socknum  # pylint: disable=protected-access
-        self._socknum = new_listen_socknum  # pylint: disable=protected-access
+        client_sock.__setattr__(  # pylint: disable=unnecessary-dunder-call
+            "_socknum", current_socknum
+        )
+        self.__setattr__(  # pylint: disable=unnecessary-dunder-call
+            "_socknum", new_listen_socknum
+        )
         self.bind((None, self._listen_port))
         self.listen()
         while self._status != wiznet5k.adafruit_wiznet5k.SNSR_SOCK_LISTEN:
