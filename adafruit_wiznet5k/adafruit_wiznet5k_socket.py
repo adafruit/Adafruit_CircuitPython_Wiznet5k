@@ -373,15 +373,27 @@ class socket:
         gc.collect()
         return bytes_sent
 
-    def sendto(self, data: bytearray, address: [Tuple[str, int]]) -> None:
+    # def sendto(self, data: bytearray, address: [Tuple[str, int]]) -> int:
+
+    def sendto(self, data: bytearray, *flags_and_or_address: any) -> int:
         """
         Connect to a remote socket and send data.
 
         :param bytearray data: Data to send to the socket.
-        :param tuple address: Remote socket as a (host, port) tuple.
+
+        Either:
+        :param [Tuple[str, int]] address: Remote socket as a (host, port) tuple.
+
+        Or:
+        :param int flags: Not implemented, kept for compatibility.
+        :param Tuple[int, Tuple(str, int)] address: Remote socket as a (host, port) tuple
         """
-        # TODO: Implement optional flags.
-        # TODO: Should return number of bytes sent (can of worms opened)
+        # May be calle with (data, address) or (data, flags, address)
+        other_args = list(flags_and_or_address)
+        if len(other_args) in (1, 2):
+            address = other_args[-1]
+        else:
+            raise ValueError("Incorrect number of arguments, should be 2 or 3.")
         self.connect(address)
         return self.send(data)
 
