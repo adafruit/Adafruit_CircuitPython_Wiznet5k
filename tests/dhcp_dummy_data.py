@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2022 Martin Stephens
 #
 # SPDX-License-Identifier: MIT
-"""Data for use in test_dhcp.py"""
+"""Data for use in test_dhcp_helper_files.py"""
 
 
 def _pad_message(message_section: bytearray, target_length: int) -> bytearray:
