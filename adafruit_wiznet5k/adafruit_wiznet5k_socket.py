@@ -228,14 +228,15 @@ class socket:
             self.close()
         return result
 
-    def getpeername(self) -> Union[str, bytearray]:
+    def getpeername(self) -> Tuple[str, int]:
         """
         Return the remote address to which the socket is connected.
 
-        :return Union[str, bytearray]: An IPv4 address (a string of the form '255.255.255.255').
-            An error may return a bytearray.
+        :return Tuple[str, int]: IPv4 address and port the socket is connected to.
         """
-        return _the_interface.remote_ip(self._socknum)
+        return _the_interface.remote_ip(self._socknum), _the_interface.remote_port(
+            self._socknum
+        )
 
     def bind(self, address: Tuple[Optional[str], int]) -> None:
         """Bind the socket to address. The socket must not already be bound.
