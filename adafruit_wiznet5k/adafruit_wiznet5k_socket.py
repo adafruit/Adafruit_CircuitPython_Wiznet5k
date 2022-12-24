@@ -237,19 +237,6 @@ class socket:
         """
         return _the_interface.remote_ip(self._socknum)
 
-    def _inet_aton(self, ip_string: str) -> bytearray:
-        """
-        Convert an IPv4 address from dotted-quad string format.
-
-        :param str ip_string: IPv4 address (a string of the form '255.255.255.255').
-
-        :return bytearray: IPv4 address as a 4 byte bytearray.
-        """
-        self._buffer = b""
-        self._buffer = [int(item) for item in ip_string.split(".")]
-        self._buffer = bytearray(self._buffer)
-        return self._buffer
-
     def bind(self, address: Tuple[Optional[str], int]) -> None:
         """Bind the socket to address. The socket must not already be bound.
 
