@@ -978,9 +978,6 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         """
         assert self.link_status, "Ethernet cable disconnected!"
         assert socket_num <= self.max_sockets, "Provided socket exceeds max_sockets."
-        status = 0
-        ret = 0
-        free_size = 0
         if len(buffer) > SOCK_SIZE:
             ret = SOCK_SIZE
         else:

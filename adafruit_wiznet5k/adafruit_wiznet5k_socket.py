@@ -352,7 +352,7 @@ class socket:
             wiznet5k.adafruit_wiznet5k.SNSR_SOCK_SYNRECV,
             wiznet5k.adafruit_wiznet5k.SNSR_SOCK_ESTABLISHED,
         ):
-            if 0 < self._timeout < time.monotonic() - stamp:
+            if self._timeout and 0 < self._timeout < time.monotonic() - stamp:
                 raise TimeoutError("Failed to accept connection.")
             if self._status == wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSED:
                 self.close()
@@ -403,8 +403,6 @@ class socket:
         gc.collect()
         return bytes_sent
 
-    # def sendto(self, data: bytearray, address: [Tuple[str, int]]) -> int:
-
     def sendto(self, data: bytearray, *flags_and_or_address: any) -> int:
         """
         Connect to a remote socket and send data.
@@ -441,12 +439,11 @@ class socket:
 
         :returns bytes: Data from the socket.
         """
-        stop_time = time.monotonic() + self._timeout
-        if self._timeout != 0.0:
-            while not self._available():
-                if self._timeout is not None and time.monotonic() > stop_time:
-                    break
-                time.sleep(0.05)
+        stamp = time.monotonic()
+        while not self._available():
+            if self._timeout and 0 < self._timeout < time.monotonic() - stamp:
+                break
+            time.sleep(0.05)
         bytes_on_socket = self._available()
         if not bytes_on_socket:
             return b""
@@ -561,9 +558,13 @@ class socket:
                     self._buffer += _the_interface.socket_read(self._socknum, avail)[1]
                 elif self._sock_type == SOCK_DGRAM:
                     self._buffer += _the_interface.read_udp(self._socknum, avail)[1]
-            if not avail and 0 < self._timeout < time.monotonic() - stamp:
-                self.close()
-                raise RuntimeError("Didn't receive response, failing out...")
+                if (
+                    self._timeout
+                    and not avail
+                    and 0 < self._timeout < time.monotonic() - stamp
+                ):
+                    self.close()
+                    raise RuntimeError("Didn't receive response, failing out...")
         firstline, self._buffer = self._buffer.split(b"\r\n", 1)
         gc.collect()
         return firstline
@@ -585,17 +586,22 @@ class socket:
         """
         return _the_interface.socket_available(self._socknum, self._sock_type)
 
-    def settimeout(self, value: float) -> None:
+    def settimeout(self, value: Optional[float]) -> None:
         """
-        Set the socket read timeout.
+        Set a timeout on blocking socket operations. The value argument can be a
+        non-negative floating point number expressing seconds, or None. If a non-zero
+        value is given, subsequent socket operations will raise a timeout exception
+        if the timeout period value has elapsed before the operation has completed.
+        If zero is given, the socket is put in non-blocking mode. If None is given,
+        the socket is put in blocking mode..
 
-        :param float value: Socket read timeout in seconds.
-
+        :param fOptional[float] value: Socket read timeout in seconds.
         """
         # TODO: Implement None and 0.0 as valid once all socket funcs can handle them.
-        if value < 0:
-            raise ValueError("Timeout period should be non-negative.")
-        self._timeout = value
+        if value is None or (isinstance(value, (int, float)) and value >= 0):
+            self._timeout = value
+        else:
+            raise ValueError("Timeout must be None, 0.0 or a positive numeric value.")
 
     def gettimeout(self) -> Optional[float]:
         """
