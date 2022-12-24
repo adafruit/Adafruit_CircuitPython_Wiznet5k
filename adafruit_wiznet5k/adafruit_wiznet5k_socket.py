@@ -251,27 +251,38 @@ class socket:
         return self._buffer
 
     def bind(self, address: Tuple[Optional[str], int]) -> None:
-        """Bind the socket to the listen port.
+        """Bind the socket to address. The socket must not already be bound.
 
-        If the host is specified the interface will be reconfigured to that IP address.
+        The hardware sockets on WIZNET5K systems all share the same IPv4 address that
+        was assigned at startup. Ports can only be bound to this address.
 
-        :param Tuple[Optional[str], int] address: Address as a (host, port) tuple. The host
-            may be an IPv4 address (a string of the form '255.255.255.255'), or None.
-            The port number is in the range (0 - 65536).
+        :param Tuple[Optional[str], int] address: Address as a (host, port) tuple.
+
+        :raises ValueError: If the IPv4 address specified is not the address
+            assigned to the WIZNET5K interface.
         """
-        if address[0] is not None:
-            ip_address = _the_interface.unpretty_ip(address[0])
-            current_ip, subnet_mask, gw_addr, dns = _the_interface.ifconfig
-            if ip_address != current_ip:
-                _the_interface.ifconfig = (ip_address, subnet_mask, gw_addr, dns)
-        self._listen_port = address[1]
-        # For UDP servers we need to open the socket here because we won't call
-        # listen
-        if self._sock_type == SOCK_DGRAM:
-            _the_interface.socket_listen(
-                self._socknum, self._listen_port, wiznet5k.adafruit_wiznet5k.SNMR_UDP
-            )
-            self._buffer = b""
+        if not self._listen_port:
+            if gethostbyname(address[0]) != _the_interface.pretty_ip(
+                _the_interface.ip_address
+            ):
+                raise ValueError(
+                    "The IPv4 address requested must match {}, "
+                    "the one assigned to the WIZNET5K interface.".format(
+                        _the_interface.pretty_ip(_the_interface.ip_address)
+                    )
+                )
+            self._listen_port = address[1]
+            # For UDP servers we need to open the socket here because we won't call
+            # listen
+            if self._sock_type == SOCK_DGRAM:
+                _the_interface.socket_listen(
+                    self._socknum,
+                    self._listen_port,
+                    wiznet5k.adafruit_wiznet5k.SNMR_UDP,
+                )
+                self._buffer = b""
+        else:
+            raise ConnectionError("The socket is already bound.")
 
     def listen(self, backlog: int = 0) -> None:
         """
@@ -376,7 +387,7 @@ class socket:
         :param int flags: Not implemented, kept for compatibility.
         :param Tuple[int, Tuple(str, int)] address: Remote socket as a (host, port) tuple
         """
-        # May be calle with (data, address) or (data, flags, address)
+        # May be called with (data, address) or (data, flags, address)
         other_args = list(flags_and_or_address)
         if len(other_args) in (1, 2):
             address = other_args[-1]
