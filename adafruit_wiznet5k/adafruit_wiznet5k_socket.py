@@ -146,8 +146,6 @@ class socket:
         type: int = SOCK_STREAM,
         proto: int = 0,
         fileno: Optional[int] = None,
-        # TODO: Remove socknum
-        socknum: Optional[int] = None,
     ) -> None:
         """
         :param int family: Socket address (and protocol) family, defaults to AF_INET.
