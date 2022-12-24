@@ -303,6 +303,17 @@ class DHCP:
         self._dhcp_state = next_state
 
     def _handle_dhcp_message(self) -> None:
+        """Receive and process DHCP message then update the finite state machine (FSM).
+
+        Wait for a response from the DHCP server, resending on an exponential fallback
+        schedule if no response is received. Process the response, sending messages,
+        setting attributes, and setting next FSM state according to the current state.
+
+        Only called when the FSM is in SELECTING or REQUESTING states.
+
+        :raises RuntimeError: If the FSM is in blocking mode and no valid response has
+            been received before the timeout expires.
+        """
         # pylint: disable=too-many-branches
         global _BUFF  # pylint: disable=global-statement
         while True:
@@ -348,7 +359,7 @@ class DHCP:
                     return
             self._next_resend = self._next_retry_time_and_retry()
             if self._retries > self._max_retries:
-                raise RuntimeError(
+                raise TimeoutError(
                     "No response from DHCP server after {}".format(self._max_retries)
                 )
             if not self._blocking:
