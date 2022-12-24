@@ -30,6 +30,22 @@ import adafruit_wiznet5k as wiznet5k
 
 # pylint: disable=invalid-name
 _the_interface: Optional[WIZNET5K] = None
+_default_socket_timeout = None
+
+
+def _is_ipv4_string(ipv4_address: str) -> bool:
+    """Check for a valid IPv4 address in dotted-quad string format
+    (for example, "123.45.67.89").
+
+    :param: str ipv4_address: The string to test.
+
+    :returns bool: True if a valid IPv4 address, False otherwise.
+    """
+    octets = ipv4_address.split(".", 3)
+    if len(octets) == 4 and "".join(octets).isdigit():
+        if all((0 <= int(octet) <= 255 for octet in octets)):
+            return True
+    return False
 
 
 def set_interface(iface: WIZNET5K) -> None:
@@ -40,6 +56,30 @@ def set_interface(iface: WIZNET5K) -> None:
     """
     global _the_interface  # pylint: disable=global-statement, invalid-name
     _the_interface = iface
+
+
+def getdefaulttimeout():
+    """
+    Return the default timeout in seconds (float) for new socket objects. A value of
+    None indicates that new socket objects have no timeout. When the socket module is
+    first imported, the default is None.
+    """
+    return _default_socket_timeout
+
+
+def setdefaulttimeout(timeout: Optional[float]) -> None:
+    """
+    Set the default timeout in seconds (float) for new socket objects. When the socket
+    module is first imported, the default is None. See settimeout() for possible values
+    and their respective meanings.
+
+    :param Optional[float] timeout: The default timeout in seconds or None.
+    """
+    global _default_socket_timeout  # pylint: disable=global-statement
+    if timeout is None or (isinstance(timeout, (int, float)) and timeout >= 0):
+        _default_socket_timeout = timeout
+    else:
+        raise ValueError("Timeout must be None, 0.0 or a positive numeric value.")
 
 
 def htonl(x: int) -> int:
@@ -64,6 +104,40 @@ def htons(x: int) -> int:
     return ((x << 8) & 0xFF00) | ((x >> 8) & 0xFF)
 
 
+def inet_aton(ip_address: str) -> bytes:
+    """
+    Convert an IPv4 address from dotted-quad string format (for example, "123.45.67.89")
+    to 32-bit packed binary format, as a bytes object four characters in length. This is
+    useful when conversing with a program that uses the standard C library and needs
+    objects of type struct in_addr, which is the C type for the 32-bit packed binary this
+    function returns.
+
+    :param str ip_address: The IPv4 address to convert.
+
+    :returns bytes: The converted IPv4 address.
+    """
+    if not _is_ipv4_string(ip_address):
+        raise ValueError("The IPv4 address must be a dotted-quad string.")
+    return _the_interface.unpretty_ip(ip_address)
+
+
+def inet_ntoa(ip_address: Union[bytes, bytearray]) -> str:
+    """
+    Convert a 32-bit packed IPv4 address (a bytes-like object four bytes in length) to
+    its standard dotted-quad string representation (for example, ‘123.45.67.89’). This is
+    useful when conversing with a program that uses the standard C library and needs
+    objects of type struct in_addr, which is the C type for the 32-bit packed binary data
+    this function takes as an argument.
+
+    :param Union[bytes, bytearray ip_address: The IPv4 address to convert.
+
+    :returns str: The converted ip_address:
+    """
+    if len(ip_address) != 4:
+        raise ValueError("The IPv4 address must be 4 bytes.")
+    return _the_interface.pretty_ip(ip_address)
+
+
 SOCK_STREAM = const(0x21)  # TCP
 TCP_MODE = 80
 SOCK_DGRAM = const(0x02)  # UDP
@@ -72,6 +146,8 @@ SOCKET_INVALID = const(255)
 
 
 # pylint: disable=too-many-arguments, unused-argument
+
+
 def getaddrinfo(
     host: str,
     port: int,
@@ -84,7 +160,7 @@ def getaddrinfo(
     Translate the host/port argument into a sequence of 5-tuples that contain all the necessary
     arguments for creating a socket connected to that service.
 
-    :param str host: a domain name, a string representation of an IPv4/v6 address or
+    :param str host: a domain name, a string representation of an IPv4 address or
         None.
     :param int port: Port number to connect to (0 - 65536).
     :param int family: Ignored and hardcoded as 0x03 (the only family implemented) by the function.
@@ -97,12 +173,7 @@ def getaddrinfo(
     """
     if not isinstance(port, int):
         raise ValueError("Port must be an integer")
-    octets = host.split(".", 3)
-    if len(octets) == 4 and "".join(octets).isdigit():
-        for octet in octets:
-            if int(octet) > 255:
-                pass
-    else:
+    if not _is_ipv4_string(host):
         host = gethostbyname(host)
     return [(AF_INET, socktype, proto, "", (host, port))]
 
@@ -147,7 +218,7 @@ class socket:
             raise RuntimeError("Only AF_INET family supported by W5K modules.")
         self._sock_type = type
         self._buffer = b""
-        self._timeout = 0
+        self._timeout = _default_socket_timeout
         self._listen_port = None
 
         self._socknum = _the_interface.get_socket()
@@ -169,15 +240,6 @@ class socket:
         while self._status != wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSED:
             if time.monotonic() - stamp > 1000:
                 raise RuntimeError("Failed to close socket")
-
-    @property
-    def _socknum(self) -> int:
-        """
-        Return the socket object's socket number.
-
-        :return int: Socket number.
-        """
-        return self._socknum
 
     @property
     def _status(self) -> int:
@@ -300,13 +362,8 @@ class socket:
         current_socknum = self._socknum
         # Create a new socket object and swap socket nums, so we can continue listening
         client_sock = socket()
-        # TODO: See if this can be done with setattr
-        client_sock.__setattr__(  # pylint: disable=unnecessary-dunder-call
-            "_socknum", current_socknum
-        )
-        self.__setattr__(  # pylint: disable=unnecessary-dunder-call
-            "_socknum", new_listen_socknum
-        )
+        client_sock._socknum = current_socknum  # pylint: disable=protected-access
+        self._socknum = new_listen_socknum
         self.bind((None, self._listen_port))
         self.listen()
         while self._status != wiznet5k.adafruit_wiznet5k.SNSR_SOCK_LISTEN:
