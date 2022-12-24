@@ -97,9 +97,14 @@ def getaddrinfo(
     """
     if not isinstance(port, int):
         raise RuntimeError("Port must be an integer")
-    if is_ipv4(host):
-        return [(AF_INET, socktype, proto, "", (host, port))]
-    return [(AF_INET, socktype, proto, "", (gethostbyname(host), port))]
+    octets = host.split(".", 3)
+    if len(octets) == 4 and "".join(octets).isdigit():
+        for octet in octets:
+            if int(octet) > 255:
+                pass
+    else:
+        host = gethostbyname(host)
+    return [(AF_INET, socktype, proto, "", (host, port))]
 
 
 def gethostbyname(hostname: str) -> str:
@@ -115,7 +120,7 @@ def gethostbyname(hostname: str) -> str:
     return address
 
 
-def is_ipv4(host: str) -> bool:
+def _is_ipv4(host: str) -> bool:
     """
     Check if a hostname is an IPv4 address (a string of the form '0.0.0.0').
 
