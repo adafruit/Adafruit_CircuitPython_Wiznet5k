@@ -96,7 +96,7 @@ def getaddrinfo(
     :return List[Tuple[int, int, int, str, Tuple[str, int]]]: Address info entries.
     """
     if not isinstance(port, int):
-        raise RuntimeError("Port must be an integer")
+        raise ValueError("Port must be an integer")
     octets = host.split(".", 3)
     if len(octets) == 4 and "".join(octets).isdigit():
         for octet in octets:
@@ -118,23 +118,6 @@ def gethostbyname(hostname: str) -> str:
     address = _the_interface.get_host_by_name(hostname)
     address = "{}.{}.{}.{}".format(address[0], address[1], address[2], address[3])
     return address
-
-
-def _is_ipv4(host: str) -> bool:
-    """
-    Check if a hostname is an IPv4 address (a string of the form '0.0.0.0').
-
-    :param str host: Hostname to check.
-
-    :return bool:
-    """
-    octets = host.split(".", 3)
-    if len(octets) != 4 or not "".join(octets).isdigit():
-        return False
-    for octet in octets:
-        if int(octet) > 255:
-            return False
-    return True
 
 
 # pylint: disable=invalid-name, too-many-public-methods
