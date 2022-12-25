@@ -289,18 +289,20 @@ class socket:
         )
 
     def bind(self, address: Tuple[Optional[str], int]) -> None:
-        """Bind the socket to address. The socket must not already be bound.
+        """
+        Bind the socket to address. The socket must not already be bound.
 
-        The hardware sockets on WIZNET5K systems all share the same IPv4 address that
-        was assigned at startup. Ports can only be bound to this address.
+        The hardware sockets on WIZNET5K systems all share the same IPv4 address. The
+        address is assigned at startup. Ports can only be bound to this address.
 
         :param Tuple[Optional[str], int] address: Address as a (host, port) tuple.
 
         :raises ValueError: If the IPv4 address specified is not the address
             assigned to the WIZNET5K interface.
         """
-        if self._listen_port:
-            raise ConnectionError("The socket is already bound.")
+        # Check is disabled to allow socket.accept to swap sockets.
+        # if self._listen_port:
+        #     raise ConnectionError("The socket is already bound.")
         if address[0]:
             if gethostbyname(address[0]) != _the_interface.pretty_ip(
                 _the_interface.ip_address

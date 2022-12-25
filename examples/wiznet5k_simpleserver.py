@@ -18,7 +18,7 @@ cs = digitalio.DigitalInOut(board.D10)
 spi_bus = busio.SPI(board.SCK, MOSI=board.MOSI, MISO=board.MISO)
 
 # Initialize ethernet interface
-eth = WIZNET5K(spi_bus, cs, is_dhcp=False)
+eth = WIZNET5K(spi_bus, cs, is_dhcp=True)
 
 # Initialize a socket for our server
 socket.set_interface(eth)
