@@ -9,7 +9,7 @@
 
 A socket compatible interface with the Wiznet5k module.
 
-* Author(s): ladyada, Brent Rubell, Patrick Van Oosterwijck, Adam Cummick
+* Author(s): ladyada, Brent Rubell, Patrick Van Oosterwijck, Adam Cummick, Martin Stephens
 
 """
 from __future__ import annotations
@@ -39,7 +39,7 @@ def _is_ipv4_string(ipv4_address: str) -> bool:
 
     :param: str ipv4_address: The string to test.
 
-    :returns bool: True if a valid IPv4 address, False otherwise.
+    :return bool: True if a valid IPv4 address, False otherwise.
     """
     octets = ipv4_address.split(".", 3)
     if len(octets) == 4 and "".join(octets).isdigit():
@@ -58,9 +58,9 @@ def set_interface(iface: WIZNET5K) -> None:
     _the_interface = iface
 
 
-def getdefaulttimeout():
+def getdefaulttimeout() -> Optional[float]:
     """
-    Return the default timeout in seconds (float) for new socket objects. A value of
+    Return the default timeout in seconds for new socket objects. A value of
     None indicates that new socket objects have no timeout. When the socket module is
     first imported, the default is None.
     """
@@ -114,7 +114,7 @@ def inet_aton(ip_address: str) -> bytes:
 
     :param str ip_address: The IPv4 address to convert.
 
-    :returns bytes: The converted IPv4 address.
+    :return bytes: The converted IPv4 address.
     """
     if not _is_ipv4_string(ip_address):
         raise ValueError("The IPv4 address must be a dotted-quad string.")
@@ -131,7 +131,7 @@ def inet_ntoa(ip_address: Union[bytes, bytearray]) -> str:
 
     :param Union[bytes, bytearray ip_address: The IPv4 address to convert.
 
-    :returns str: The converted ip_address:
+    :return str: The converted ip_address:
     """
     if len(ip_address) != 4:
         raise ValueError("The IPv4 address must be 4 bytes.")
@@ -152,7 +152,7 @@ def getaddrinfo(
     host: str,
     port: int,
     family: int = 0,
-    socktype: int = 0,
+    soc_type: int = 0,
     proto: int = 0,
     flags: int = 0,
 ) -> List[Tuple[int, int, int, str, Tuple[str, int]]]:
@@ -164,23 +164,28 @@ def getaddrinfo(
         None.
     :param int port: Port number to connect to (0 - 65536).
     :param int family: Ignored and hardcoded as 0x03 (the only family implemented) by the function.
-    :param int socktype: The type of socket, either SOCK_STREAM (0x21) for TCP or SOCK_DGRAM (0x02)
-        for UDP, defaults to 0x00.
+    :param int soc_type: The type of socket, either SOCK_STREAM (0x21) for TCP or SOCK_DGRAM (0x02)
+        for UDP, defaults to 0.
     :param int proto: Unused in this implementation of socket.
     :param int flags: Unused in this implementation of socket.
 
-    :return List[Tuple[int, int, int, str, Tuple[str, int]]]: Address info entries.
+    :return List[Tuple[int, int, int, str, Tuple[str, int]]]: Address info entries in the form
+        (family, type, proto, canonname, sockaddr). In these tuples, family, type, proto are meant
+        to be passed to the socket() function. canonname will always be an empty string, sockaddr
+        is a tuple describing a socket address, whose format is (address, port), and is meant to be
+        passed to the socket.connect() method.
     """
     if not isinstance(port, int):
         raise ValueError("Port must be an integer")
     if not _is_ipv4_string(host):
         host = gethostbyname(host)
-    return [(AF_INET, socktype, proto, "", (host, port))]
+    return [(AF_INET, soc_type, proto, "", (host, port))]
 
 
 def gethostbyname(hostname: str) -> str:
     """
-    Lookup a host name's IPv4 address.
+    Translate a host name to IPv4 address format. The IPv4 address is returned as a string, such
+    as '100.50.200.5'. If the host name is an IPv4 address itself it is returned unchanged.
 
     :param str hostname: Hostname to lookup.
 
@@ -214,7 +219,6 @@ class socket:
             defaults to SOCK_STREAM.
         :param int proto: Unused, retained for compatibility.
         :param Optional[int] fileno: Unused, retained for compatibility.
-        :param Optional[int] socknum: Unused, retained for compatibility.
         """
         if family != AF_INET:
             raise RuntimeError("Only AF_INET family supported by W5K modules.")
@@ -300,7 +304,7 @@ class socket:
         :raises ValueError: If the IPv4 address specified is not the address
             assigned to the WIZNET5K interface.
         """
-        # Check is disabled to allow socket.accept to swap sockets.
+        # Check to see if the socket is bound is disabled to allow socket.accept to swap sockets.
         # if self._listen_port:
         #     raise ConnectionError("The socket is already bound.")
         if address[0]:
@@ -338,15 +342,9 @@ class socket:
         self,
     ) -> Tuple[socket, Tuple[str, int]]:
         """
-        Accept a connection.
+        Accept a connection. The socket must be bound to an address and listening for connections.
 
-        The socket must be bound to an address and listening for connections.
-
-        The return value is a pair (conn, address) where conn is a new
-        socket object to send and receive data on the connection, and address is
-        the address bound to the socket on the other end of the connection.
-
-        :returns OptionalTuple[socket, Tuple[str, int]]: TThe return value is a pair
+        :return Tuple[socket, Tuple[str, int]]: The return value is a pair
         (conn, address) where conn is a new socket object to send and receive data on
         the connection, and address is the address bound to the socket on the other
         end of the connection.
@@ -395,8 +393,6 @@ class socket:
 
     def send(self, data: Union[bytes, bytearray]) -> int:
         """
-        Send data to the socket.
-
         Send data to the socket. The socket must be connected to a remote socket.
         Applications are responsible for checking that all data has been sent; if
         only some of the data was transmitted, the application needs to attempt
@@ -404,7 +400,7 @@ class socket:
 
         :param bytearray data: Data to send to the socket.
 
-        :returns int: Number of bytes sent.
+        :return int: Number of bytes sent.
         """
         bytes_sent = _the_interface.socket_write(self._socknum, data, self._timeout)
         gc.collect()
@@ -412,14 +408,15 @@ class socket:
 
     def sendto(self, data: bytearray, *flags_and_or_address: any) -> int:
         """
-        Connect to a remote socket and send data.
-
-        :param bytearray data: Data to send to the socket.
+        Send data to the socket. The socket should not be connected to a remote socket, since the
+        destination socket is specified by address. Return the number of bytes sent..
 
         Either:
+        :param bytearray data: Data to send to the socket.
         :param [Tuple[str, int]] address: Remote socket as a (host, port) tuple.
 
         Or:
+        :param bytearray data: Data to send to the socket.
         :param int flags: Not implemented, kept for compatibility.
         :param Tuple[int, Tuple(str, int)] address: Remote socket as a (host, port) tuple
         """
@@ -439,12 +436,13 @@ class socket:
         flags: int = 0,
     ) -> bytes:
         """
-        Receive data from the socket.
+        Receive data from the socket. The return value is a bytes object representing the data
+        received. The maximum amount of data to be received at once is specified by bufsize.
 
         :param int bufsize: Maximum number of bytes to receive.
         :param int flags: ignored, present for compatibility.
 
-        :returns bytes: Data from the socket.
+        :return bytes: Data from the socket.
         """
         stamp = time.monotonic()
         while not self._available():
@@ -488,13 +486,15 @@ class socket:
 
     def recvfrom(self, bufsize: int, flags: int = 0) -> Tuple[bytes, Tuple[str, int]]:
         """
-        Receive data from the socket.
+        Receive data from the socket. The return value is a pair (bytes, address) where bytes is
+        a bytes object representing the data received and address is the address of the socket
+        sending the data.
 
         :param int bufsize: Maximum number of bytes to receive.
         :param int flags: Ignored, present for compatibility.
 
         :return Tuple[bytes, Tuple[str, int]]: a tuple (bytes, address)
-            where address is a tuple (ip, port)
+            where address is a tuple (address, port)
         """
         return (
             self.recv(bufsize),
@@ -527,13 +527,14 @@ class socket:
     ) -> Tuple[int, Tuple[str, int]]:
         """
         Receive data from the socket, writing it into buffer instead of creating a new bytestring.
+        The return value is a pair (nbytes, address) where nbytes is the number of bytes received
+        and address is the address of the socket sending the data.
 
         :param bytearray buffer: Data buffer.
         :param int nbytes: Maximum number of bytes to receive.
         :param int flags: Unused, present for compatibility.
 
-        :return Tuple[int, Tuple[str, int]]: A tuple (nbytes, address) where nbytes is the
-        number of bytes received and address is a tuple (IPv4 address, port).
+        :return Tuple[int, Tuple[str, int]]: The number of bytes and address.
         """
         return (
             self.recv_into(buffer, nbytes),
@@ -579,7 +580,10 @@ class socket:
         _the_interface.socket_disconnect(self._socknum)
 
     def close(self) -> None:
-        """Close the socket."""
+        """
+        Mark the socket closed. Once that happens, all future operations on the socket object
+        will fail. The remote end will receive no more data.
+        """
         _the_interface.socket_close(self._socknum)
 
     def _available(self) -> int:
@@ -608,11 +612,44 @@ class socket:
 
     def gettimeout(self) -> Optional[float]:
         """
-        Timeout associated with socket operations.
+        Return the timeout in seconds (float) associated with socket operations, or None if no
+        timeout is set. This reflects the last call to setblocking() or settimeout().
 
         :return Optional[float]: Timeout in seconds, or None if no timeout is set.
         """
         return self._timeout
+
+    def setblocking(self, flag: bool) -> None:
+        """
+        Set blocking or non-blocking mode of the socket: if flag is false, the socket is set
+        to non-blocking, else to blocking mode.
+
+        This method is a shorthand for certain settimeout() calls:
+
+        sock.setblocking(True) is equivalent to sock.settimeout(None)
+        sock.setblocking(False) is equivalent to sock.settimeout(0.0)
+
+        :param bool flag: The blocking mode of the socket.
+
+        :raises TypeError: If flag is not a bool.
+
+        """
+        if flag is True:
+            self.settimeout(None)
+        elif flag is False:
+            self.settimeout(0.0)
+        else:
+            raise TypeError("Flag must be a boolean.")
+
+    def getblocking(self) -> bool:
+        """
+        Return True if socket is in blocking mode, False if in non-blocking.
+
+        This is equivalent to checking socket.gettimeout() == 0.
+
+        :return bool: Blocking mode of the socket.
+        """
+        return self.gettimeout() == 0
 
     @property
     def family(self) -> int:
