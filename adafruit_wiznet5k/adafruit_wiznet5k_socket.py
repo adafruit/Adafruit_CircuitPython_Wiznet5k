@@ -345,9 +345,9 @@ class socket:
         Accept a connection. The socket must be bound to an address and listening for connections.
 
         :return Tuple[socket, Tuple[str, int]]: The return value is a pair
-        (conn, address) where conn is a new socket object to send and receive data on
-        the connection, and address is the address bound to the socket on the other
-        end of the connection.
+            (conn, address) where conn is a new socket object to send and receive data on
+            the connection, and address is the address bound to the socket on the other
+            end of the connection.
         """
         stamp = time.monotonic()
         while self._status not in (
