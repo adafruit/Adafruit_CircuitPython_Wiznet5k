@@ -15,6 +15,8 @@ ethernet modules.
 """
 from __future__ import annotations
 
+import gc
+
 try:
     from typing import TYPE_CHECKING, Union, Tuple
 
@@ -54,7 +56,7 @@ class DNS:
         self,
         iface: WIZNET5K,
         dns_address: Union[str, Tuple[int, int, int, int]],
-        debug: bool = False,
+        debug: bool = True,
     ) -> None:
         """
         :param adafruit_wiznet5k.WIZNET5K: Ethernet network connection.
@@ -66,7 +68,6 @@ class DNS:
         socket.set_interface(iface)
         self._sock = socket.socket(type=socket.SOCK_DGRAM)
         self._sock.settimeout(1)
-
         self._dns_server = dns_address
         self._host = b""
         self._request_id = 0  # request identifier
@@ -80,6 +81,7 @@ class DNS:
 
         :return Union[int, bytes] The IPv4 address if successful, -1 otherwise.
         """
+
         if self._dns_server is None:
             return INVALID_SERVER
         self._host = hostname
@@ -88,7 +90,7 @@ class DNS:
         self._build_dns_question()
 
         # Send DNS request packet
-        self._sock.bind((None, DNS_PORT))
+        self._sock.bind(("", DNS_PORT))
         self._sock.connect((self._dns_server, DNS_PORT))
         if self._debug:
             print("* DNS: Sending request packet...")
@@ -225,6 +227,7 @@ class DNS:
                 print("* DNS ERROR: Unexpected Data Length: ", data_len)
             return -1
         ptr += 2
+        gc.collect()
         # Return address
         return self._pkt_buf[ptr : ptr + 4]
 

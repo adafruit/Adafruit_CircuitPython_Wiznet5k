@@ -186,6 +186,8 @@ def gethostbyname(hostname: str) -> str:
 
     :return str: IPv4 address (a string of the form '0.0.0.0').
     """
+    if _is_ipv4_string(hostname):
+        return hostname
     address = _the_interface.get_host_by_name(hostname)
     address = "{}.{}.{}.{}".format(address[0], address[1], address[2], address[3])
     return address
@@ -297,7 +299,9 @@ class socket:
         :raises ValueError: If the IPv4 address specified is not the address
             assigned to the WIZNET5K interface.
         """
-        if not self._listen_port:
+        if self._listen_port:
+            raise ConnectionError("The socket is already bound.")
+        if address[0]:
             if gethostbyname(address[0]) != _the_interface.pretty_ip(
                 _the_interface.ip_address
             ):
@@ -307,18 +311,16 @@ class socket:
                         _the_interface.pretty_ip(_the_interface.ip_address)
                     )
                 )
-            self._listen_port = address[1]
-            # For UDP servers we need to open the socket here because we won't call
-            # listen
-            if self._sock_type == SOCK_DGRAM:
-                _the_interface.socket_listen(
-                    self._socknum,
-                    self._listen_port,
-                    wiznet5k.adafruit_wiznet5k.SNMR_UDP,
-                )
-                self._buffer = b""
-        else:
-            raise ConnectionError("The socket is already bound.")
+        self._listen_port = address[1]
+        # For UDP servers we need to open the socket here because we won't call
+        # listen
+        if self._sock_type == SOCK_DGRAM:
+            _the_interface.socket_listen(
+                self._socknum,
+                self._listen_port,
+                wiznet5k.adafruit_wiznet5k.SNMR_UDP,
+            )
+            self._buffer = b""
 
     def listen(self, backlog: int = 0) -> None:
         """
@@ -379,7 +381,10 @@ class socket:
         if self._listen_port is not None:
             _the_interface.src_port = self._listen_port
         result = _the_interface.socket_connect(
-            self._socknum, bytes(gethostbyname(address[0])), address[1], self._sock_type
+            self._socknum,
+            _the_interface.unpretty_ip(gethostbyname(address[0])),
+            address[1],
+            self._sock_type,
         )
         _the_interface.src_port = 0
         if not result:
@@ -467,8 +472,6 @@ class socket:
 
         :return bytes: All data available from the connection.
         """
-        # print("Socket read", bufsize)
-        ret = None
         avail = self._available()
         if avail:
             if self._sock_type == SOCK_STREAM:
@@ -477,7 +480,6 @@ class socket:
                 self._buffer += _the_interface.read_udp(self._socknum, avail)[1]
         gc.collect()
         ret = self._buffer
-        # print("RET ptr:", id(ret), id(self._buffer))
         self._buffer = b""
         gc.collect()
         return ret
@@ -597,7 +599,6 @@ class socket:
 
         :param fOptional[float] value: Socket read timeout in seconds.
         """
-        # TODO: Implement None and 0.0 as valid once all socket funcs can handle them.
         if value is None or (isinstance(value, (int, float)) and value >= 0):
             self._timeout = value
         else:

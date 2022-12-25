@@ -267,8 +267,9 @@ class DHCP:
 
         :return Union[Tuple[int, bytes], Tuple[int, int]]: DHCP packet type.
         """
+        global _BUFF  # pylint: disable=global-statement
         # store packet in buffer
-        _BUFF = self._sock.recv()
+        _BUFF = bytearray(self._sock.recv(len(_BUFF)))
         if self._debug:
             print("DHCP Response: ", _BUFF)
 
@@ -403,8 +404,10 @@ class DHCP:
                 self._dhcp_state = STATE_DHCP_WAIT
             else:
                 self._sock.settimeout(self._response_timeout)
-                self._sock.bind((None, 68))
-                self._sock.connect((self.dhcp_server_ip, DHCP_SERVER_PORT))
+                self._sock.bind(("", 68))
+                self._sock.connect(
+                    (".".join(map(str, self.dhcp_server_ip)), DHCP_SERVER_PORT)
+                )
                 if self._last_lease_time == 0 or time.monotonic() > (
                     self._last_lease_time + self._lease_time
                 ):
@@ -423,7 +426,7 @@ class DHCP:
                     self._dhcp_state = STATE_DHCP_REQUEST
 
         elif self._dhcp_state == STATE_DHCP_DISCOVER:
-            if self._sock.available():
+            if self._sock._available():  # pylint: disable=protected-access
                 if self._debug:
                     print("* DHCP: Parsing OFFER")
                 msg_type, xid = self.parse_dhcp_response()
@@ -448,7 +451,7 @@ class DHCP:
                         print("* DHCP: Received DHCP Message is not OFFER")
 
         elif self._dhcp_state == STATE_DHCP_REQUEST:
-            if self._sock.available():
+            if self._sock._available():  # pylint: disable=protected-access
                 if self._debug:
                     print("* DHCP: Parsing ACK")
                 msg_type, xid = self.parse_dhcp_response()

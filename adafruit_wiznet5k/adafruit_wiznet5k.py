@@ -264,11 +264,13 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         :return Union[int, bytes]: a 4 bytearray.
         """
         if self._debug:
-            print("* Get host by name")
+            print(f"* Get host by name : {hostname}")
         if isinstance(hostname, str):
             hostname = bytes(hostname, "utf-8")
         # Return IP assigned by DHCP
-        _dns_client = dns.DNS(self, self._dns, debug=self._debug)
+        _dns_client = dns.DNS(
+            self, self.pretty_ip(bytearray(self._dns)), debug=self._debug
+        )
         ret = _dns_client.gethostbyname(hostname)
         if self._debug:
             print("* Resolved IP: ", ret)
