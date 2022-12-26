@@ -354,7 +354,7 @@ class DHCP:
                                 self._sock.close()
                                 self._sock = None
                                 self._dhcp_state = STATE_BOUND
-                            return
+                                return
                 if not self._blocking:
                     return
             self._next_resend = self._next_retry_time_and_retry()
