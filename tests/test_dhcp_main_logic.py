@@ -281,6 +281,20 @@ class TestHandleDhcpMessage:
         dhcp_mock_5k_with_socket._handle_dhcp_message()
 
         assert dhcp_mock_5k_with_socket._renew is True
+        assert dhcp_mock_5k_with_socket._dhcp_state == wiz_dhcp.STATE_INIT
+
+    @freeze_time("2022-06-10")
+    def test_requesting_with_renew_ack(self, dhcp_mock_5k_with_socket):
+        dhcp_mock_5k_with_socket._sock.available.return_value = 32
+        dhcp_mock_5k_with_socket._next_resend = time.monotonic() + 5
+        dhcp_mock_5k_with_socket._dhcp_state = wiz_dhcp.STATE_REQUESTING
+        dhcp_mock_5k_with_socket._parse_dhcp_response.return_value = wiz_dhcp.DHCP_ACK
+        dhcp_mock_5k_with_socket._renew = True
+
+        dhcp_mock_5k_with_socket._handle_dhcp_message()
+
+        assert dhcp_mock_5k_with_socket._renew is False
+        assert dhcp_mock_5k_with_socket._sock is None
         assert dhcp_mock_5k_with_socket._dhcp_state == wiz_dhcp.STATE_BOUND
 
     @freeze_time("2022-06-10")
@@ -293,7 +307,7 @@ class TestHandleDhcpMessage:
         dhcp_mock_5k_with_socket._handle_dhcp_message()
 
         assert dhcp_mock_5k_with_socket._renew is True
-        assert dhcp_mock_5k_with_socket._dhcp_state == wiz_dhcp.STATE_BOUND
+        assert dhcp_mock_5k_with_socket._dhcp_state == wiz_dhcp.STATE_REQUESTING
 
     @freeze_time("2022-06-10", auto_tick_seconds=1000)
     def test_requesting_with_timeout(self, dhcp_mock_5k_with_socket):
@@ -306,7 +320,7 @@ class TestHandleDhcpMessage:
         dhcp_mock_5k_with_socket._handle_dhcp_message()
 
         assert dhcp_mock_5k_with_socket._renew is True
-        assert dhcp_mock_5k_with_socket._dhcp_state == wiz_dhcp.STATE_BOUND
+        assert dhcp_mock_5k_with_socket._dhcp_state == wiz_dhcp.STATE_REQUESTING
 
 
 class TestStateMachine:
@@ -348,8 +362,8 @@ class TestStateMachine:
                 20.0,
                 wiz_dhcp.STATE_BOUND,
             ),
-            (60.0, wiz_dhcp.STATE_RENEWING),
-            (110.0, wiz_dhcp.STATE_REBINDING),
+            (60.0, wiz_dhcp.STATE_BOUND),
+            (110.0, wiz_dhcp.STATE_BOUND),
             (160.0, wiz_dhcp.STATE_INIT),
         ),
     )

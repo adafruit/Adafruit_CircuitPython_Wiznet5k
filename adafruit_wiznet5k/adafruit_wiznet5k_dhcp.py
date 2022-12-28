@@ -314,10 +314,40 @@ class DHCP:
         :raises TimeoutError: If the FSM is in blocking mode and no valid response has
             been received before the timeout expires.
         """
-        # pylint: disable=too-many-branches
         global _BUFF  # pylint: disable=global-statement
-        if self._dhcp_state == STATE_REQUESTING and self._renew:
-            self._dhcp_state = STATE_BOUND
+
+        def state_selecting_processed():
+            """Process a message while the FSM is in SELECTING state."""
+            if self._dhcp_state == STATE_SELECTING and msg_type == DHCP_OFFER:
+                self._send_message_set_next_state(
+                    next_state=STATE_REQUESTING,
+                    max_retries=3,
+                )
+                return True
+            return False
+
+        def state_requesting_processed():
+            """Process a message while the FSM is in REQUESTING state."""
+            if self._dhcp_state == STATE_REQUESTING:
+                if msg_type == DHCP_NAK:
+                    self._dhcp_state = STATE_INIT
+                    return True
+                if msg_type == DHCP_ACK:
+                    if self._lease_time == 0:
+                        self._lease_time = DEFAULT_LEASE_TIME
+                    self._t1 = self._start_time + self._lease_time // 2
+                    self._t2 = (
+                        self._start_time + self._lease_time - self._lease_time // 8
+                    )
+                    self._lease_time += self._start_time
+                    self._increment_transaction_id()
+                    self._renew = False
+                    self._sock.close()
+                    self._sock = None
+                    self._dhcp_state = STATE_BOUND
+                    return True
+            return False
+
         while True:
             while time.monotonic() < self._next_resend:
                 if self._sock.available():
@@ -328,35 +358,10 @@ class DHCP:
                         if self._debug:
                             print(error)
                     else:
-                        if (
-                            self._dhcp_state == STATE_SELECTING
-                            and msg_type == DHCP_OFFER
-                        ):
-                            self._send_message_set_next_state(
-                                next_state=STATE_REQUESTING,
-                                max_retries=3,
-                            )
+                        if state_selecting_processed():
                             return
-                        if self._dhcp_state == STATE_REQUESTING:
-                            if msg_type == DHCP_NAK:
-                                self._dhcp_state = STATE_INIT
-                                return
-                            if msg_type == DHCP_ACK:
-                                if self._lease_time == 0:
-                                    self._lease_time = DEFAULT_LEASE_TIME
-                                self._t1 = self._start_time + self._lease_time // 2
-                                self._t2 = (
-                                    self._start_time
-                                    + self._lease_time
-                                    - self._lease_time // 8
-                                )
-                                self._lease_time += self._start_time
-                                self._increment_transaction_id()
-                                self._renew = False
-                                self._sock.close()
-                                self._sock = None
-                                self._dhcp_state = STATE_BOUND
-                                return
+                        if state_requesting_processed():
+                            return
                 if not self._blocking:
                     return
             self._next_resend = self._next_retry_time_and_retry()
@@ -419,6 +424,9 @@ class DHCP:
             self._max_retries = 3
             self._handle_dhcp_message()
 
+        if self._renew:
+            self._dhcp_state = STATE_BOUND
+
     def _generate_dhcp_message(
         self,
         *,
@@ -437,25 +445,25 @@ class DHCP:
         """
 
         def option_writer(
-            pointer: int, option_code: int, option_data: Union[Tuple[int, ...], bytes]
+            offset: int, option_code: int, option_data: Union[Tuple[int, ...], bytes]
         ) -> int:
             """Helper function to set DHCP option data for a DHCP
             message.
 
-            :param int pointer: Pointer to start of a DHCP option.
+            :param int offset: Pointer to start of a DHCP option.
             :param int option_code: Type of option to add.
             :param Tuple[int] option_data: The data for the option.
 
             :returns int: Pointer to next option.
             """
             global _BUFF  # pylint: disable=global-variable-not-assigned
-            _BUFF[pointer] = option_code
+            _BUFF[offset] = option_code
             data_length = len(option_data)
-            pointer += 1
-            _BUFF[pointer] = data_length
-            pointer += 1
-            data_end = pointer + data_length
-            _BUFF[pointer:data_end] = option_data
+            offset += 1
+            _BUFF[offset] = data_length
+            offset += 1
+            data_end = offset + data_length
+            _BUFF[offset:data_end] = option_data
             return data_end
 
         global _BUFF  # pylint: disable=global-variable-not-assigned
@@ -481,24 +489,24 @@ class DHCP:
 
         # Option - DHCP Message Type
         pointer = option_writer(
-            pointer=pointer, option_code=53, option_data=(message_type,)
+            offset=pointer, option_code=53, option_data=(message_type,)
         )
         # Option - Host Name
         pointer = option_writer(
-            pointer=pointer, option_code=12, option_data=self._hostname
+            offset=pointer, option_code=12, option_data=self._hostname
         )
         if message_type == DHCP_REQUEST:
             # Request subnet mask, router and DNS server.
             pointer = option_writer(
-                pointer=pointer, option_code=55, option_data=(1, 3, 6)
+                offset=pointer, option_code=55, option_data=(1, 3, 6)
             )
             # Set Requested IP Address to offered IP address.
             pointer = option_writer(
-                pointer=pointer, option_code=50, option_data=self.local_ip
+                offset=pointer, option_code=50, option_data=self.local_ip
             )
             # Set Server ID to chosen DHCP server IP address.
             pointer = option_writer(
-                pointer=pointer, option_code=54, option_data=self.dhcp_server_ip
+                offset=pointer, option_code=54, option_data=self.dhcp_server_ip
             )
         _BUFF[pointer] = 0xFF
 
