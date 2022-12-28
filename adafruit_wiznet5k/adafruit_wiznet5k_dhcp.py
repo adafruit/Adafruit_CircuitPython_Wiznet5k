@@ -316,6 +316,8 @@ class DHCP:
         """
         # pylint: disable=too-many-branches
         global _BUFF  # pylint: disable=global-statement
+        if self._dhcp_state == STATE_REQUESTING and self._renew:
+            self._dhcp_state = STATE_BOUND
         while True:
             while time.monotonic() < self._next_resend:
                 if self._sock.available():
@@ -358,7 +360,7 @@ class DHCP:
                 if not self._blocking:
                     return
             self._next_resend = self._next_retry_time_and_retry()
-            if self._retries > self._max_retries:
+            if self._retries > self._max_retries and not self._renew:
                 raise TimeoutError(
                     "No response from DHCP server after {} retries.".format(
                         self._max_retries
@@ -370,57 +372,52 @@ class DHCP:
     def _dhcp_state_machine(self, *, blocking: bool = False) -> None:
         """I'll get to it"""
 
-        global _BUFF  # pylint: disable=global-variable-not-assigned, global-statement
         self._blocking = blocking
+        if self._dhcp_state == STATE_BOUND:
+            now = time.monotonic()
+            if now < self._t1:
+                return
+            if now > self._lease_time:
+                self._blocking = True
+                self._dhcp_state = STATE_INIT
+            elif now > self._t2:
+                self._dhcp_state = STATE_REBINDING
+            else:
+                self._dhcp_state = STATE_RENEWING
 
-        while self._eth.link_status:
-            if self._dhcp_state == STATE_BOUND:
-                now = time.monotonic()
-                if now < self._t1:
-                    return
-                if now > self._lease_time:
-                    self._blocking = True
-                    self._dhcp_state = STATE_INIT
-                elif now > self._t2:
-                    self._dhcp_state = STATE_REBINDING
-                else:
-                    self._dhcp_state = STATE_RENEWING
+        if self._dhcp_state == STATE_RENEWING:
+            self._renew = True
+            self._socket_setup()
+            self._start_time = time.monotonic()
+            self._send_message_set_next_state(
+                next_state=STATE_REQUESTING,
+                max_retries=3,
+            )
 
-            if self._dhcp_state == STATE_RENEWING:
-                self._renew = True
-                self._socket_setup()
-                self._start_time = time.monotonic()
-                self._send_message_set_next_state(
-                    next_state=STATE_REQUESTING,
-                    max_retries=3,
-                )
+        if self._dhcp_state == STATE_REBINDING:
+            self._renew = True
+            self.dhcp_server_ip = BROADCAST_SERVER_ADDR
+            self._socket_setup()
+            self._start_time = time.monotonic()
+            self._send_message_set_next_state(
+                next_state=STATE_REQUESTING,
+                max_retries=3,
+            )
 
-            if self._dhcp_state == STATE_REBINDING:
-                self._renew = True
-                self.dhcp_server_ip = BROADCAST_SERVER_ADDR
-                self._socket_setup()
-                self._send_message_set_next_state(
-                    next_state=STATE_REQUESTING,
-                    max_retries=3,
-                )
+        if self._dhcp_state == STATE_INIT:
+            self._dsm_reset()
+            self._send_message_set_next_state(
+                next_state=STATE_SELECTING,
+                max_retries=3,
+            )
 
-            if self._dhcp_state == STATE_INIT:
-                self._dsm_reset()
-                self._send_message_set_next_state(
-                    next_state=STATE_SELECTING,
-                    max_retries=3,
-                )
+        if self._dhcp_state == STATE_SELECTING:
+            self._max_retries = 3
+            self._handle_dhcp_message()
 
-            if self._dhcp_state == STATE_SELECTING:
-                self._max_retries = 3
-                self._handle_dhcp_message()
-
-            if self._dhcp_state == STATE_REQUESTING:
-                self._max_retries = 3
-                self._handle_dhcp_message()
-            if not self._blocking:
-                break
-        self._blocking = False
+        if self._dhcp_state == STATE_REQUESTING:
+            self._max_retries = 3
+            self._handle_dhcp_message()
 
     def _generate_dhcp_message(
         self,
