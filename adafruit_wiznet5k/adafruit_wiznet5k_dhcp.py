@@ -311,7 +311,7 @@ class DHCP:
 
         Only called when the FSM is in SELECTING or REQUESTING states.
 
-        :raises RuntimeError: If the FSM is in blocking mode and no valid response has
+        :raises TimeoutError: If the FSM is in blocking mode and no valid response has
             been received before the timeout expires.
         """
         # pylint: disable=too-many-branches
@@ -360,7 +360,9 @@ class DHCP:
             self._next_resend = self._next_retry_time_and_retry()
             if self._retries > self._max_retries:
                 raise TimeoutError(
-                    "No response from DHCP server after {}".format(self._max_retries)
+                    "No response from DHCP server after {} retries.".format(
+                        self._max_retries
+                    )
                 )
             if not self._blocking:
                 return

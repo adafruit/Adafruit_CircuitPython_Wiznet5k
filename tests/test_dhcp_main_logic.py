@@ -136,3 +136,112 @@ class TestHandleDhcpMessage:
         elif fsm_state == wiz_dhcp.STATE_REQUESTING:  # Not called for STATE_REQUESTING
             dhcp_mock_5k_with_socket._send_message_set_next_state.assert_not_called()
             assert dhcp_mock_5k_with_socket._dhcp_state == next_state
+
+    @freeze_time("2022-06-10")
+    def test_with_no_data_on_socket_blocking(
+        self,
+        dhcp_mock_5k_with_socket,
+    ):
+        # Mock the methods that will be checked for this test.
+        dhcp_mock_5k_with_socket._parse_dhcp_response.return_value = wiz_dhcp.DHCP_OFFER
+        dhcp_mock_5k_with_socket._sock.available.side_effect = [0, 0, 32]
+        # Set up initial values for the test
+        dhcp_mock_5k_with_socket._next_resend = time.monotonic() + 5
+        dhcp_mock_5k_with_socket._dhcp_state = wiz_dhcp.STATE_SELECTING
+        dhcp_mock_5k_with_socket._blocking = True
+        # Test
+        dhcp_mock_5k_with_socket._handle_dhcp_message()
+        # Check response
+        assert dhcp_mock_5k_with_socket._sock.available.call_count == 3
+        dhcp_mock_5k_with_socket._sock.recv.assert_called_once()
+
+    @freeze_time("2022-06-10")
+    def test_with_no_data_on_socket_nonblocking(
+        self,
+        dhcp_mock_5k_with_socket,
+    ):
+        # Mock the methods that will be checked for this test.
+        dhcp_mock_5k_with_socket._parse_dhcp_response.return_value = wiz_dhcp.DHCP_OFFER
+        dhcp_mock_5k_with_socket._sock.available.side_effect = [0, 0, 32]
+        # Set up initial values for the test
+        dhcp_mock_5k_with_socket._next_resend = time.monotonic() + 5
+        dhcp_mock_5k_with_socket._dhcp_state = wiz_dhcp.STATE_SELECTING
+        dhcp_mock_5k_with_socket._blocking = False
+        # Test
+        dhcp_mock_5k_with_socket._handle_dhcp_message()
+        # Check response
+        assert dhcp_mock_5k_with_socket._sock.available.call_count == 1
+        assert dhcp_mock_5k_with_socket._dhcp_state == wiz_dhcp.STATE_SELECTING
+        dhcp_mock_5k_with_socket._sock.recv.assert_not_called()
+
+    @freeze_time("2022-06-10")
+    def test_with_valueerror_nonblocking(
+        self,
+        dhcp_mock_5k_with_socket,
+    ):
+        # Mock the methods that will be checked for this test.
+        dhcp_mock_5k_with_socket._sock.available.return_value = 32
+        dhcp_mock_5k_with_socket._parse_dhcp_response.side_effect = [ValueError]
+        # Set up initial values for the test
+        dhcp_mock_5k_with_socket._next_resend = time.monotonic() + 5
+        dhcp_mock_5k_with_socket._dhcp_state = wiz_dhcp.STATE_SELECTING
+        dhcp_mock_5k_with_socket._blocking = False
+        # Test
+        dhcp_mock_5k_with_socket._handle_dhcp_message()
+        # Check response
+        assert dhcp_mock_5k_with_socket._dhcp_state == wiz_dhcp.STATE_SELECTING
+
+    @freeze_time("2022-06-10")
+    def test_with_valueerror_blocking(
+        self,
+        dhcp_mock_5k_with_socket,
+    ):
+        # Mock the methods that will be checked for this test.
+        dhcp_mock_5k_with_socket._sock.available.return_value = 32
+        dhcp_mock_5k_with_socket._parse_dhcp_response.side_effect = [
+            ValueError,
+            ValueError,
+            wiz_dhcp.DHCP_OFFER,
+        ]
+        # Set up initial values for the test
+        dhcp_mock_5k_with_socket._next_resend = time.monotonic() + 5
+        dhcp_mock_5k_with_socket._dhcp_state = wiz_dhcp.STATE_SELECTING
+        dhcp_mock_5k_with_socket._blocking = True
+        # Test
+        dhcp_mock_5k_with_socket._handle_dhcp_message()
+        # Check response
+        dhcp_mock_5k_with_socket._send_message_set_next_state.assert_called_once_with(
+            next_state=wiz_dhcp.STATE_REQUESTING, max_retries=3
+        )
+
+    @freeze_time("2022-06-10", auto_tick_seconds=1)
+    def test_timeout_blocking(
+        self,
+        dhcp_mock_5k_with_socket,
+    ):
+        # Mock the methods that will be checked for this test.
+        dhcp_mock_5k_with_socket._sock.available.return_value = 0
+        # Set up initial values for the test
+        dhcp_mock_5k_with_socket._next_resend = time.monotonic() + 5
+        dhcp_mock_5k_with_socket._max_retries = 3
+        dhcp_mock_5k_with_socket._dhcp_state = wiz_dhcp.STATE_SELECTING
+        dhcp_mock_5k_with_socket._blocking = True
+        # Test
+        with pytest.raises(TimeoutError):
+            dhcp_mock_5k_with_socket._handle_dhcp_message()
+
+    @freeze_time("2022-06-10", auto_tick_seconds=1)
+    def test_timeout_nonblocking(
+        self,
+        dhcp_mock_5k_with_socket,
+    ):
+        # Mock the methods that will be checked for this test.
+        dhcp_mock_5k_with_socket._sock.available.return_value = 0
+        # Set up initial values for the test
+        dhcp_mock_5k_with_socket._next_resend = time.monotonic() + 5
+        dhcp_mock_5k_with_socket._max_retries = 3
+        dhcp_mock_5k_with_socket._dhcp_state = wiz_dhcp.STATE_SELECTING
+        dhcp_mock_5k_with_socket._blocking = False
+        # Test
+        dhcp_mock_5k_with_socket._handle_dhcp_message()
+        assert dhcp_mock_5k_with_socket._retries == 0
