@@ -365,7 +365,9 @@ class DHCP:
                 if not self._blocking:
                     return
             self._next_resend = self._next_retry_time_and_retry()
-            if self._retries > self._max_retries and not self._renew:
+            if self._retries > self._max_retries:
+                if self._renew:
+                    return
                 raise TimeoutError(
                     "No response from DHCP server after {} retries.".format(
                         self._max_retries
@@ -375,7 +377,10 @@ class DHCP:
                 return
 
     def _dhcp_state_machine(self, *, blocking: bool = False) -> None:
-        """I'll get to it"""
+        """
+        A finite state machine to allow the DHCP lease to be managed without blocking
+        the main program. The initial lease...
+        """
 
         self._blocking = blocking
         if self._dhcp_state == STATE_BOUND:
