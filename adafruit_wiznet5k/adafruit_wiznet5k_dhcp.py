@@ -84,6 +84,12 @@ BUFF_LENGTH = 318
 _BUFF = bytearray(BUFF_LENGTH)
 
 
+def _debugging_message(message: Union[Exception, str], debugging: bool) -> None:
+    """Helper function to print debugging messages."""
+    if debugging:
+        print(message)
+
+
 class DHCP:
     """Wiznet5k DHCP Client.
 
@@ -135,6 +141,7 @@ class DHCP:
         :param bool debug: Enable debugging output.
         """
         self._debug = debug
+        _debugging_message("Initialising DHCP instance.", self._debug)
         self._response_timeout = response_timeout
 
         # Prevent buffer overrun in send_dhcp_message()
@@ -177,16 +184,21 @@ class DHCP:
 
     def request_dhcp_lease(self) -> bool:
         """Request to renew or acquire a DHCP lease."""
+        _debugging_message("Requesting DHCP lease.", self._debug)
         self._dhcp_state_machine(blocking=True)
         return self._dhcp_state == STATE_BOUND
 
-    def maintain_dhcp_lease(self) -> None:
+    def maintain_dhcp_lease(self, blocking: bool = False) -> None:
         """Maintain DHCP lease"""
-        self._dhcp_state_machine()
+        _debugging_message(
+            "Maintaining lease with blocking = {}".format(blocking), self._debug
+        )
+        self._dhcp_state_machine(blocking=blocking)
 
     def _dsm_reset(self) -> None:
         """Close the socket and set attributes to default values used by the
         state machine INIT state."""
+        _debugging_message("Resetting DHCP state machine.", self._debug)
         self._socket_release()
         self.dhcp_server_ip = BROADCAST_SERVER_ADDR
         self._eth.ifconfig = (
@@ -206,6 +218,7 @@ class DHCP:
 
     def _socket_release(self) -> None:
         """Close the socket if it exists."""
+        _debugging_message("Releasing socket.", self._debug)
         if self._sock:
             self._sock.close()
             self._sock = None
@@ -224,8 +237,10 @@ class DHCP:
         :raises TimeoutError: If the FSM is in blocking mode and a socket cannot be
             initialised.
         """
+        _debugging_message("Setting up a socket.", self._debug)
         self._socket_release()
         stop_time = time.monotonic() + timeout
+        _debugging_message("Creating new socket instance for DHCP.", self._debug)
         while not time.monotonic() > stop_time:
             try:
                 self._sock = socket.socket(type=socket.SOCK_DGRAM)
@@ -249,6 +264,7 @@ class DHCP:
 
     def _increment_transaction_id(self) -> None:
         """Increment the transaction ID and roll over from 0x7fffffff to 0."""
+        _debugging_message("Incrementing transaction ID", self._debug)
         self._transaction_id = (self._transaction_id + 1) & 0x7FFFFFFF
 
     def _next_retry_time_and_retry(self, *, interval: int = 4) -> int:
@@ -266,6 +282,9 @@ class DHCP:
 
         :raises ValueError: If the calculated interval is < 1 second.
         """
+        _debugging_message(
+            "Calculating next retry time and incrementing retries.", self._debug
+        )
         delay = int(2**self._retries * interval + randint(-1, 1) + time.monotonic())
         if delay < 1:
             raise ValueError("Retry delay must be >= 1 second")
@@ -288,6 +307,10 @@ class DHCP:
 
         :raises ValueError: If the next FSM state does not handle DHCP messages.
         """
+        _debugging_message(
+            "Setting next FSM state to {} and sending a message.".format(next_state),
+            self._debug,
+        )
         if next_state not in (STATE_SELECTING, STATE_REQUESTING):
             raise ValueError("The next state must be SELECTING or REQUESTING.")
         if next_state == STATE_SELECTING:
@@ -314,6 +337,7 @@ class DHCP:
 
         :returns int: The number of bytes stored in the global buffer.
         """
+        _debugging_message("Receiving a DHCP response.", self._debug)
         # DHCP returns the query plus additional data. The query length is 236 bytes.
         minimum_packet_length = 236
         buffer = bytearray(b"")
@@ -325,6 +349,7 @@ class DHCP:
             bytes_read = len(buffer)
             if bytes_read == BUFF_LENGTH:
                 break
+        _debugging_message("Received {} bytes".format(bytes_read), self._debug)
         if bytes_read < minimum_packet_length:
             bytes_read = 0
         else:
@@ -350,6 +375,9 @@ class DHCP:
         def processing_state_selecting():
             """Process a message while the FSM is in SELECTING state."""
             if self._dhcp_state == STATE_SELECTING and msg_type == DHCP_OFFER:
+                _debugging_message(
+                    "FSM state is SELECTING with valid OFFER.", self._debug
+                )
                 self._send_message_set_next_state(
                     next_state=STATE_REQUESTING,
                     max_retries=3,
@@ -360,10 +388,17 @@ class DHCP:
         def processing_state_requesting():
             """Process a message while the FSM is in REQUESTING state."""
             if self._dhcp_state == STATE_REQUESTING:
+                _debugging_message("FSM state is REQUESTING.", self._debug)
                 if msg_type == DHCP_NAK:
+                    _debugging_message(
+                        "Message is NAK, setting FSM state to INIT.", self._debug
+                    )
                     self._dhcp_state = STATE_INIT
                     return True
                 if msg_type == DHCP_ACK:
+                    _debugging_message(
+                        "Message is ACK, setting FSM state to BOUND.", self._debug
+                    )
                     if self._lease_time == 0:
                         self._lease_time = DEFAULT_LEASE_TIME
                     self._t1 = self._start_time + self._lease_time // 2
@@ -379,20 +414,24 @@ class DHCP:
             return False
 
         # Main processing loop
+        _debugging_message("Processing SELECTING or REQUESTING state.", self._debug)
         while True:
             while time.monotonic() < self._next_resend:
                 if self._receive_dhcp_response():
                     try:
                         msg_type = self._parse_dhcp_response()
+                        _debugging_message(
+                            "Received message type {}".format(msg_type), self._debug
+                        )
                     except ValueError as error:
-                        if self._debug:
-                            print(error)
+                        _debugging_message(error, self._debug)
                     else:
                         if processing_state_selecting():
                             return
                         if processing_state_requesting():
                             return
                 if not self._blocking:
+                    _debugging_message("Nonblocking, exiting loop.", self._debug)
                     return
             self._next_resend = self._next_retry_time_and_retry()
             if self._retries > self._max_retries:
@@ -404,6 +443,9 @@ class DHCP:
                     )
                 )
             if not self._blocking:
+                _debugging_message(
+                    "Nonblocking, returning from message function.", self._debug
+                )
                 return
 
     def _dhcp_state_machine(self, *, blocking: bool = False) -> None:
@@ -411,18 +453,33 @@ class DHCP:
         A finite state machine to allow the DHCP lease to be managed without blocking
         the main program. The initial lease...
         """
-
+        _debugging_message(
+            "DHCP FSM called with blocking={}".format(blocking), self._debug
+        )
+        _debugging_message(
+            "FSM initial state is {}".format(self._dhcp_state), self._debug
+        )
         self._blocking = blocking
         if self._dhcp_state == STATE_BOUND:
             now = time.monotonic()
             if now < self._t1:
+                _debugging_message("No timers have expired. Exiting FSM.", self._debug)
                 return
             if now > self._lease_time:
+                _debugging_message(
+                    "Lease has expired, switching state to INIT.", self._debug
+                )
                 self._blocking = True
                 self._dhcp_state = STATE_INIT
             elif now > self._t2:
+                _debugging_message(
+                    "T2 has expired, switching state to REBINDING.", self._debug
+                )
                 self._dhcp_state = STATE_REBINDING
             else:
+                _debugging_message(
+                    "T1 has expired, switching state to RENEWING.", self._debug
+                )
                 self._dhcp_state = STATE_RENEWING
 
         if self._dhcp_state == STATE_RENEWING:
@@ -460,6 +517,10 @@ class DHCP:
             self._handle_dhcp_message()
 
         if self._renew:
+            _debugging_message(
+                "Lease has not expired, setting state to BOUND and exiting FSM.",
+                self._debug,
+            )
             self._dhcp_state = STATE_BOUND
 
     def _generate_dhcp_message(
@@ -491,7 +552,6 @@ class DHCP:
 
             :returns int: Pointer to next option.
             """
-            global _BUFF  # pylint: disable=global-variable-not-assigned
             _BUFF[offset] = option_code
             data_length = len(option_data)
             offset += 1
@@ -501,8 +561,8 @@ class DHCP:
             _BUFF[offset:data_end] = option_data
             return data_end
 
-        global _BUFF  # pylint: disable=global-variable-not-assigned
-        _BUFF[:] = bytearray(b"\x00" * BUFF_LENGTH)
+        # global _BUFF  # pylint: disable=global-variable-not-assigned
+        _BUFF[:] = bytearray(BUFF_LENGTH)
         # OP.HTYPE.HLEN.HOPS
         _BUFF[0:4] = (DHCP_BOOT_REQUEST, DHCP_HTYPE10MB, DHCP_HLENETHERNET, DHCP_HOPS)
         # Transaction ID (xid)
@@ -570,7 +630,6 @@ class DHCP:
             :returns Tuple[int, int, bytes]: Pointer to next option,
                 option type, and option data.
             """
-            global _BUFF  # pylint: disable=global-variable-not-assigned
             option_type = _BUFF[pointer]
             pointer += 1
             data_length = _BUFF[pointer]
@@ -581,7 +640,7 @@ class DHCP:
 
         # Validate OP
         if _BUFF[0] != DHCP_BOOT_REPLY:
-            raise ValueError("DHCP message OP is not expected BOOTP Reply.")
+            raise ValueError("DHCP message is not the expected DHCP Reply.")
         # Confirm transaction IDs match.
         xid = _BUFF[4:8]
         if xid != self._transaction_id.to_bytes(4, "big"):
@@ -619,164 +678,22 @@ class DHCP:
             elif data_type == 0:
                 break
 
-        if self._debug:
-            print(
-                "Msg Type: {}\nSubnet Mask: {}\nDHCP Server IP: {}\nDNS Server IP: {}\
+        _debugging_message(
+            "Msg Type: {}\nSubnet Mask: {}\nDHCP Server IP: {}\nDNS Server IP: {}\
                   \nGateway IP: {}\nLocal IP: {}\nT1: {}\nT2: {}\nLease Time: {}".format(
-                    msg_type,
-                    self.subnet_mask,
-                    self.dhcp_server_ip,
-                    self.dns_server_ip,
-                    self.gateway_ip,
-                    self.local_ip,
-                    self._t1,
-                    self._t2,
-                    self._lease_time,
-                )
-            )
-
+                msg_type,
+                self.subnet_mask,
+                self.dhcp_server_ip,
+                self.dns_server_ip,
+                self.gateway_ip,
+                self.local_ip,
+                self._t1,
+                self._t2,
+                self._lease_time,
+            ),
+            self._debug,
+        )
         gc.collect()
         if msg_type is None:
             raise ValueError("No valid message type in response.")
         return msg_type
-
-    # # pylint: disable=too-many-branches, too-many-statements
-    # def _dhcp_state_machine(self) -> None:
-    #     """
-    #     DHCP state machine without wait loops to enable cooperative multitasking.
-    #     This state machine is used both by the initial blocking lease request and
-    #     the non-blocking DHCP maintenance function.
-    #     """
-    #     if self._eth.link_status:
-    #         if self._dhcp_state == STATE_DHCP_DISCONN:
-    #             self._dhcp_state = STATE_DHCP_START
-    #     else:
-    #         if self._dhcp_state != STATE_DHCP_DISCONN:
-    #             self._dhcp_state = STATE_DHCP_DISCONN
-    #             self.dhcp_server_ip = BROADCAST_SERVER_ADDR
-    #             self._last_lease_time = 0
-    #             reset_ip = (0, 0, 0, 0)
-    #             self._eth.ifconfig = (reset_ip, reset_ip, reset_ip, reset_ip)
-    #             if self._sock is not None:
-    #                 self._sock.close()
-    #                 self._sock = None
-    #
-    #     if self._dhcp_state == STATE_DHCP_START:
-    #         self._start_time = time.monotonic()
-    #         self._transaction_id = (self._transaction_id + 1) & 0x7FFFFFFF
-    #         try:
-    #             self._sock = socket.socket(type=socket.SOCK_DGRAM)
-    #         except RuntimeError:
-    #             if self._debug:
-    #                 print("* DHCP: Failed to allocate socket")
-    #             self._dhcp_state = STATE_DHCP_WAIT
-    #         else:
-    #             self._sock.settimeout(self._response_timeout)
-    #             self._sock.bind((None, 68))
-    #             self._sock.connect((self.dhcp_server_ip, DHCP_SERVER_PORT))
-    #             if self._last_lease_time == 0 or time.monotonic() > (
-    #                 self._last_lease_time + self._lease_time
-    #             ):
-    #                 if self._debug:
-    #                     print("* DHCP: Send discover to {}".format(self.dhcp_server_ip))
-    #                 # self.send_dhcp_message(
-    #                 #     STATE_DHCP_DISCOVER, (time.monotonic() - self._start_time)
-    #                 # )
-    #                 self._dhcp_state = STATE_DHCP_DISCOVER
-    #             else:
-    #                 if self._debug:
-    #                     print("* DHCP: Send request to {}".format(self.dhcp_server_ip))
-    #                 # self.send_dhcp_message(
-    #                 #     DHCP_REQUEST, (time.monotonic() - self._start_time), True
-    #                 # )
-    #                 self._dhcp_state = STATE_DHCP_REQUEST
-    #
-    #     elif self._dhcp_state == STATE_DHCP_DISCOVER:
-    #         if self._sock.available():
-    #             if self._debug:
-    #                 print("* DHCP: Parsing OFFER")
-    #             msg_type, xid = None, None  # self.parse_dhcp_response()
-    #             if msg_type == DHCP_OFFER:
-    #                 # Check if transaction ID matches, otherwise it may be an offer
-    #                 # for another device
-    #                 if htonl(self._transaction_id) == int.from_bytes(xid, "big"):
-    #                     if self._debug:
-    #                         print(
-    #                             "* DHCP: Send request to {}".format(self.dhcp_server_ip)
-    #                         )
-    #                     self._transaction_id = (self._transaction_id + 1) & 0x7FFFFFFF
-    #                     # self.send_dhcp_message(
-    #                     #     DHCP_REQUEST, (time.monotonic() - self._start_time)
-    #                     # )
-    #                     self._dhcp_state = STATE_DHCP_REQUEST
-    #                 else:
-    #                     if self._debug:
-    #                         print("* DHCP: Received OFFER with non-matching xid")
-    #             else:
-    #                 if self._debug:
-    #                     print("* DHCP: Received DHCP Message is not OFFER")
-    #
-    #     elif self._dhcp_state == STATE_DHCP_REQUEST:
-    #         if self._sock.available():
-    #             if self._debug:
-    #                 print("* DHCP: Parsing ACK")
-    #             msg_type, xid = None, None  # self.parse_dhcp_response()
-    #             # Check if transaction ID matches, otherwise it may be
-    #             # for another device
-    #             if htonl(self._transaction_id) == int.from_bytes(xid, "big"):
-    #                 if msg_type == DHCP_ACK:
-    #                     if self._debug:
-    #                         print("* DHCP: Successful lease")
-    #                     self._sock.close()
-    #                     self._sock = None
-    #                     self._dhcp_state = STATE_DHCP_LEASED
-    #                     self._last_lease_time = self._start_time
-    #                     if self._lease_time == 0:
-    #                         self._lease_time = DEFAULT_LEASE_TIME
-    #                     if self._t1 == 0:
-    #                         # T1 is 50% of _lease_time
-    #                         self._t1 = self._lease_time >> 1
-    #                     if self._t2 == 0:
-    #                         # T2 is 87.5% of _lease_time
-    #                         self._t2 = self._lease_time - (self._lease_time >> 3)
-    #                     self._renew_in_sec = self._t1
-    #                     self._rebind_in_sec = self._t2
-    #                     self._eth.ifconfig = (
-    #                         self.local_ip,
-    #                         self.subnet_mask,
-    #                         self.gateway_ip,
-    #                         self.dns_server_ip,
-    #                     )
-    #                     gc.collect()
-    #                 else:
-    #                     if self._debug:
-    #                         print("* DHCP: Received DHCP Message is not ACK")
-    #             else:
-    #                 if self._debug:
-    #                     print("* DHCP: Received non-matching xid")
-    #
-    #     elif self._dhcp_state == STATE_DHCP_WAIT:
-    #         if time.monotonic() > (self._start_time + DHCP_WAIT_TIME):
-    #             if self._debug:
-    #                 print("* DHCP: Begin retry")
-    #             self._dhcp_state = STATE_DHCP_START
-    #             if time.monotonic() > (self._last_lease_time + self._rebind_in_sec):
-    #                 self.dhcp_server_ip = BROADCAST_SERVER_ADDR
-    #             if time.monotonic() > (self._last_lease_time + self._lease_time):
-    #                 reset_ip = (0, 0, 0, 0)
-    #                 self._eth.ifconfig = (reset_ip, reset_ip, reset_ip, reset_ip)
-    #
-    #     elif self._dhcp_state == STATE_DHCP_LEASED:
-    #         if time.monotonic() > (self._last_lease_time + self._renew_in_sec):
-    #             self._dhcp_state = STATE_DHCP_START
-    #             if self._debug:
-    #                 print("* DHCP: Time to renew lease")
-    #
-    #     if self._dhcp_state in (
-    #         STATE_DHCP_DISCOVER,
-    #         STATE_DHCP_REQUEST,
-    #     ) and time.monotonic() > (self._start_time + self._response_timeout):
-    #         self._dhcp_state = STATE_DHCP_WAIT
-    #         if self._sock is not None:
-    #             self._sock.close()
-    #             self._sock = None
