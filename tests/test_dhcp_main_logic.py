@@ -28,6 +28,9 @@ def mock_dhcp(mocker):
     dhcp._sock = mocker.patch(
         "adafruit_wiznet5k.adafruit_wiznet5k_dhcp.socket.socket", autospec=True
     )
+    # Mock the _receive_dhcp_response method to select whether a response was received,
+    # assume a good message.
+    mocker.patch.object(dhcp, "_receive_dhcp_response", autospec=True, return_value=240)
     # Mock the _parse_dhcp_response method to inject message types without supplying
     # fake DHCP message packets.
     mocker.patch.object(dhcp, "_parse_dhcp_response", autospec=True)
@@ -64,12 +67,10 @@ class TestHandleDhcpMessage:
         # Set up initial values for the test.
         # Start FSM in SELECTING state.
         mock_dhcp._dhcp_state = wiz_dhcp.STATE_SELECTING
-        # Receive the expected OFFER message type.
-        mock_dhcp._parse_dhcp_response.return_value = wiz_dhcp.DHCP_OFFER
-        # Have some data on the socket.
-        mock_dhcp._sock.available.return_value = 24
         # Avoid a timeout before checking the message.
         mock_dhcp._next_resend = time.monotonic() + 5
+        # Receive the expected OFFER message type.
+        mock_dhcp._parse_dhcp_response.return_value = wiz_dhcp.DHCP_OFFER
         # Test.
         mock_dhcp._handle_dhcp_message()
         # Confirm that the message would be parsed.
@@ -126,8 +127,6 @@ class TestHandleDhcpMessage:
         mock_dhcp._parse_dhcp_response.return_value = msg_type
         # Receive the incorrect message type.
         mock_dhcp._dhcp_state = fsm_state
-        # Have some data on the socket.
-        mock_dhcp._sock.available.return_value = 32
         # Avoid a timeout before checking the message.
         mock_dhcp._next_resend = time.monotonic() + 5
         # Test an initial negotiation, not a renewal or rebind.
@@ -136,8 +135,7 @@ class TestHandleDhcpMessage:
         mock_dhcp._blocking = False
         # Test.
         mock_dhcp._handle_dhcp_message()
-        # Only one call to recv() (and therefore other methods) because nonblocking.
-        mock_dhcp._sock.recv.assert_called_once()
+        # Only one call methods because nonblocking, so no attempt to get another message.
         mock_dhcp._parse_dhcp_response.assert_called_once()
         mock_dhcp._send_message_set_next_state.assert_not_called()
         # Confirm that the FSM state has not changed.
@@ -199,22 +197,22 @@ class TestHandleDhcpMessage:
         # Set up initial values for the test.
         # Start FSM in required state.
         mock_dhcp._dhcp_state = wiz_dhcp.STATE_SELECTING
+        # Avoid a timeout before checking the message.
+        mock_dhcp._next_resend = time.monotonic() + 5
         # Return a correct message type once data is on the socket.
         mock_dhcp._parse_dhcp_response.return_value = wiz_dhcp.DHCP_OFFER
         # No data on the socket, and finally some data.
-        mock_dhcp._sock.available.side_effect = [0, 0, 32]
-        # Avoid a timeout before checking the message.
-        mock_dhcp._next_resend = time.monotonic() + 5
+        mock_dhcp._receive_dhcp_response.side_effect = [0, 0, 320]
         # Test an initial negotiation, not a renewal or rebind.
         mock_dhcp._renew = False
         # Put FSM into blocking mode so that multiple attempts are made.
         mock_dhcp._blocking = True
         # Test.
         mock_dhcp._handle_dhcp_message()
-        # Check available() called the correct number of times.
-        assert mock_dhcp._sock.available.call_count == 3
+        # Check _receive_dhcp_response called the correct number of times.
+        assert mock_dhcp._receive_dhcp_response.call_count == 3
         # Confirm that only one message was processed.
-        mock_dhcp._sock.recv.assert_called_once()
+        mock_dhcp._parse_dhcp_response.assert_called_once()
 
     @freeze_time("2022-06-10")
     def test_with_no_data_on_socket_nonblocking(
@@ -224,20 +222,20 @@ class TestHandleDhcpMessage:
         # Set up initial values for the test.
         # Start FSM in required state.
         mock_dhcp._dhcp_state = wiz_dhcp.STATE_SELECTING
+        # Avoid a timeout before checking the message.
+        mock_dhcp._next_resend = time.monotonic() + 5
         # Return a correct message type if data is on the socket.
         mock_dhcp._parse_dhcp_response.return_value = wiz_dhcp.DHCP_OFFER
         # No data on the socket, and finally some data.
-        mock_dhcp._sock.available.side_effect = [0, 0, 32]
-        # Avoid a timeout before checking the message.
-        mock_dhcp._next_resend = time.monotonic() + 5
+        mock_dhcp._receive_dhcp_response.side_effect = [0, 0, 320]
         # Test an initial negotiation, not a renewal or rebind.
         mock_dhcp._renew = False
         # Put FSM into nonblocking mode so that a single attempt is made.
         mock_dhcp._blocking = False
         # Test.
         mock_dhcp._handle_dhcp_message()
-        # Available should only be called once in nonblocking mode.
-        mock_dhcp._sock.available.assert_called_once()
+        # Receive should only be called once in nonblocking mode.
+        mock_dhcp._receive_dhcp_response.assert_called_once()
         # Check that no data was read from the socket.
         mock_dhcp._sock.recv.assert_not_called()
         # Confirm that the FSM state has not changed.
@@ -256,8 +254,6 @@ class TestHandleDhcpMessage:
             ValueError,
             ValueError,
         ]
-        # Have some data on the socket.
-        mock_dhcp._sock.available.return_value = 32
         # Avoid a timeout before checking the message.
         mock_dhcp._next_resend = time.monotonic() + 5
         # Test an initial negotiation, not a renewal or rebind.
@@ -266,8 +262,8 @@ class TestHandleDhcpMessage:
         mock_dhcp._blocking = False
         # Test.
         mock_dhcp._handle_dhcp_message()
-        # Available should only be called once in nonblocking mode.
-        mock_dhcp._sock.available.assert_called_once()
+        # Receive should only be called once in nonblocking mode.
+        mock_dhcp._receive_dhcp_response.assert_called_once()
         # Confirm that _send_message_set_next_state not called.
         mock_dhcp._send_message_set_next_state.assert_not_called()
         # Check that FSM state has not changed.
@@ -287,8 +283,6 @@ class TestHandleDhcpMessage:
             ValueError,
             wiz_dhcp.DHCP_OFFER,
         ]
-        # Have some data on the socket.
-        mock_dhcp._sock.available.return_value = 32
         # Avoid a timeout before checking the message.
         mock_dhcp._next_resend = time.monotonic() + 5
         # Test an initial negotiation, not a renewal or rebind.
@@ -298,7 +292,7 @@ class TestHandleDhcpMessage:
         # Test.
         mock_dhcp._handle_dhcp_message()
         # Check available() called three times.
-        assert mock_dhcp._sock.available.call_count == 3
+        assert mock_dhcp._receive_dhcp_response.call_count == 3
         # Confirm that _send_message_set_next_state was called to change FSM state.
         mock_dhcp._send_message_set_next_state.assert_called_once_with(
             next_state=wiz_dhcp.STATE_REQUESTING, max_retries=3

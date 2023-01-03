@@ -346,7 +346,6 @@ class DHCP:
         :raises TimeoutError: If the FSM is in blocking mode and no valid response has
             been received before the timeout expires.
         """
-        global _BUFF  # pylint: disable=global-statement
 
         def processing_state_selecting():
             """Process a message while the FSM is in SELECTING state."""
@@ -379,10 +378,10 @@ class DHCP:
                     return True
             return False
 
+        # Main processing loop
         while True:
             while time.monotonic() < self._next_resend:
-                if self._sock.available():
-                    _BUFF = self._sock.recv()
+                if self._receive_dhcp_response():
                     try:
                         msg_type = self._parse_dhcp_response()
                     except ValueError as error:
@@ -580,7 +579,6 @@ class DHCP:
             option_data = _BUFF[pointer:data_end]
             return data_end, option_type, option_data
 
-        global _BUFF  # pylint: disable=global-variable-not-assigned
         # Validate OP
         if _BUFF[0] != DHCP_BOOT_REPLY:
             raise ValueError("DHCP message OP is not expected BOOTP Reply.")
