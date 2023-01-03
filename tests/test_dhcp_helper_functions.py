@@ -27,6 +27,15 @@ def mock_socket(mocker):
     )
 
 
+@pytest.fixture
+def mock_dhcp(mocker, mock_wiznet5k):
+    dhcp = wiz_dhcp.DHCP(mock_wiznet5k, (1, 2, 3, 4, 5, 6))
+    dhcp._sock = mocker.patch(
+        "adafruit_wiznet5k.adafruit_wiznet5k_dhcp.socket.socket", autospec=True
+    )
+    return dhcp
+
+
 class TestDHCPInit:
     def test_constants(self):
         """Test all the constants in the DHCP module."""
@@ -547,3 +556,62 @@ class TestSmallHelperFunctions:
             dhcp_client._send_message_set_next_state(
                 next_state=next_state, max_retries=4
             )
+
+
+class TestReceiveResponse:
+
+    minimum_packet_length = 236
+
+    @freeze_time("2022-10-10")
+    @pytest.mark.parametrize(
+        "bytes_on_socket", (wiz_dhcp.BUFF_LENGTH, minimum_packet_length + 1)
+    )
+    def test_receive_response_good_data(self, mock_dhcp, bytes_on_socket):
+        mock_dhcp._next_resend = time.monotonic() + 15
+        mock_dhcp._sock.recv.return_value = bytes([0] * bytes_on_socket)
+        response = mock_dhcp._receive_dhcp_response()
+        assert response == bytes_on_socket
+        assert response > 236
+
+    @freeze_time("2022-10-10")
+    @pytest.mark.parametrize(
+        "bytes_on_socket", ([bytes([0] * minimum_packet_length), bytes([0] * 1)],)
+    )
+    def test_receive_response_short_packet(self, mock_dhcp, bytes_on_socket):
+        mock_dhcp._next_resend = time.monotonic() + 15
+        mock_dhcp._sock.recv.side_effect = bytes_on_socket
+        assert mock_dhcp._receive_dhcp_response() > 236
+
+    @freeze_time("2022-10-10", auto_tick_seconds=5)
+    def test_timeout(self, mock_dhcp):
+        mock_dhcp._next_resend = time.monotonic() + 15
+        mock_dhcp._sock.recv.side_effect = [b"", b"", b"", b"", b"", bytes([0] * 240)]
+        assert mock_dhcp._receive_dhcp_response() == 0
+
+    @freeze_time("2022-10-10")
+    @pytest.mark.parametrize("bytes_returned", ([240], [230, 30]))
+    def test_buffer_handling(self, mock_dhcp, bytes_returned):
+        total_bytes = sum(bytes_returned)
+        mock_dhcp._next_resend = time.monotonic() + 15
+        wiz_dhcp._BUFF = bytearray([1] * wiz_dhcp.BUFF_LENGTH)
+        expected_result = bytearray([2] * total_bytes) + (
+            bytes([0] * (wiz_dhcp.BUFF_LENGTH - total_bytes))
+        )
+        mock_dhcp._sock.recv.side_effect = (bytes([2] * x) for x in bytes_returned)
+        assert mock_dhcp._receive_dhcp_response() == total_bytes
+        assert wiz_dhcp._BUFF == expected_result
+
+    @freeze_time("2022-10-10")
+    def test_buffer_does_not_overrun(self, mocker, mock_dhcp):
+        mock_dhcp._next_resend = time.monotonic() + 15
+        mock_dhcp._sock.recv.return_value = bytes([2] * wiz_dhcp.BUFF_LENGTH)
+        mock_dhcp._receive_dhcp_response()
+        mock_dhcp._sock.recv.assert_called_once_with(wiz_dhcp.BUFF_LENGTH)
+        mock_dhcp._sock.recv.reset_mock()
+        mock_dhcp._sock.recv.side_effect = [bytes([2] * 200), bytes([2] * 118)]
+        mock_dhcp._receive_dhcp_response()
+        assert mock_dhcp._sock.recv.call_count == 2
+        assert mock_dhcp._sock.recv.call_args_list == [
+            mocker.call(318),
+            mocker.call(118),
+        ]

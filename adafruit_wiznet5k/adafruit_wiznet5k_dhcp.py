@@ -91,16 +91,16 @@ class DHCP:
     to run in a non-blocking mode suitable for CircuitPython.
 
     The DHCP client obtains a lease and maintains it. The process of obtaining the initial
-    lease is best run in a blocking mode, as several messages must be exchanged with the DHCP
+    lease is run in a blocking mode, as several messages must be exchanged with the DHCP
     server. Once the lease has been allocated, lease maintenance can be performed in
     non-blocking mode as nothing needs to be done until it is time to reallocate the
     lease. Renewing or rebinding is a simpler process which may be repeated periodically
     until successful. If the lease expires, the client attempts to obtain a new lease in
     blocking mode when the maintenance routine is run.
 
-    In most circumstances, call `DHCP.request_lease` in blocking mode to obtain a
-    lease, then periodically call `DHCP.maintain_lease` in non-blocking mode so that the
-    FSM can check whether the lease needs to be renewed, and can then renew it.
+    In most circumstances, call `DHCP.request_lease` to obtain a lease, then periodically call
+    `DHCP.maintain_lease` in non-blocking mode so that the FSM can check whether the lease
+    needs to be renewed, and can then renew it.
 
     Since DHCP uses UDP, messages may be lost. The DHCP protocol uses exponential backoff
     for retrying. Retries occur after 4, 8, and 16 seconds (the final retry is followed by
@@ -302,6 +302,38 @@ class DHCP:
         self._retries = 0
         self._dhcp_state = next_state
 
+    def _receive_dhcp_response(self) -> int:
+        """
+        Receive data from the socket in response to a DHCP query.
+
+        Reads data from the buffer until a viable minimum packet size has been
+        received or the operation times out. If a viable packet is received, it is
+        stored in the global buffer and the number of bytes received is returned.
+        If the packet is too short, it is discarded and zero is returned. The
+        maximum packet size is limited by the size of the global buffer.
+
+        :returns int: The number of bytes stored in the global buffer.
+        """
+        # DHCP returns the query plus additional data. The query length is 236 bytes.
+        minimum_packet_length = 236
+        buffer = bytearray(b"")
+        bytes_read = 0
+        while (
+            bytes_read <= minimum_packet_length and time.monotonic() < self._next_resend
+        ):
+            buffer.extend(self._sock.recv(BUFF_LENGTH - bytes_read))
+            bytes_read = len(buffer)
+            if bytes_read == BUFF_LENGTH:
+                break
+        if bytes_read < minimum_packet_length:
+            bytes_read = 0
+        else:
+            _BUFF[:bytes_read] = buffer
+            _BUFF[bytes_read:] = bytearray(BUFF_LENGTH - bytes_read)
+        del buffer
+        gc.collect()
+        return bytes_read
+
     def _handle_dhcp_message(self) -> None:
         """Receive and process DHCP message then update the finite state machine (FSM).
 
@@ -316,7 +348,7 @@ class DHCP:
         """
         global _BUFF  # pylint: disable=global-statement
 
-        def state_selecting_processed():
+        def processing_state_selecting():
             """Process a message while the FSM is in SELECTING state."""
             if self._dhcp_state == STATE_SELECTING and msg_type == DHCP_OFFER:
                 self._send_message_set_next_state(
@@ -326,7 +358,7 @@ class DHCP:
                 return True
             return False
 
-        def state_requesting_processed():
+        def processing_state_requesting():
             """Process a message while the FSM is in REQUESTING state."""
             if self._dhcp_state == STATE_REQUESTING:
                 if msg_type == DHCP_NAK:
@@ -342,8 +374,7 @@ class DHCP:
                     self._lease_time += self._start_time
                     self._increment_transaction_id()
                     self._renew = False
-                    self._sock.close()
-                    self._sock = None
+                    self._socket_release()
                     self._dhcp_state = STATE_BOUND
                     return True
             return False
@@ -358,9 +389,9 @@ class DHCP:
                         if self._debug:
                             print(error)
                     else:
-                        if state_selecting_processed():
+                        if processing_state_selecting():
                             return
-                        if state_requesting_processed():
+                        if processing_state_requesting():
                             return
                 if not self._blocking:
                     return
