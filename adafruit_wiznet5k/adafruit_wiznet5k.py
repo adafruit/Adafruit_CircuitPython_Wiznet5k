@@ -74,6 +74,16 @@ REG_SNRX_RSR = const(0x0026)  # RX Free Size
 REG_SNRX_RD = const(0x0028)  # Read Size Pointer
 REG_SNTX_FSR = const(0x0020)  # Socket n TX Free Size
 REG_SNTX_WR = const(0x0024)  # TX Write Pointer
+# Registers for implementing socketless ARP
+_REG_SLCR = const(0x004C)  # Socketless Command Register
+_REG_SLRTR = const(0x004D)  # Socketless Retransmission Time Register
+_REG_SLRCR = const(0x004F)  # Socketless Retransmission Count Register
+_REG_SLPIPR = const(0x0050)  # Socketless Peer IP Address Register
+_REG_SLPHAR = const(0x0054)  # Socketless Peer Hardware Address Register
+_REG_SLIR = const(0x005F)  # Socketless Peer Interrupt Register
+_MASK_ARP_COMMAND = const(0b00000010)  # Sets the send ARP command
+_MASK_ARP_RECEIVED = const(0b00000010)  # Masks the ARP received bit
+_MASK_ARP_TIMEOUT = const(0b00000100)  # Masks the ARP timeout bit
 
 # SNSR Commands
 SNSR_SOCK_CLOSED = const(0x00)
@@ -1155,3 +1165,45 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             cntl_byte = 0
             return self.read(self._ch_base_msb + sock * CH_SIZE + address, cntl_byte)
         return None
+
+    def ip_in_use(self, ip_addr: bytes) -> bool:
+        """
+        Send an ARP to the IPv4 address supplied and wait for a response.
+
+        A helper function for the DHCP client to confirm that the offered IP address is
+        not in use before setting up the DHCP parameters. May also be called by the user
+        before setting a manual IP address, to make sure that it is not already in use.
+
+        :param bytes ip_addr: The 4 byte IPv4 address to send the ARP to.
+
+        :returns bool: True if the ARP received a response (i.e. the address is already in use),
+            False if the ARP timed out.
+        """
+        if len(ip_addr) != 4:
+            raise ValueError("An IPv4 address must be 4 bytes.")
+        if self.ifconfig[0] != b"/x00/x00x/00x/00":
+            raise ValueError(
+                "send_arp must be called before setting the Wiznet IP address."
+            )
+        if self.mac_address == b"/x00/x00/x00/x00/x00/x00":
+            raise ValueError(
+                "The Wiznet MAC address must be set before calling send_arp."
+            )
+        # Check that no socketless commands are in progress.
+        while self.read(_REG_SLCR, 0x00):
+            time.sleep(0.05)
+        # Set up the ARP parameters.
+        self.write(_REG_SLPIPR, 0x04, ip_addr)  # Set the peer IP address.
+        self.write(_REG_SLRTR, 0x04, 0x0740)  # Set time before retry to 0.2 seconds.
+        self.write(
+            _REG_SLRCR, 0x04, 0x05
+        )  # Set the retry count to 5, total timeout of 1 second.
+        self.write(_REG_SLRCR, 0x04, _MASK_ARP_COMMAND)  # Send the ARP.
+        # Wait for the result.
+        while True:
+            register = self.read(_REG_SLIR, 0x00)
+            if register & _MASK_ARP_RECEIVED:
+                return True
+            if register & _MASK_ARP_TIMEOUT:
+                return False
+            time.sleep(0.05)
