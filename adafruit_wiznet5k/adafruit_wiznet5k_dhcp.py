@@ -550,7 +550,7 @@ class DHCP:
             :param int option_code: Type of option to add.
             :param Tuple[int] option_data: The data for the option.
 
-            :returns int: Pointer to next option.
+            :returns int: Pointer to start of next option.
             """
             _BUFF[offset] = option_code
             data_length = len(option_data)
@@ -697,3 +697,41 @@ class DHCP:
         if msg_type is None:
             raise ValueError("No valid message type in response.")
         return msg_type
+
+    def _ip_in_use(self) -> bool:
+        """
+        Send an ARP to the IPv4 address supplied and wait for a response.
+
+        A helper function for the DHCP client to confirm that the offered IP address is
+        not in use before setting up the DHCP parameters. May also be called by the user
+        before setting a manual IP address, to make sure that it is not already in use.
+
+        According to RFC5227 section 2.1.1 of , we check for ARP Probe or ARPResponse
+        reception from other devices for 1 second after sending ARPProbe. If there is no
+        reception for 1 second, the probe is repeated three times in total, and if there
+        is no reception, it is determined that there is no conflict.
+
+        :param bytes ip_addr: The 4 byte IPv4 address to test for a conflict.
+
+        :returns bool: True if the ARP received a response (i.e. the address is already in use),
+            False if the ARP timed out.
+
+        :raises RuntimeError: If the Ethernet link is down.
+        """
+        # Check link status
+        if not self._eth.link_status:
+            raise RuntimeError("Ethernet link is down")
+        # Store current RTR and RCR and set RTR and RCR to 1 second and 3 retries for DHCP.
+        temp_rcr = self._eth.rcr
+        temp_rtr = self._eth.rtr
+        # Set current retry timer and retry count to 1 sec and 3 tries to match DHCP standard.
+        self._eth.rcr = 3
+        self._eth.rtr = 100000  # 100us * 10000 = 1 second
+        # Send a dummy packet to the assigned address on the DHCP socket.
+        x = self._sock.sendto(
+            b"CHECK_IP_CONFLICT", (self._eth.pretty_ip(self.local_ip), 5000)
+        )
+        # Reset the RTR and RCR registers.
+        self._eth.rcr = temp_rcr
+        self._eth.rtr = temp_rtr
+        return bool(x)
