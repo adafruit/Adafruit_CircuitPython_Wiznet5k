@@ -982,9 +982,6 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         """
         assert self.link_status, "Ethernet cable disconnected!"
         assert socket_num <= self.max_sockets, "Provided socket exceeds max_sockets."
-        status = 0
-        ret = 0
-        free_size = 0
         if len(buffer) > SOCK_SIZE:
             ret = SOCK_SIZE
         else:
@@ -1021,11 +1018,9 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
                 txbuf = buffer[0:size]
                 self.write(dst_addr, 0x00, txbuf)
                 txbuf = buffer[size:ret]
-                size = ret - size
                 dst_addr = socket_num * SOCK_SIZE + 0x4000
                 self.write(dst_addr, 0x00, txbuf)
             else:
-                txbuf = buffer[:ret]
                 self.write(dst_addr, 0x00, buffer[:ret])
 
         # update sn_tx_wr to the value + data size
@@ -1036,9 +1031,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         self._read_sncr(socket_num)
 
         # check data was  transferred correctly
-        while (
-            self._read_socket(socket_num, REG_SNIR)[0] & SNIR_SEND_OK
-        ) != SNIR_SEND_OK:
+        while not self._read_snir(socket_num)[0] & SNIR_SEND_OK:
             if self.socket_status(socket_num)[0] in (
                 SNSR_SOCK_CLOSED,
                 SNSR_SOCK_TIME_WAIT,
@@ -1048,6 +1041,10 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             ) or (timeout and time.monotonic() - stamp > timeout):
                 # self.socket_close(socket_num)
                 return 0
+            if self._read_snir(socket_num)[0] & SNIR_TIMEOUT:
+                raise TimeoutError(
+                    "Hardware timeout while sending on socket {}.".format(socket_num)
+                )
             time.sleep(0.01)
 
         self._write_snir(socket_num, SNIR_SEND_OK)
@@ -1110,8 +1107,15 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
     def _write_sndipr(self, sock: int, ip_addr: bytearray) -> None:
         """Write to socket destination IP Address."""
-        for octet in range(0, 4):
-            self._write_socket(sock, REG_SNDIPR + octet, ip_addr[octet])
+        for offset in range(4):
+            self._write_socket(sock, REG_SNDIPR + offset, ip_addr[offset])
+
+    def _read_sndipr(self, sock) -> bytearray:
+        """Read socket destination IP address."""
+        data = b""
+        for offset in range(4):
+            data += self._read_socket(sock, REG_SIPR + offset)
+        return bytearray(data)
 
     def _write_sndport(self, sock: int, port: int) -> None:
         """Write to socket destination port."""
@@ -1121,6 +1125,10 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
     def _read_snsr(self, sock: int) -> Optional[bytearray]:
         """Read Socket n Status Register."""
         return self._read_socket(sock, REG_SNSR)
+
+    def _read_snir(self, sock: int) -> Optional[bytearray]:
+        """Read Socket n Interrupt Register."""
+        return self._read_socket(sock, REG_SNIR)
 
     def _write_snmr(self, sock: int, protocol: int) -> None:
         """Write to Socket n Mode Register."""
@@ -1207,3 +1215,48 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             # Assume a W5100s
             reg = _REG_RTR_5100s
         self.write(reg, 0x04, retry_count)
+
+    def _ip_address_in_use(self, socknum, local_ip) -> bool:
+        """
+        Send an ARP to the IPv4 address supplied and wait for a response.
+
+        A helper function for the DHCP client to confirm that the offered IP address is
+        not in use before setting up the DHCP parameters. May also be called by the user
+        before setting a manual IP address, to make sure that it is not already in use.
+
+        According to RFC5227 section 2.1.1 of , we check for ARP Probe or ARPResponse
+        reception from other devices for 1 second after sending ARPProbe. If there is no
+        reception for 1 second, the probe is repeated three times in total, and if there
+        is no reception, it is determined that there is no conflict.
+
+        :param bytes local_ip: The 4 byte IPv4 address to test for a conflict.
+        :param int socknum: The socket to test.
+
+        :returns bool: True if the he address is already in use), False if not.
+
+        :raises RuntimeError: If the Ethernet link is down or could not connect to the socket.
+        """
+        # Check link status
+        if not self.link_status:
+            raise RuntimeError("Ethernet link is down")
+        # Store current RTR, RCR and destination IPv4 address.
+        temp_rcr = self.rcr
+        temp_rtr = self.rtr
+        temp_ip = self._read_sndipr(socknum)
+        # Set current retry timer and retry count to 1 sec and 3 tries to match DHCP standard.
+        self.rcr = 3
+        self.rtr = 100000  # 100us * 10000 = 1 second
+        # Send a dummy packet to the assigned address on the DHCP socket to mimic ARP.
+        ip_in_use = True
+        try:
+            if self.socket_connect(socknum, bytes(local_ip), 5000, conn_mode=0x02) != 1:
+                raise RuntimeError("Unable to connect to socket {}.".format(socknum))
+            self.socket_write(socknum, b"CHECK_IP_CONFLICT")
+        except TimeoutError:
+            ip_in_use = False
+        finally:
+            # Reset the RTR, RCR and destination IPv4 registers.
+            self._write_sndipr(socknum, temp_ip)
+            self.rcr = temp_rcr
+            self.rtr = temp_rtr
+        return ip_in_use
