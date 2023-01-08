@@ -28,7 +28,6 @@ import gc
 import time
 from random import randint
 from micropython import const
-import adafruit_wiznet5k.adafruit_wiznet5k_socket as socket
 
 # DHCP State Machine
 STATE_INIT = const(0x01)
@@ -65,8 +64,8 @@ MAX_DHCP_OPT = const(0x10)
 DHCP_SERVER_PORT = const(67)
 # DHCP Lease Time, in seconds
 DEFAULT_LEASE_TIME = const(900)
-BROADCAST_SERVER_ADDR = (255, 255, 255, 255)
-UNASSIGNED_IP_ADDR = (0, 0, 0, 0)
+BROADCAST_SERVER_ADDR = b"/xff/xff/xff/xff"  # (255.255.255.255)
+UNASSIGNED_IP_ADDR = b"/x00/x00/x00/x00"  # (0.0.0.0)
 
 # DHCP Response Options
 MSG_TYPE = 53
@@ -150,7 +149,6 @@ class DHCP:
         self._mac_address = mac_address
 
         # Set socket interface
-        socket.set_interface(eth)
         self._eth = eth
         self._wiz_sock = None
 
@@ -237,8 +235,6 @@ class DHCP:
         :raises TimeoutError: If the FSM is in blocking mode and a socket cannot be
             initialised.
         """
-        _debugging_message("Setting up a socket.", self._debug)
-        self._socket_release()
         stop_time = time.monotonic() + timeout
         _debugging_message("Creating new socket instance for DHCP.", self._debug)
         while not self._wiz_sock and time.monotonic() < stop_time:
@@ -254,6 +250,7 @@ class DHCP:
                 self._eth.read_sncr(self._wiz_sock) == 0
             ):  # Wait for command to complete.
                 time.sleep(0.0001)
+            self._eth.write_sndport(self._wiz_sock, DHCP_SERVER_PORT)
 
     def _increment_transaction_id(self) -> None:
         """Increment the transaction ID and roll over from 0x7fffffff to 0."""
@@ -312,6 +309,8 @@ class DHCP:
             message_type = DHCP_REQUEST
         self._generate_dhcp_message(message_type=message_type)
         self._wiz_sock.send(_BUFF)
+        self._eth.write_sndipr(self._wiz_sock, self.dhcp_server_ip)
+        self._eth.socket_write(self._wiz_sock, _BUFF)
         self._retries = 0
         self._max_retries = max_retries
         self._next_resend = self._next_retry_time_and_retry()
@@ -338,7 +337,9 @@ class DHCP:
         while (
             bytes_read <= minimum_packet_length and time.monotonic() < self._next_resend
         ):
-            buffer.extend(self._wiz_sock.recv(BUFF_LENGTH - bytes_read))
+            buffer.extend(
+                self._eth.socket_read(self._wiz_sock, BUFF_LENGTH - bytes_read)[1]
+            )
             bytes_read = len(buffer)
             if bytes_read == BUFF_LENGTH:
                 break

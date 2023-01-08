@@ -696,8 +696,8 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             raise RuntimeError("Failed to initialize a connection with the socket.")
 
         # set socket destination IP and port
-        self._write_sndipr(socket_num, dest)
-        self._write_sndport(socket_num, port)
+        self.write_sndipr(socket_num, dest)
+        self.write_sndport(socket_num, port)
         self._send_socket_cmd(socket_num, CMD_SOCK_CONNECT)
 
         if conn_mode == SNMR_TCP:
@@ -859,7 +859,10 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         if self._debug:
             print("*** Closing socket #%d" % socket_num)
         self.write_sncr(socket_num, CMD_SOCK_CLOSE)
-        self.read_sncr(socket_num)
+        while self.read_sncr(socket_num):
+            time.sleep(0.0001)
+        while self.read_snsr(socket_num) != SNSR_SOCK_CLOSED:
+            time.sleep(0.0001)
 
     def socket_disconnect(self, socket_num: int) -> None:
         """
@@ -872,9 +875,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         self.write_sncr(socket_num, CMD_SOCK_DISCON)
         self.read_sncr(socket_num)
 
-    def socket_read(
-        self, socket_num: int, length: int
-    ) -> Tuple[int, Union[int, bytearray]]:
+    def socket_read(self, socket_num: int, length: int) -> Tuple[int, bytes]:
         """
         Read data from a TCP socket.
 
@@ -890,24 +891,24 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         assert socket_num <= self.max_sockets, "Provided socket exceeds max_sockets."
 
         # Check if there is data available on the socket
+        resp = b""
         ret = self._get_rx_rcv_size(socket_num)
         if self._debug:
             print("Bytes avail. on sock: ", ret)
         if ret == 0:
             # no data on socket?
-            status = self._read_snmr(socket_num)
-            if status in (SNSR_SOCK_LISTEN, SNSR_SOCK_CLOSED, SNSR_SOCK_CLOSE_WAIT):
+            if self._read_snmr(socket_num) in (
+                SNSR_SOCK_LISTEN,
+                SNSR_SOCK_CLOSED,
+                SNSR_SOCK_CLOSE_WAIT,
+            ):
                 # remote end closed its side of the connection, EOF state
-                ret = 0
-                resp = 0
-            else:
+                raise RuntimeError("Lost connection to peer.")
                 # connection is alive, no data waiting to be read
-                ret = -1
-                resp = -1
+            ret = -1
         elif ret > length:
             # set ret to the length of buffer
             ret = length
-
         if ret > 0:
             if self._debug:
                 print("\t * Processing {} bytes of data".format(ret))
@@ -940,7 +941,8 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
             # Notify the W5k of the updated Sn_Rx_RD
             self.write_sncr(socket_num, CMD_SOCK_RECV)
-            self.read_sncr(socket_num)
+            while self.read_sncr(socket_num):
+                time.sleep(0.0001)
         return ret, resp
 
     def read_udp(
@@ -1028,7 +1030,8 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         self._write_sntx_wr(socket_num, ptr)
 
         self.write_sncr(socket_num, CMD_SOCK_SEND)
-        self.read_sncr(socket_num)
+        while self.read_sncr(socket_num):
+            time.sleep(0.0001)
 
         # check data was  transferred correctly
         while not self._read_snir(socket_num)[0] & SNIR_SEND_OK:
@@ -1105,7 +1108,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         data += self._read_socket(sock, REG_SNRX_RSR + 1)
         return data
 
-    def _write_sndipr(self, sock: int, ip_addr: bytearray) -> None:
+    def write_sndipr(self, sock: int, ip_addr: bytearray) -> None:
         """Write to socket destination IP Address."""
         for offset in range(4):
             self._write_socket(sock, REG_SNDIPR + offset, ip_addr[offset])
@@ -1117,7 +1120,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             data += self._read_socket(sock, REG_SIPR + offset)
         return bytearray(data)
 
-    def _write_sndport(self, sock: int, port: int) -> None:
+    def write_sndport(self, sock: int, port: int) -> None:
         """Write to socket destination port."""
         self._write_socket(sock, REG_SNDPORT, port >> 8)
         self._write_socket(sock, REG_SNDPORT + 1, port & 0xFF)
@@ -1258,7 +1261,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             ip_in_use = False
         finally:
             # Reset the RTR, RCR and destination IPv4 registers.
-            self._write_sndipr(socknum, temp_ip)
+            self.write_sndipr(socknum, temp_ip)
             self.rcr = temp_rcr
             self.rtr = temp_rtr
         return ip_in_use
