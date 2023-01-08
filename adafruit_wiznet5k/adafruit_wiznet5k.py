@@ -663,7 +663,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
         :return: Optional[bytearray]
         """
-        return self._read_snsr(socket_num)
+        return self.read_snsr(socket_num)
 
     def socket_connect(
         self,
@@ -714,8 +714,8 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
     def _send_socket_cmd(self, socket: int, cmd: int) -> None:
         """Send a socket command to a socket."""
-        self._write_sncr(socket, cmd)
-        while self._read_sncr(socket) != b"\x00":
+        self.write_sncr(socket, cmd)
+        while self.read_sncr(socket) != b"\x00":
             if self._debug:
                 print("waiting for sncr to clear...")
 
@@ -769,7 +769,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         # Wait until ready
         status = [SNSR_SOCK_CLOSED]
         while status[0] not in (SNSR_SOCK_LISTEN, SNSR_SOCK_ESTABLISHED, SNSR_SOCK_UDP):
-            status = self._read_snsr(socket_num)
+            status = self.read_snsr(socket_num)
             if status[0] == SNSR_SOCK_CLOSED:
                 raise RuntimeError("Listening socket closed.")
 
@@ -814,7 +814,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         assert self.link_status, "Ethernet cable disconnected!"
         if self._debug:
             print("*** Opening socket %d" % socket_num)
-        status = self._read_snsr(socket_num)[0]
+        status = self.read_snsr(socket_num)[0]
         if status in (
             SNSR_SOCK_CLOSED,
             SNSR_SOCK_TIME_WAIT,
@@ -832,20 +832,20 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
             if self.src_port > 0:
                 # write to socket source port
-                self._write_sock_port(socket_num, self.src_port)
+                self.write_sock_port(socket_num, self.src_port)
             else:
                 s_port = randint(49152, 65535)
                 while s_port in SRC_PORTS:
                     s_port = randint(49152, 65535)
-                self._write_sock_port(socket_num, s_port)
+                self.write_sock_port(socket_num, s_port)
                 SRC_PORTS[socket_num] = s_port
 
             # open socket
-            self._write_sncr(socket_num, CMD_SOCK_OPEN)
-            self._read_sncr(socket_num)
+            self.write_sncr(socket_num, CMD_SOCK_OPEN)
+            self.read_sncr(socket_num)
             assert (
-                self._read_snsr((socket_num))[0] == 0x13
-                or self._read_snsr((socket_num))[0] == 0x22
+                self.read_snsr((socket_num))[0] == 0x13
+                or self.read_snsr((socket_num))[0] == 0x22
             ), "Could not open socket in TCP or UDP mode."
             return 0
         return 1
@@ -858,8 +858,8 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         """
         if self._debug:
             print("*** Closing socket #%d" % socket_num)
-        self._write_sncr(socket_num, CMD_SOCK_CLOSE)
-        self._read_sncr(socket_num)
+        self.write_sncr(socket_num, CMD_SOCK_CLOSE)
+        self.read_sncr(socket_num)
 
     def socket_disconnect(self, socket_num: int) -> None:
         """
@@ -869,8 +869,8 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         """
         if self._debug:
             print("*** Disconnecting socket #%d" % socket_num)
-        self._write_sncr(socket_num, CMD_SOCK_DISCON)
-        self._read_sncr(socket_num)
+        self.write_sncr(socket_num, CMD_SOCK_DISCON)
+        self.read_sncr(socket_num)
 
     def socket_read(
         self, socket_num: int, length: int
@@ -939,8 +939,8 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             self._write_snrx_rd(socket_num, ptr)
 
             # Notify the W5k of the updated Sn_Rx_RD
-            self._write_sncr(socket_num, CMD_SOCK_RECV)
-            self._read_sncr(socket_num)
+            self.write_sncr(socket_num, CMD_SOCK_RECV)
+            self.read_sncr(socket_num)
         return ret, resp
 
     def read_udp(
@@ -1027,8 +1027,8 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         ptr = (ptr + ret) & 0xFFFF
         self._write_sntx_wr(socket_num, ptr)
 
-        self._write_sncr(socket_num, CMD_SOCK_SEND)
-        self._read_sncr(socket_num)
+        self.write_sncr(socket_num, CMD_SOCK_SEND)
+        self.read_sncr(socket_num)
 
         # check data was  transferred correctly
         while not self._read_snir(socket_num)[0] & SNIR_SEND_OK:
@@ -1122,7 +1122,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         self._write_socket(sock, REG_SNDPORT, port >> 8)
         self._write_socket(sock, REG_SNDPORT + 1, port & 0xFF)
 
-    def _read_snsr(self, sock: int) -> Optional[bytearray]:
+    def read_snsr(self, sock: int) -> Optional[bytearray]:
         """Read Socket n Status Register."""
         return self._read_socket(sock, REG_SNSR)
 
@@ -1138,15 +1138,17 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         """Write to Socket n Interrupt Register."""
         self._write_socket(sock, REG_SNIR, data)
 
-    def _write_sock_port(self, sock: int, port: int) -> None:
+    def write_sock_port(self, sock: int, port: int) -> None:
         """Write to the socket port number."""
         self._write_socket(sock, REG_SNPORT, port >> 8)
         self._write_socket(sock, REG_SNPORT + 1, port & 0xFF)
 
-    def _write_sncr(self, sock: int, data: int) -> None:
+    def write_sncr(self, sock: int, data: int) -> None:
+        """Write to socket command register."""
         self._write_socket(sock, REG_SNCR, data)
 
-    def _read_sncr(self, sock: int) -> Optional[bytearray]:
+    def read_sncr(self, sock: int) -> Optional[bytearray]:
+        """Read socket command register."""
         return self._read_socket(sock, REG_SNCR)
 
     def _read_snmr(self, sock: int) -> Optional[bytearray]:

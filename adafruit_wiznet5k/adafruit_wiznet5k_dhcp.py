@@ -152,7 +152,7 @@ class DHCP:
         # Set socket interface
         socket.set_interface(eth)
         self._eth = eth
-        self._sock = None
+        self._wiz_sock = None
 
         # DHCP state machine
         self._dhcp_state = STATE_INIT
@@ -219,11 +219,11 @@ class DHCP:
     def _socket_release(self) -> None:
         """Close the socket if it exists."""
         _debugging_message("Releasing socket.", self._debug)
-        if self._sock:
-            self._sock.close()
-            self._sock = None
+        if self._wiz_sock:
+            self._eth.socket_close(self._wiz_sock)
+            self._wiz_sock = None
 
-    def _socket_setup(self, timeout: int = 5) -> None:
+    def _dhcp_connection_setup(self, timeout: int = 5) -> None:
         """Initialise a UDP socket.
 
         Attempt to initialise a UDP socket. If the finite state machine (FSM) is in
@@ -241,28 +241,19 @@ class DHCP:
         self._socket_release()
         stop_time = time.monotonic() + timeout
         _debugging_message("Creating new socket instance for DHCP.", self._debug)
-        while not time.monotonic() > stop_time:
-            try:
-                self._sock = socket.socket(type=socket.SOCK_DGRAM)
-            except RuntimeError:
-                if self._debug:
-                    print("DHCP client failed to allocate socket")
-                if self._blocking:
-                    print("Retrying…")
-                else:
-                    return
-            else:
-                self._sock.settimeout(self._response_timeout)
-                # Shouldn't call socket.bind on UDP sockets.
-                self._sock.bind((None, 68))
-                # Shouldn't call socket.connect on UDP sockets.
-                self._sock.connect((self.dhcp_server_ip, DHCP_SERVER_PORT))
-                return
-        raise TimeoutError(
-            "DHCP client failed to allocate a socket. Retried for {} seconds.".format(
-                timeout
-            )
-        )
+        while not self._wiz_sock and time.monotonic() < stop_time:
+            self._wiz_sock = self._eth.get_socket()
+            if self._wiz_sock == 0xFF:
+                self._wiz_sock = None
+        while (
+            time.monotonic() < stop_time and self._eth.read_snsr(self._wiz_sock) != 0x22
+        ):
+            self._eth.write_sock_port(self._wiz_sock, 68)  # Set DHCP client port.
+            self._eth.write_sncr(self._wiz_sock, 0x01)  # Open the socket.
+            while (
+                self._eth.read_sncr(self._wiz_sock) == 0
+            ):  # Wait for command to complete.
+                time.sleep(0.0001)
 
     def _increment_transaction_id(self) -> None:
         """Increment the transaction ID and roll over from 0x7fffffff to 0."""
@@ -320,7 +311,7 @@ class DHCP:
         else:
             message_type = DHCP_REQUEST
         self._generate_dhcp_message(message_type=message_type)
-        self._sock.send(_BUFF)
+        self._wiz_sock.send(_BUFF)
         self._retries = 0
         self._max_retries = max_retries
         self._next_resend = self._next_retry_time_and_retry()
@@ -347,7 +338,7 @@ class DHCP:
         while (
             bytes_read <= minimum_packet_length and time.monotonic() < self._next_resend
         ):
-            buffer.extend(self._sock.recv(BUFF_LENGTH - bytes_read))
+            buffer.extend(self._wiz_sock.recv(BUFF_LENGTH - bytes_read))
             bytes_read = len(buffer)
             if bytes_read == BUFF_LENGTH:
                 break
@@ -486,7 +477,7 @@ class DHCP:
 
         if self._dhcp_state == STATE_RENEWING:
             self._renew = True
-            self._socket_setup()
+            self._dhcp_connection_setup()
             self._start_time = time.monotonic()
             self._send_message_set_next_state(
                 next_state=STATE_REQUESTING,
@@ -496,7 +487,7 @@ class DHCP:
         if self._dhcp_state == STATE_REBINDING:
             self._renew = True
             self.dhcp_server_ip = BROADCAST_SERVER_ADDR
-            self._socket_setup()
+            self._dhcp_connection_setup()
             self._start_time = time.monotonic()
             self._send_message_set_next_state(
                 next_state=STATE_REQUESTING,
