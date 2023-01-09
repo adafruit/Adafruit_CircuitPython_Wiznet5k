@@ -156,7 +156,6 @@ class DHCP:
         self._dhcp_state = STATE_INIT
         self._transaction_id = randint(1, 0x7FFFFFFF)
         self._start_time = 0
-        self._next_resend = 0
         self._retries = 0
         self._max_retries = 0
         self._blocking = False
@@ -260,31 +259,30 @@ class DHCP:
         _debugging_message("Incrementing transaction ID", self._debug)
         self._transaction_id = (self._transaction_id + 1) & 0x7FFFFFFF
 
-    def _next_retry_time_and_retry(self, *, interval: int = 4) -> int:
+    def _next_retry_time(self, *, attempt: int, interval: int = 4) -> float:
         """Calculate a retry stop time.
 
         The interval is calculated as an exponential fallback with a random variation to
         prevent DHCP packet collisions. This timeout is intended to be compared with
-        time.monotonic(). Uses self._retries as the exponent, and increments this value
-        each time it is called.
+        time.monotonic().
 
+        :param int attempt: The current attempt, used as the exponent for calculating the
+            timeout.
         :param int interval: The base retry interval in seconds. Defaults to 4 as per the
-            DHCP standard for Ethernet connections.
+            DHCP standard for Ethernet connections. Minimum value 2, defaults to 4.
 
-        :returns int: The timeout in time.monotonic() seconds.
+        :returns float: The timeout in time.monotonic() seconds.
 
-        :raises ValueError: If the calculated interval is < 1 second.
+        :raises ValueError: If the interval is not > 1 second as this could return a zero or
+            negative delay.
         """
         _debugging_message(
             "Calculating next retry time and incrementing retries.", self._debug
         )
-        delay = 2**self._retries * interval + randint(-1, 1)
-        print("delay = {}".format(delay))
-        delay += time.monotonic()
-        if delay < 1:
-            raise ValueError("Retry delay must be >= 1 second")
-        self._retries += 1
-        return int(delay)
+        if interval <= 1:
+            raise ValueError("Retry interval must be > 1 second.")
+        delay = 2**attempt * interval + randint(-1, 1) + time.monotonic()
+        return delay
 
     def _prepare_and_set_next_state(
         self,
@@ -312,7 +310,7 @@ class DHCP:
         self._retries = 0
         self._dhcp_state = next_state
 
-    def _receive_dhcp_response(self) -> int:
+    def _receive_dhcp_response(self, timeout) -> int:
         """
         Receive data from the socket in response to a DHCP query.
 
@@ -329,9 +327,7 @@ class DHCP:
         minimum_packet_length = 236
         buffer = bytearray(b"")
         bytes_read = 0
-        while (
-            bytes_read <= minimum_packet_length and time.monotonic() < self._next_resend
-        ):
+        while bytes_read <= minimum_packet_length and time.monotonic() < timeout:
             buffer.extend(
                 self._eth.socket_read(self._wiz_sock, BUFF_LENGTH - bytes_read)[1]
             )
@@ -412,15 +408,13 @@ class DHCP:
             raise ValueError(
                 "FSM should only send messages in SELECTING or REQUESTING states."
             )
-        while True:
-            self._generate_dhcp_message(message_type=message_type)
+        for attempt in range(4):  # Initial attempt plus 3 retries.
+            message_length = self._generate_dhcp_message(message_type=message_type)
             self._eth.write_sndipr(self._wiz_sock, self.dhcp_server_ip)
-            self._eth.socket_write(self._wiz_sock, _BUFF)
-            self._next_resend = self._next_retry_time_and_retry()
-            while time.monotonic() < self._next_resend:
-                start_time = time.monotonic()
-                print("Waiting for response…")
-                if self._receive_dhcp_response():
+            self._eth.socket_write(self._wiz_sock, _BUFF[:message_length])
+            next_resend = self._next_retry_time(attempt=attempt)
+            while time.monotonic() < next_resend:
+                if self._receive_dhcp_response(next_resend):
                     try:
                         msg_type = self._parse_dhcp_response()
                         _debugging_message(
@@ -436,22 +430,11 @@ class DHCP:
                 if not self._blocking:
                     _debugging_message("Nonblocking, exiting loop.", self._debug)
                     return
-            print("++++ Attempt {}".format(self._retries))
-            print(time.monotonic() - start_time)
-            # self._next_resend = self._next_retry_time_and_retry()
-            if self._retries > self._max_retries:
-                if self._renew:
-                    return
-                raise TimeoutError(
-                    "No response from DHCP server after {} retries.".format(
-                        self._max_retries
-                    )
-                )
-            if not self._blocking:
-                _debugging_message(
-                    "Nonblocking, returning from message function.", self._debug
-                )
-                return
+        if self._renew:
+            return
+        raise TimeoutError(
+            "No response from DHCP server after {} retries.".format(self._max_retries)
+        )
 
     def _dhcp_state_machine(self, *, blocking: bool = False) -> None:
         """
@@ -534,7 +517,7 @@ class DHCP:
         message_type: int,
         broadcast: bool = False,
         renew: bool = False,
-    ) -> None:
+    ) -> int:
         """
         Assemble a DHCP message. The content will vary depending on which type of
             message is being sent and whether the lease is new or being renewed.
@@ -543,6 +526,8 @@ class DHCP:
         :param bool broadcast: Used to set the flag requiring a broadcast reply from the
             DHCP server. Defaults to False which matches the DHCP standard.
         :param bool renew: Set True for renewing and rebinding operations, defaults to False.
+
+        :returns int: The length of the DHCP message.
         """
 
         def option_writer(
@@ -590,12 +575,10 @@ class DHCP:
         pointer = 240
 
         # Option - DHCP Message Type
-        print("Option - DHCP Message Type")
         pointer = option_writer(
             offset=pointer, option_code=53, option_data=(message_type,)
         )
         # Option - Host Name
-        print("Option - Host Name")
         pointer = option_writer(
             offset=pointer, option_code=12, option_data=self._hostname
         )
@@ -613,6 +596,7 @@ class DHCP:
                 offset=pointer, option_code=54, option_data=self.dhcp_server_ip
             )
         _BUFF[pointer] = 0xFF
+        return pointer + 1
 
     def _parse_dhcp_response(
         self,

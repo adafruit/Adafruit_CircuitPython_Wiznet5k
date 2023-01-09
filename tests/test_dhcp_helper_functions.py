@@ -431,7 +431,7 @@ class TestSmallHelperFunctions:
         now = time.monotonic()
         for retry in range(3):
             dhcp_client._retries = retry
-            assert dhcp_client._next_retry_time_and_retry() == int(
+            assert dhcp_client._next_retry_time() == int(
                 2**retry * 4 + rand_int + now
             )
             assert dhcp_client._retries == retry + 1
@@ -448,7 +448,7 @@ class TestSmallHelperFunctions:
         now = time.monotonic()
         for retry in range(3):
             dhcp_client._retries = retry
-            assert dhcp_client._next_retry_time_and_retry(interval=interval) == int(
+            assert dhcp_client._next_retry_time(interval=interval) == int(
                 2**retry * interval + now
             )
 
@@ -521,7 +521,7 @@ class TestSmallHelperFunctions:
             message_type=msg_type
         )
         dhcp_client._wiz_sock.send.assert_called_once_with(message)
-        dhcp_client._next_retry_time_and_retry.assert_called_once()
+        dhcp_client._next_retry_time.assert_called_once()
 
     @pytest.mark.parametrize(
         "next_state",
