@@ -555,7 +555,6 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         addr: int,
         callback: int,
         length: int = 1,
-        buffer: Optional[WriteableBuffer] = None,
     ) -> Union[WriteableBuffer, bytearray]:
         """
         Read data from a register address.
@@ -563,9 +562,8 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         :param int addr: Register address to read.
         :param int callback: Callback reference.
         :param int length: Number of bytes to read from the register, defaults to 1.
-        :param Optional[WriteableBuffer] buffer: Buffer to read data into, defaults to None.
 
-        :return Union[WriteableBuffer, bytearray]: Data read from the chip.
+        :return bytes: Data read from the chip.
         """
         with self._device as bus_device:
             if self._chip_type == "w5500":
@@ -578,12 +576,9 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
                 bus_device.write(bytes([addr >> 8]))  # pylint: disable=no-member
                 bus_device.write(bytes([addr & 0xFF]))  # pylint: disable=no-member
 
-            if buffer is None:
-                self._rxbuf = bytearray(length)
-                bus_device.readinto(self._rxbuf)  # pylint: disable=no-member
-                return self._rxbuf
-            bus_device.readinto(buffer, end=length)  # pylint: disable=no-member
-            return buffer
+            self._rxbuf = bytearray(length)
+            bus_device.readinto(self._rxbuf)  # pylint: disable=no-member
+            return bytes(self._rxbuf)
 
     def write(
         self, addr: int, callback: int, data: Union[int, Sequence[Union[int, bytes]]]
@@ -827,7 +822,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
                 print("* Opening W5k Socket, protocol={}".format(conn_mode))
             time.sleep(0.00025)
 
-            self._write_snmr(socket_num, conn_mode)
+            self.write_snmr(socket_num, conn_mode)
             self._write_snir(socket_num, 0xFF)
 
             if self.src_port > 0:
@@ -1133,7 +1128,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         """Read Socket n Interrupt Register."""
         return self._read_socket(sock, REG_SNIR)
 
-    def _write_snmr(self, sock: int, protocol: int) -> None:
+    def write_snmr(self, sock: int, protocol: int) -> None:
         """Write to Socket n Mode Register."""
         self._write_socket(sock, REG_SNMR, protocol)
 
@@ -1169,7 +1164,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             )
         return None
 
-    def _read_socket(self, sock: int, address: int) -> Optional[bytearray]:
+    def _read_socket(self, sock: int, address: int) -> bytearray:
         """Read a W5k socket register."""
         if self._chip_type == "w5500":
             cntl_byte = (sock << 5) + 0x08
@@ -1177,7 +1172,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         if self._chip_type == "w5100s":
             cntl_byte = 0
             return self.read(self._ch_base_msb + sock * CH_SIZE + address, cntl_byte)
-        return None
+        raise RuntimeError("Invalid Wiznet chip type.")
 
     @property
     def rcr(self) -> int:

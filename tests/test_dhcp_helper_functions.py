@@ -20,19 +20,8 @@ def mock_wiznet5k(mocker):
 
 
 @pytest.fixture
-def mock_socket(mocker):
-    """Mock socket module to allow test data to be read and written by the DHCP module."""
-    return mocker.patch(
-        "adafruit_wiznet5k.adafruit_wiznet5k_dhcp.socket", autospec=True
-    )
-
-
-@pytest.fixture
-def mock_dhcp(mocker, mock_wiznet5k):
+def mock_dhcp(mock_wiznet5k):
     dhcp = wiz_dhcp.DHCP(mock_wiznet5k, (1, 2, 3, 4, 5, 6))
-    dhcp._wiz_sock = mocker.patch(
-        "adafruit_wiznet5k.adafruit_wiznet5k_dhcp.socket.socket", autospec=True
-    )
     return dhcp
 
 
@@ -74,8 +63,8 @@ class TestDHCPInit:
         assert wiz_dhcp.DHCP_SERVER_PORT == const(67)
         # DHCP Lease Time, in seconds
         assert wiz_dhcp.DEFAULT_LEASE_TIME == const(900)
-        assert wiz_dhcp.BROADCAST_SERVER_ADDR == (255, 255, 255, 255)
-        assert wiz_dhcp.UNASSIGNED_IP_ADDR == (0, 0, 0, 0)
+        assert wiz_dhcp.BROADCAST_SERVER_ADDR == b"/xff/xff/xff/xff"
+        assert wiz_dhcp.UNASSIGNED_IP_ADDR == b"/x00/x00/x00/x00"
 
         # DHCP Response Options
         assert wiz_dhcp.MSG_TYPE == 53
@@ -100,7 +89,7 @@ class TestDHCPInit:
             bytes([1, 2, 4, 6, 7, 8]),
         ),
     )
-    def test_dhcp_setup_default(self, mocker, mock_wiznet5k, mock_socket, mac_address):
+    def test_dhcp_setup_default(self, mocker, mock_wiznet5k, mac_address):
         """Test intial settings from DHCP.__init__."""
         # Test with mac address as tuple, list and bytes with default values.
         mock_randint = mocker.patch(
@@ -112,7 +101,6 @@ class TestDHCPInit:
         assert dhcp_client._response_timeout == 30.0
         assert dhcp_client._debug is False
         assert dhcp_client._mac_address == mac_address
-        mock_socket.set_interface.assert_called_once_with(mock_wiznet5k)
         assert dhcp_client._wiz_sock is None
         assert dhcp_client._dhcp_state == wiz_dhcp.STATE_INIT
         mock_randint.assert_called_once()
@@ -152,11 +140,10 @@ class TestDHCPInit:
 
 @freeze_time("2022-10-20")
 class TestSendDHCPMessage:
-    def test_generate_message_with_default_attributes(self, mock_wiznet5k, mock_socket):
+    def test_generate_message_with_default_attributes(self, mock_wiznet5k):
         """Test the _generate_message function with default values."""
         assert len(wiz_dhcp._BUFF) == 318
         dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, (4, 5, 6, 7, 8, 9))
-        dhcp_client._wiz_sock = mock_socket.socket(type=mock_socket.SOCK_DGRAM)
         dhcp_client._transaction_id = 0x6FFFFFFF
         dhcp_client._start_time = time.monotonic() - 23.4
         dhcp_client._generate_dhcp_message(message_type=wiz_dhcp.DHCP_DISCOVER)
@@ -349,12 +336,11 @@ class TestParseDhcpMessage:
         assert dhcp_client._t1 == t1
         assert dhcp_client._t2 == t2
 
-    def test_parsing_failures(self, mock_wiznet5k, mock_socket):
+    def test_parsing_failures(self, mock_wiznet5k):
         # Test for bad OP code, ID mismatch, no server ID, bad Magic Cookie
         bad_data = dhcp_data.BAD_DATA
         dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, (1, 2, 3, 4, 5, 6))
-        dhcp_client._wiz_sock = mock_socket.socket(type=mock_socket.SOCK_DGRAM)
-        dhcp_client._wiz_sock.recv.return_value = bad_data
+        dhcp_client._eth._read_socket.return_value = (len(bad_data), bad_data)
         # Transaction ID mismatch.
         dhcp_client._transaction_id = 0x42424242
         with pytest.raises(ValueError):
@@ -377,13 +363,11 @@ class TestParseDhcpMessage:
 
 
 class TestResetDsmReset:
-    def test_socket_reset(self, mock_wiznet5k, mock_socket):
+    def test_socket_reset(self, mock_wiznet5k):
         dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, (1, 2, 3, 4, 5, 6))
 
         dhcp_client._dsm_reset()
         assert dhcp_client._wiz_sock is None
-
-        dhcp_client._wiz_sock = mock_socket.socket(type=mock_socket.SOCK_DGRAM)
 
         dhcp_client._dsm_reset()
         assert dhcp_client._wiz_sock is None
@@ -413,12 +397,12 @@ class TestResetDsmReset:
 
 
 class TestSocketRelease:
-    def test_socket_set_to_none(self, mock_wiznet5k, mock_socket):
+    def test_socket_set_to_none(self, mock_wiznet5k):
         dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, (1, 2, 3, 4, 5, 6))
         dhcp_client._socket_release()
         assert dhcp_client._wiz_sock is None
 
-        dhcp_client._wiz_sock = mock_socket.socket(type=mock_socket.SOCK_DGRAM)
+        dhcp_client._wiz_sock = 2
         dhcp_client._socket_release()
         assert dhcp_client._wiz_sock is None
 
@@ -468,13 +452,12 @@ class TestSmallHelperFunctions:
                 2**retry * interval + now
             )
 
-    def test_setup_socket_with_no_error(self, mock_wiznet5k, mock_socket):
+    def test_setup_socket_with_no_error(self, mock_wiznet5k):
+        mock_wiznet5k.get_socket.return_value = 2
         dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, (1, 2, 3, 4, 5, 6))
         dhcp_client._dhcp_connection_setup()
-        mock_socket.socket.assert_called_once()
-        dhcp_client._wiz_sock.settimeout.assert_called_once_with(
-            dhcp_client._response_timeout
-        )
+        mock_wiznet5k.get_socket.assert_called_once()
+        # mock_wiznet5k.write
         dhcp_client._wiz_sock.bind.assert_called_once_with((None, 68))
         dhcp_client._wiz_sock.connect.assert_called_once_with(
             (wiz_dhcp.BROADCAST_SERVER_ADDR, 67)
@@ -528,7 +511,7 @@ class TestSmallHelperFunctions:
         wiz_dhcp._BUFF = bytearray(message)
         dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, (1, 2, 3, 4, 5, 6))
         dhcp_client._wiz_sock = mocker.Mock()
-        dhcp_client._send_message_set_next_state(
+        dhcp_client._prepare_message_set_next_state(
             next_state=next_state, max_retries=retries
         )
         assert dhcp_client._retries == 0
@@ -553,7 +536,7 @@ class TestSmallHelperFunctions:
         # Test with all states that should not call this function.
         dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, (1, 2, 3, 4, 5, 6))
         with pytest.raises(ValueError):
-            dhcp_client._send_message_set_next_state(
+            dhcp_client._prepare_message_set_next_state(
                 next_state=next_state, max_retries=4
             )
 

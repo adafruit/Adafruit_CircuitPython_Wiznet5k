@@ -198,6 +198,7 @@ class DHCP:
         state machine INIT state."""
         _debugging_message("Resetting DHCP state machine.", self._debug)
         self._socket_release()
+        self._dhcp_connection_setup()
         self.dhcp_server_ip = BROADCAST_SERVER_ADDR
         self._eth.ifconfig = (
             UNASSIGNED_IP_ADDR,
@@ -237,20 +238,22 @@ class DHCP:
         """
         stop_time = time.monotonic() + timeout
         _debugging_message("Creating new socket instance for DHCP.", self._debug)
-        while not self._wiz_sock and time.monotonic() < stop_time:
+        while self._wiz_sock is None and time.monotonic() < stop_time:
             self._wiz_sock = self._eth.get_socket()
             if self._wiz_sock == 0xFF:
                 self._wiz_sock = None
-        while (
-            time.monotonic() < stop_time and self._eth.read_snsr(self._wiz_sock) != 0x22
-        ):
+        while time.monotonic() < stop_time:
+            self._eth.write_snmr(self._wiz_sock, 0x02)  # Set UDP connection
             self._eth.write_sock_port(self._wiz_sock, 68)  # Set DHCP client port.
             self._eth.write_sncr(self._wiz_sock, 0x01)  # Open the socket.
             while (
                 self._eth.read_sncr(self._wiz_sock) == 0
             ):  # Wait for command to complete.
-                time.sleep(0.0001)
-            self._eth.write_sndport(self._wiz_sock, DHCP_SERVER_PORT)
+                time.sleep(0.001)
+            if self._eth.read_snsr(self._wiz_sock) == bytes([0x22]):
+                self._eth.write_sndport(self._wiz_sock, DHCP_SERVER_PORT)
+                return
+        raise RuntimeError("Unable to initialize UDP socket.")
 
     def _increment_transaction_id(self) -> None:
         """Increment the transaction ID and roll over from 0x7fffffff to 0."""
@@ -281,7 +284,7 @@ class DHCP:
         self._retries += 1
         return delay
 
-    def _send_message_set_next_state(
+    def _prepare_message_set_next_state(
         self,
         *,
         next_state: int,
@@ -303,14 +306,6 @@ class DHCP:
         )
         if next_state not in (STATE_SELECTING, STATE_REQUESTING):
             raise ValueError("The next state must be SELECTING or REQUESTING.")
-        if next_state == STATE_SELECTING:
-            message_type = DHCP_DISCOVER
-        else:
-            message_type = DHCP_REQUEST
-        self._generate_dhcp_message(message_type=message_type)
-        self._wiz_sock.send(_BUFF)
-        self._eth.write_sndipr(self._wiz_sock, self.dhcp_server_ip)
-        self._eth.socket_write(self._wiz_sock, _BUFF)
         self._retries = 0
         self._max_retries = max_retries
         self._next_resend = self._next_retry_time_and_retry()
@@ -365,14 +360,14 @@ class DHCP:
         :raises TimeoutError: If the FSM is in blocking mode and no valid response has
             been received before the timeout expires.
         """
-
+        # pylint: disable=too-many-branches
         def processing_state_selecting():
             """Process a message while the FSM is in SELECTING state."""
             if self._dhcp_state == STATE_SELECTING and msg_type == DHCP_OFFER:
                 _debugging_message(
                     "FSM state is SELECTING with valid OFFER.", self._debug
                 )
-                self._send_message_set_next_state(
+                self._prepare_message_set_next_state(
                     next_state=STATE_REQUESTING,
                     max_retries=3,
                 )
@@ -409,8 +404,17 @@ class DHCP:
 
         # Main processing loop
         _debugging_message("Processing SELECTING or REQUESTING state.", self._debug)
+        if self._dhcp_state == STATE_SELECTING:
+            message_type = DHCP_DISCOVER
+        elif self._dhcp_state == STATE_REQUESTING:
+            message_type = DHCP_REQUEST
+        else:
+            raise ValueError("Wrong FSM state attempting to send message.")
         while True:
             while time.monotonic() < self._next_resend:
+                self._generate_dhcp_message(message_type=message_type)
+                self._eth.write_sndipr(self._wiz_sock, self.dhcp_server_ip)
+                self._eth.socket_write(self._wiz_sock, _BUFF)
                 if self._receive_dhcp_response():
                     try:
                         msg_type = self._parse_dhcp_response()
@@ -480,7 +484,7 @@ class DHCP:
             self._renew = True
             self._dhcp_connection_setup()
             self._start_time = time.monotonic()
-            self._send_message_set_next_state(
+            self._prepare_message_set_next_state(
                 next_state=STATE_REQUESTING,
                 max_retries=3,
             )
@@ -490,14 +494,14 @@ class DHCP:
             self.dhcp_server_ip = BROADCAST_SERVER_ADDR
             self._dhcp_connection_setup()
             self._start_time = time.monotonic()
-            self._send_message_set_next_state(
+            self._prepare_message_set_next_state(
                 next_state=STATE_REQUESTING,
                 max_retries=3,
             )
 
         if self._dhcp_state == STATE_INIT:
             self._dsm_reset()
-            self._send_message_set_next_state(
+            self._prepare_message_set_next_state(
                 next_state=STATE_SELECTING,
                 max_retries=3,
             )
@@ -552,13 +556,15 @@ class DHCP:
             _BUFF[offset] = data_length
             offset += 1
             data_end = offset + data_length
-            _BUFF[offset:data_end] = option_data
+            _BUFF[offset:data_end] = bytes(option_data)
             return data_end
 
         # global _BUFF  # pylint: disable=global-variable-not-assigned
         _BUFF[:] = bytearray(BUFF_LENGTH)
         # OP.HTYPE.HLEN.HOPS
-        _BUFF[0:4] = (DHCP_BOOT_REQUEST, DHCP_HTYPE10MB, DHCP_HLENETHERNET, DHCP_HOPS)
+        _BUFF[0:4] = bytes(
+            [DHCP_BOOT_REQUEST, DHCP_HTYPE10MB, DHCP_HLENETHERNET, DHCP_HOPS]
+        )
         # Transaction ID (xid)
         _BUFF[4:8] = self._transaction_id.to_bytes(4, "big")
         # Seconds elapsed
@@ -577,10 +583,12 @@ class DHCP:
         pointer = 240
 
         # Option - DHCP Message Type
+        print("Option - DHCP Message Type")
         pointer = option_writer(
             offset=pointer, option_code=53, option_data=(message_type,)
         )
         # Option - Host Name
+        print("Option - Host Name")
         pointer = option_writer(
             offset=pointer, option_code=12, option_data=self._hostname
         )

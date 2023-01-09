@@ -76,7 +76,7 @@ class TestHandleDhcpMessage:
         # Confirm that the message would be parsed.
         mock_dhcp._parse_dhcp_response.assert_called_once()
         # Confirm that the correct next FSM state was set.
-        mock_dhcp._send_message_set_next_state.assert_called_once_with(
+        mock_dhcp._prepare_message_set_next_state.assert_called_once_with(
             next_state=wiz_dhcp.STATE_REQUESTING, max_retries=3
         )
 
@@ -106,7 +106,7 @@ class TestHandleDhcpMessage:
         # The correct state has been set.
         assert mock_dhcp._dhcp_state == wiz_dhcp.STATE_BOUND
         # No DHCP message to be sent.
-        mock_dhcp._send_message_set_next_state.assert_not_called()
+        mock_dhcp._prepare_message_set_next_state.assert_not_called()
 
     @freeze_time("2022-06-10")
     @pytest.mark.parametrize(
@@ -137,7 +137,7 @@ class TestHandleDhcpMessage:
         mock_dhcp._handle_dhcp_message()
         # Only one call methods because nonblocking, so no attempt to get another message.
         mock_dhcp._parse_dhcp_response.assert_called_once()
-        mock_dhcp._send_message_set_next_state.assert_not_called()
+        mock_dhcp._prepare_message_set_next_state.assert_not_called()
         # Confirm that the FSM state has not changed.
         assert mock_dhcp._dhcp_state == fsm_state
 
@@ -183,9 +183,9 @@ class TestHandleDhcpMessage:
         assert mock_dhcp._parse_dhcp_response.call_count == len(msg_type)
         # Confirm correct calls to _send_message_set_next_state are made.
         if fsm_state == wiz_dhcp.STATE_SELECTING:
-            mock_dhcp._send_message_set_next_state.assert_called_once()
+            mock_dhcp._prepare_message_set_next_state.assert_called_once()
         elif fsm_state == wiz_dhcp.STATE_REQUESTING:  # Not called for STATE_REQUESTING
-            mock_dhcp._send_message_set_next_state.assert_not_called()
+            mock_dhcp._prepare_message_set_next_state.assert_not_called()
             # Confirm correct final FSM state.
             assert mock_dhcp._dhcp_state == next_state
 
@@ -265,7 +265,7 @@ class TestHandleDhcpMessage:
         # Receive should only be called once in nonblocking mode.
         mock_dhcp._receive_dhcp_response.assert_called_once()
         # Confirm that _send_message_set_next_state not called.
-        mock_dhcp._send_message_set_next_state.assert_not_called()
+        mock_dhcp._prepare_message_set_next_state.assert_not_called()
         # Check that FSM state has not changed.
         assert mock_dhcp._dhcp_state == wiz_dhcp.STATE_SELECTING
 
@@ -294,7 +294,7 @@ class TestHandleDhcpMessage:
         # Check available() called three times.
         assert mock_dhcp._receive_dhcp_response.call_count == 3
         # Confirm that _send_message_set_next_state was called to change FSM state.
-        mock_dhcp._send_message_set_next_state.assert_called_once_with(
+        mock_dhcp._prepare_message_set_next_state.assert_called_once_with(
             next_state=wiz_dhcp.STATE_REQUESTING, max_retries=3
         )
 
@@ -440,7 +440,7 @@ class TestStateMachine:
         mock_dhcp._dhcp_state_machine()
 
         mock_dhcp._dsm_reset.assert_called_once()
-        mock_dhcp._send_message_set_next_state.assert_called_once_with(
+        mock_dhcp._prepare_message_set_next_state.assert_called_once_with(
             next_state=wiz_dhcp.STATE_SELECTING, max_retries=3
         )
 
@@ -501,7 +501,7 @@ class TestStateMachine:
         assert mock_dhcp._renew is True
         assert mock_dhcp._start_time == time.monotonic()
         mock_dhcp._dhcp_connection_setup.assert_called_once()
-        mock_dhcp._send_message_set_next_state.assert_called_once_with(
+        mock_dhcp._prepare_message_set_next_state.assert_called_once_with(
             next_state=wiz_dhcp.STATE_REQUESTING, max_retries=3
         )
 
@@ -517,6 +517,6 @@ class TestStateMachine:
         assert mock_dhcp._renew is True
         assert mock_dhcp._start_time == time.monotonic()
         mock_dhcp._dhcp_connection_setup.assert_called_once()
-        mock_dhcp._send_message_set_next_state.assert_called_once_with(
+        mock_dhcp._prepare_message_set_next_state.assert_called_once_with(
             next_state=wiz_dhcp.STATE_REQUESTING, max_retries=3
         )
