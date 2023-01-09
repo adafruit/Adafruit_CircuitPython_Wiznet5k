@@ -69,10 +69,10 @@ def htons(x: int) -> int:
     return (((x) << 8) & 0xFF00) | (((x) >> 8) & 0xFF)
 
 
-_SOCK_STREAM = const(0x21)  # TCP
+SOCK_STREAM = const(0x21)  # TCP
 _TCP_MODE = 80
 SOCK_DGRAM = const(0x02)  # UDP
-_AF_INET = const(3)
+AF_INET = const(3)
 _SOCKET_INVALID = const(255)
 
 
@@ -103,8 +103,8 @@ def getaddrinfo(
     if not isinstance(port, int):
         raise ValueError("Port must be an integer")
     if is_ipv4(host):
-        return [(_AF_INET, socktype, proto, "", (host, port))]
-    return [(_AF_INET, socktype, proto, "", (gethostbyname(host), port))]
+        return [(AF_INET, socktype, proto, "", (host, port))]
+    return [(AF_INET, socktype, proto, "", (gethostbyname(host), port))]
 
 
 def gethostbyname(hostname: str) -> str:
@@ -147,8 +147,8 @@ class socket:
     # pylint: disable=redefined-builtin,unused-argument
     def __init__(
         self,
-        family: int = _AF_INET,
-        type: int = _SOCK_STREAM,
+        family: int = AF_INET,
+        type: int = SOCK_STREAM,
         proto: int = 0,
         fileno: Optional[int] = None,
         socknum: Optional[int] = None,
@@ -161,7 +161,7 @@ class socket:
         :param Optional[int] fileno: Unused, retained for compatibility.
         :param Optional[int] socknum: Unused, retained for compatibility.
         """
-        if family != _AF_INET:
+        if family != AF_INET:
             raise RuntimeError("Only AF_INET family supported by W5K modules.")
         self._sock_type = type
         self._buffer = b""
@@ -176,7 +176,7 @@ class socket:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
-        if self._sock_type == _SOCK_STREAM:
+        if self._sock_type == SOCK_STREAM:
             self.disconnect()
             stamp = time.monotonic()
             while self.status == wiznet5k.adafruit_wiznet5k._SNSR_SOCK_FIN_WAIT:
@@ -407,7 +407,7 @@ class socket:
             while True:
                 avail = self.available()
                 if avail:
-                    if self._sock_type == _SOCK_STREAM:
+                    if self._sock_type == SOCK_STREAM:
                         self._buffer += _the_interface.socket_read(self.socknum, avail)[
                             1
                         ]
@@ -429,7 +429,7 @@ class socket:
             avail = self.available()
             if avail:
                 stamp = time.monotonic()
-                if self._sock_type == _SOCK_STREAM:
+                if self._sock_type == SOCK_STREAM:
                     recv = _the_interface.socket_read(
                         self.socknum, min(to_read, avail)
                     )[1]
@@ -470,7 +470,7 @@ class socket:
         ret = None
         avail = self.available()
         if avail:
-            if self._sock_type == _SOCK_STREAM:
+            if self._sock_type == SOCK_STREAM:
                 self._buffer += _the_interface.socket_read(self.socknum, avail)[1]
             elif self._sock_type == SOCK_DGRAM:
                 self._buffer += _the_interface.read_udp(self.socknum, avail)[1]
@@ -552,7 +552,7 @@ class socket:
         while b"\r\n" not in self._buffer:
             avail = self.available()
             if avail:
-                if self._sock_type == _SOCK_STREAM:
+                if self._sock_type == SOCK_STREAM:
                     self._buffer += _the_interface.socket_read(self.socknum, avail)[1]
                 elif self._sock_type == SOCK_DGRAM:
                     self._buffer += _the_interface.read_udp(self.socknum, avail)[1]
@@ -569,7 +569,7 @@ class socket:
 
     def disconnect(self) -> None:
         """Disconnect a TCP socket."""
-        if self._sock_type != _SOCK_STREAM:
+        if self._sock_type != SOCK_STREAM:
             raise RuntimeError("Socket must be a TCP socket.")
         _the_interface.socket_disconnect(self.socknum)
 
