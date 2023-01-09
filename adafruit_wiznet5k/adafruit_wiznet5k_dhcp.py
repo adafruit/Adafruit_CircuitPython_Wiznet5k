@@ -409,13 +409,14 @@ class DHCP:
         elif self._dhcp_state == STATE_REQUESTING:
             message_type = DHCP_REQUEST
         else:
-            raise ValueError("Wrong FSM state attempting to send message.")
+            raise ValueError(
+                "FSM should only send messages in SELECTING or REQUESTING states."
+            )
         while True:
+            self._generate_dhcp_message(message_type=message_type)
+            self._eth.write_sndipr(self._wiz_sock, self.dhcp_server_ip)
+            self._eth.socket_write(self._wiz_sock, _BUFF)
             while time.monotonic() < self._next_resend:
-                self._generate_dhcp_message(message_type=message_type)
-                self._eth.write_sndipr(self._wiz_sock, self.dhcp_server_ip)
-                print("Sending the message.")
-                self._eth.socket_write(self._wiz_sock, _BUFF)
                 print("Waiting for response…")
                 if self._receive_dhcp_response():
                     try:

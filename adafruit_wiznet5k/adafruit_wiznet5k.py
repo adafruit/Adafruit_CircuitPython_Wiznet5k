@@ -1044,7 +1044,6 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
                     "Hardware timeout while sending on socket {}.".format(socket_num)
                 )
             time.sleep(0.001)
-
         self._write_snir(socket_num, SNIR_SEND_OK)
         return ret
 
