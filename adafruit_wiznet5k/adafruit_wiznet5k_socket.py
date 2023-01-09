@@ -146,8 +146,6 @@ SOCKET_INVALID = const(255)
 
 
 # pylint: disable=too-many-arguments, unused-argument
-
-
 def getaddrinfo(
     host: str,
     port: int,
@@ -334,7 +332,8 @@ class socket:
 
         :param int backlog: Included for compatibility but ignored.
         """
-        assert self._listen_port is not None, "Use bind to set the port before listen!"
+        if self._listen_port is None:
+            raise RuntimeError("Use bind to set the port before listen!")
         _the_interface.socket_listen(self._socknum, self._listen_port)
         self._buffer = b""
 
@@ -576,7 +575,8 @@ class socket:
 
     def _disconnect(self) -> None:
         """Disconnect a TCP socket."""
-        assert self._sock_type == SOCK_STREAM, "Socket must be a TCP socket."
+        if self._sock_type != SOCK_STREAM:
+            raise RuntimeError("Socket must be a TCP socket.")
         _the_interface.socket_disconnect(self._socknum)
 
     def close(self) -> None:
