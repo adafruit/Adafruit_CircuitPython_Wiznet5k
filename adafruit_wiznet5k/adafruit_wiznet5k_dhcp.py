@@ -278,11 +278,13 @@ class DHCP:
         _debugging_message(
             "Calculating next retry time and incrementing retries.", self._debug
         )
-        delay = int(2**self._retries * interval + randint(-1, 1) + time.monotonic())
+        delay = 2**self._retries * interval + randint(-1, 1)
+        print("delay = {}".format(delay))
+        delay += time.monotonic()
         if delay < 1:
             raise ValueError("Retry delay must be >= 1 second")
         self._retries += 1
-        return delay
+        return int(delay)
 
     def _prepare_and_set_next_state(
         self,
@@ -306,9 +308,7 @@ class DHCP:
         )
         if next_state not in (STATE_SELECTING, STATE_REQUESTING):
             raise ValueError("The next state must be SELECTING or REQUESTING.")
-        self._retries = 0
         self._max_retries = max_retries
-        self._next_resend = self._next_retry_time_and_retry()
         self._retries = 0
         self._dhcp_state = next_state
 
@@ -360,7 +360,7 @@ class DHCP:
         :raises TimeoutError: If the FSM is in blocking mode and no valid response has
             been received before the timeout expires.
         """
-        # pylint: disable=too-many-branches
+        # pylint: disable=too-many-branches, too-many-statements
         def processing_state_selecting():
             """Process a message while the FSM is in SELECTING state."""
             if self._dhcp_state == STATE_SELECTING and msg_type == DHCP_OFFER:
@@ -416,7 +416,9 @@ class DHCP:
             self._generate_dhcp_message(message_type=message_type)
             self._eth.write_sndipr(self._wiz_sock, self.dhcp_server_ip)
             self._eth.socket_write(self._wiz_sock, _BUFF)
+            self._next_resend = self._next_retry_time_and_retry()
             while time.monotonic() < self._next_resend:
+                start_time = time.monotonic()
                 print("Waiting for response…")
                 if self._receive_dhcp_response():
                     try:
@@ -434,7 +436,9 @@ class DHCP:
                 if not self._blocking:
                     _debugging_message("Nonblocking, exiting loop.", self._debug)
                     return
-            self._next_resend = self._next_retry_time_and_retry()
+            print("++++ Attempt {}".format(self._retries))
+            print(time.monotonic() - start_time)
+            # self._next_resend = self._next_retry_time_and_retry()
             if self._retries > self._max_retries:
                 if self._renew:
                     return
