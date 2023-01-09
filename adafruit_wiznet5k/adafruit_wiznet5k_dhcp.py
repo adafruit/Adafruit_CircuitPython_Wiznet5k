@@ -64,8 +64,8 @@ MAX_DHCP_OPT = const(0x10)
 DHCP_SERVER_PORT = const(67)
 # DHCP Lease Time, in seconds
 DEFAULT_LEASE_TIME = const(900)
-BROADCAST_SERVER_ADDR = b"/xff/xff/xff/xff"  # (255.255.255.255)
-UNASSIGNED_IP_ADDR = b"/x00/x00/x00/x00"  # (0.0.0.0)
+BROADCAST_SERVER_ADDR = b"\xff\xff\xff\xff"  # (255.255.255.255)
+UNASSIGNED_IP_ADDR = b"\x00\x00\x00\x00"  # (0.0.0.0)
 
 # DHCP Response Options
 MSG_TYPE = 53
@@ -284,7 +284,7 @@ class DHCP:
         self._retries += 1
         return delay
 
-    def _prepare_message_set_next_state(
+    def _prepare_and_set_next_state(
         self,
         *,
         next_state: int,
@@ -301,7 +301,7 @@ class DHCP:
         :raises ValueError: If the next FSM state does not handle DHCP messages.
         """
         _debugging_message(
-            "Setting next FSM state to {} and sending a message.".format(next_state),
+            "Setting next FSM state to {}.".format(next_state),
             self._debug,
         )
         if next_state not in (STATE_SELECTING, STATE_REQUESTING):
@@ -367,7 +367,7 @@ class DHCP:
                 _debugging_message(
                     "FSM state is SELECTING with valid OFFER.", self._debug
                 )
-                self._prepare_message_set_next_state(
+                self._prepare_and_set_next_state(
                     next_state=STATE_REQUESTING,
                     max_retries=3,
                 )
@@ -414,7 +414,9 @@ class DHCP:
             while time.monotonic() < self._next_resend:
                 self._generate_dhcp_message(message_type=message_type)
                 self._eth.write_sndipr(self._wiz_sock, self.dhcp_server_ip)
+                print("Sending the message.")
                 self._eth.socket_write(self._wiz_sock, _BUFF)
+                print("Waiting for response…")
                 if self._receive_dhcp_response():
                     try:
                         msg_type = self._parse_dhcp_response()
@@ -484,7 +486,7 @@ class DHCP:
             self._renew = True
             self._dhcp_connection_setup()
             self._start_time = time.monotonic()
-            self._prepare_message_set_next_state(
+            self._prepare_and_set_next_state(
                 next_state=STATE_REQUESTING,
                 max_retries=3,
             )
@@ -494,14 +496,14 @@ class DHCP:
             self.dhcp_server_ip = BROADCAST_SERVER_ADDR
             self._dhcp_connection_setup()
             self._start_time = time.monotonic()
-            self._prepare_message_set_next_state(
+            self._prepare_and_set_next_state(
                 next_state=STATE_REQUESTING,
                 max_retries=3,
             )
 
         if self._dhcp_state == STATE_INIT:
             self._dsm_reset()
-            self._prepare_message_set_next_state(
+            self._prepare_and_set_next_state(
                 next_state=STATE_SELECTING,
                 max_retries=3,
             )

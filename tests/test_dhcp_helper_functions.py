@@ -511,7 +511,7 @@ class TestSmallHelperFunctions:
         wiz_dhcp._BUFF = bytearray(message)
         dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, (1, 2, 3, 4, 5, 6))
         dhcp_client._wiz_sock = mocker.Mock()
-        dhcp_client._prepare_message_set_next_state(
+        dhcp_client._prepare_and_set_next_state(
             next_state=next_state, max_retries=retries
         )
         assert dhcp_client._retries == 0
@@ -536,7 +536,7 @@ class TestSmallHelperFunctions:
         # Test with all states that should not call this function.
         dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, (1, 2, 3, 4, 5, 6))
         with pytest.raises(ValueError):
-            dhcp_client._prepare_message_set_next_state(
+            dhcp_client._prepare_and_set_next_state(
                 next_state=next_state, max_retries=4
             )
 

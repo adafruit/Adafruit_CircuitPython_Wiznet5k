@@ -977,6 +977,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
         :return int: The number of bytes written to the buffer.
         """
+        # pylint: disable=too-many-branches
         assert self.link_status, "Ethernet cable disconnected!"
         assert socket_num <= self.max_sockets, "Provided socket exceeds max_sockets."
         if len(buffer) > SOCK_SIZE:
@@ -985,7 +986,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             ret = len(buffer)
         stamp = time.monotonic()
 
-        # if buffer is available, start the transfer
+        # If buffer is available, start the transfer
         free_size = self._get_tx_free_size(socket_num)
         while free_size < ret:
             free_size = self._get_tx_free_size(socket_num)
@@ -1001,7 +1002,6 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         offset = ptr & SOCK_MASK
         if self._chip_type == "w5500":
             dst_addr = offset + (socket_num * SOCK_SIZE + 0x8000)
-
             txbuf = buffer[:ret]
             cntl_byte = 0x14 + (socket_num << 5)
             self.write(dst_addr, cntl_byte, txbuf)
@@ -1023,10 +1023,9 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         # update sn_tx_wr to the value + data size
         ptr = (ptr + ret) & 0xFFFF
         self._write_sntx_wr(socket_num, ptr)
-
         self.write_sncr(socket_num, CMD_SOCK_SEND)
-        while self.read_sncr(socket_num):
-            time.sleep(0.0001)
+        while self.read_sncr(socket_num) != b"\x00":
+            time.sleep(0.001)
 
         # check data was  transferred correctly
         while not self._read_snir(socket_num)[0] & SNIR_SEND_OK:
@@ -1036,14 +1035,15 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
                 SNSR_SOCK_FIN_WAIT,
                 SNSR_SOCK_CLOSE_WAIT,
                 SNSR_SOCK_CLOSING,
-            ) or (timeout and time.monotonic() - stamp > timeout):
-                # self.socket_close(socket_num)
-                return 0
+            ):
+                raise RuntimeError("Socket closed before data was sent.")
+            if timeout and time.monotonic() - stamp > timeout:
+                raise RuntimeError("Operation timed out. No data sent.")
             if self._read_snir(socket_num)[0] & SNIR_TIMEOUT:
                 raise TimeoutError(
                     "Hardware timeout while sending on socket {}.".format(socket_num)
                 )
-            time.sleep(0.01)
+            time.sleep(0.001)
 
         self._write_snir(socket_num, SNIR_SEND_OK)
         return ret
