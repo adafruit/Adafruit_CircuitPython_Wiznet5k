@@ -695,33 +695,34 @@ class TestReceiveResponse:
         "bytes_on_socket", (wiz_dhcp.BUFF_LENGTH, minimum_packet_length + 1)
     )
     def test_receive_response_good_data(self, mock_dhcp, bytes_on_socket):
-        mock_dhcp._next_resend = time.monotonic() + 15
-        mock_dhcp._wiz_sock.recv.return_value = bytes([0] * bytes_on_socket)
-        response = mock_dhcp._receive_dhcp_response()
+        mock_dhcp._eth.read_udp.return_value = (
+            bytes_on_socket,
+            bytes([0] * bytes_on_socket),
+        )
+        response = mock_dhcp._receive_dhcp_response(time.monotonic() + 15)
         assert response == bytes_on_socket
         assert response > 236
 
     @freeze_time("2022-10-10")
-    @pytest.mark.parametrize(
-        "bytes_on_socket", ([bytes([0] * minimum_packet_length), bytes([0] * 1)],)
-    )
-    def test_receive_response_short_packet(self, mock_dhcp, bytes_on_socket):
-        mock_dhcp._next_resend = time.monotonic() + 15
-        mock_dhcp._wiz_sock.recv.side_effect = bytes_on_socket
-        assert mock_dhcp._receive_dhcp_response() > 236
+    def test_receive_response_short_packet(self, mock_dhcp):
+        mock_dhcp._eth.read_udp.side_effect = [
+            (236, bytes([0] * 236)),
+            (1, bytes([0] * 1)),
+        ]
+        assert mock_dhcp._receive_dhcp_response(time.monotonic() + 15) > 236
 
     @freeze_time("2022-10-10", auto_tick_seconds=5)
     def test_timeout(self, mock_dhcp):
         mock_dhcp._next_resend = time.monotonic() + 15
-        mock_dhcp._wiz_sock.recv.side_effect = [
-            b"",
-            b"",
-            b"",
-            b"",
-            b"",
+        mock_dhcp._eth.read_udp.side_effect = [
+            (0, b""),
+            (0, b""),
+            (0, b""),
+            (0, b""),
+            (0, b""),
             bytes([0] * 240),
         ]
-        assert mock_dhcp._receive_dhcp_response() == 0
+        assert mock_dhcp._receive_dhcp_response(time.monotonic() + 15) == 0
 
     @freeze_time("2022-10-10")
     @pytest.mark.parametrize("bytes_returned", ([240], [230, 30]))
@@ -732,21 +733,30 @@ class TestReceiveResponse:
         expected_result = bytearray([2] * total_bytes) + (
             bytes([0] * (wiz_dhcp.BUFF_LENGTH - total_bytes))
         )
-        mock_dhcp._wiz_sock.recv.side_effect = (bytes([2] * x) for x in bytes_returned)
-        assert mock_dhcp._receive_dhcp_response() == total_bytes
+        mock_dhcp._eth.read_udp.side_effect = (
+            (x, bytes([2] * x)) for x in bytes_returned
+        )
+        assert mock_dhcp._receive_dhcp_response(time.monotonic() + 15) == total_bytes
         assert wiz_dhcp._BUFF == expected_result
 
     @freeze_time("2022-10-10")
     def test_buffer_does_not_overrun(self, mocker, mock_dhcp):
+        mock_dhcp._wiz_sock = 1
         mock_dhcp._next_resend = time.monotonic() + 15
-        mock_dhcp._wiz_sock.recv.return_value = bytes([2] * wiz_dhcp.BUFF_LENGTH)
-        mock_dhcp._receive_dhcp_response()
-        mock_dhcp._wiz_sock.recv.assert_called_once_with(wiz_dhcp.BUFF_LENGTH)
-        mock_dhcp._wiz_sock.recv.reset_mock()
-        mock_dhcp._wiz_sock.recv.side_effect = [bytes([2] * 200), bytes([2] * 118)]
-        mock_dhcp._receive_dhcp_response()
-        assert mock_dhcp._wiz_sock.recv.call_count == 2
-        assert mock_dhcp._wiz_sock.recv.call_args_list == [
-            mocker.call(318),
-            mocker.call(118),
+        mock_dhcp._eth.read_udp.return_value = (
+            wiz_dhcp.BUFF_LENGTH,
+            bytes([2] * wiz_dhcp.BUFF_LENGTH),
+        )
+        mock_dhcp._receive_dhcp_response(time.monotonic() + 10)
+        mock_dhcp._eth.read_udp.assert_called_once_with(1, wiz_dhcp.BUFF_LENGTH)
+        mock_dhcp._eth.read_udp.reset_mock()
+        mock_dhcp._eth.read_udp.side_effect = [
+            (200, bytes([2] * 200)),
+            (118, bytes([2] * 118)),
+        ]
+        mock_dhcp._receive_dhcp_response(time.monotonic() + 10)
+        assert mock_dhcp._eth.read_udp.call_count == 2
+        assert mock_dhcp._eth.read_udp.call_args_list == [
+            mocker.call(1, 318),
+            mocker.call(1, 118),
         ]

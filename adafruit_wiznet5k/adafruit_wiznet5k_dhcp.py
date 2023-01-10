@@ -301,7 +301,7 @@ class DHCP:
         bytes_read = 0
         while bytes_read <= minimum_packet_length and time.monotonic() < timeout:
             buffer.extend(
-                self._eth.socket_read(self._wiz_sock, BUFF_LENGTH - bytes_read)[1]
+                self._eth.read_udp(self._wiz_sock, BUFF_LENGTH - bytes_read)[1]
             )
             bytes_read = len(buffer)
             if bytes_read == BUFF_LENGTH:

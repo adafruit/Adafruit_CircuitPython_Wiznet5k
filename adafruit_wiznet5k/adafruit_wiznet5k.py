@@ -940,18 +940,16 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
                 time.sleep(0.0001)
         return ret, resp
 
-    def read_udp(
-        self, socket_num: int, length: int
-    ) -> Union[int, Tuple[int, Union[int, bytearray]]]:
+    def read_udp(self, socket_num: int, length: int) -> Tuple[int, bytes]:
         """
         Read UDP socket's current message bytes.
 
         :param int socket_num: The socket to read data from.
         :param int length: The number of bytes to read from the socket.
 
-        :return Union[int, Tuple[int, Union[int, bytearray]]]: If the read was successful then
-            the first item of the tuple is the length of the data and the second is the data.
-            If the read was unsuccessful then -1 is returned.
+        :return Tuple[int, bytes]: If the read was successful then the first
+            item of the tuple is the length of the data and the second is the data.
+            If the read was unsuccessful then (0, b"") is returned.
         """
         if self.udp_datasize[socket_num] > 0:
             if self.udp_datasize[socket_num] <= length:
@@ -962,7 +960,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
                 self.socket_read(socket_num, self.udp_datasize[socket_num] - length)
             self.udp_datasize[socket_num] = 0
             return ret, resp
-        return -1
+        return 0, b""
 
     def socket_write(
         self, socket_num: int, buffer: bytearray, timeout: float = 0
