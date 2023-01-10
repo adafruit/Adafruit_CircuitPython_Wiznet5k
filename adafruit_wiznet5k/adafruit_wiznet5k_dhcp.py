@@ -354,16 +354,18 @@ class DHCP:
                 return True
         return False
 
-    def _handle_dhcp_message(self) -> None:
+    def _handle_dhcp_message(self) -> int:
         """Send, receive and process DHCP message. Update the finite state machine (FSM).
 
         Send a message and wait for a response from the DHCP server, resending on an
-        exponential fallback schedule if no response is received. Process the response,
-        sending messages, setting attributes, and setting next FSM state according to the
-        current state.
-
+        exponential fallback schedule matching the DHCP standard if no response is received.
         Only called when the FSM is in SELECTING or REQUESTING states.
 
+        :returns int: The DHCP message type, or 0 if no message received in non-blocking
+            or renewing states.
+
+        :raises ValueError: If the function is not called from SELECTING or BLOCKING FSM
+            states.
         :raises TimeoutError: If the FSM is in blocking mode and no valid response has
             been received before the timeout expires.
         """
@@ -374,7 +376,7 @@ class DHCP:
             msg_type_out = DHCP_REQUEST
         else:
             raise ValueError(
-                "FSM should only send messages while in SELECTING or REQUESTING states."
+                "FSM can only send messages while in SELECTING or REQUESTING states."
             )
         for attempt in range(4):  # Initial attempt plus 3 retries.
             message_length = self._generate_dhcp_message(message_type=msg_type_out)
@@ -388,16 +390,15 @@ class DHCP:
                         _debugging_message(
                             "Received message type {}".format(msg_type_in), self._debug
                         )
+                        return msg_type_in
                     except ValueError as error:
                         _debugging_message(error, self._debug)
-                    else:
-                        if self._process_messaging_states(message_type=msg_type_in):
-                            return
                 if not self._blocking or self._renew:
                     _debugging_message(
-                        "Nonblocking or renewing, exiting loop.", self._debug
+                        "No message, nonblocking or renewing, exiting loop.",
+                        self._debug,
                     )
-                    return
+                    return 0  # Did not receive a response in a single attempt.
         raise TimeoutError(
             "No response from DHCP server after {} retries.".format(attempt)
         )

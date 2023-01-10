@@ -504,8 +504,9 @@ class TestHandleDhcpMessage:
         mocker.patch.object(
             dhcp_client, "_receive_dhcp_response", autospec=True, return_value=300
         )
+        # Non zero value is a good message for _handle_dhcp_message.
         mocker.patch.object(
-            dhcp_client, "_parse_dhcp_response", autospec=True, return_value=0x00
+            dhcp_client, "_parse_dhcp_response", autospec=True, return_value=0x01
         )
         mocker.patch.object(
             dhcp_client,
@@ -519,7 +520,7 @@ class TestHandleDhcpMessage:
         dhcp_client._blocking = True
         dhcp_client._renew = False
         # Test.
-        dhcp_client._handle_dhcp_message()
+        assert dhcp_client._handle_dhcp_message() == 1
         # Confirm that the msg_type sent matches the FSM state.
         dhcp_client._generate_dhcp_message.assert_called_once_with(message_type=msg_in)
         dhcp_client._eth.write_sndipr.assert_called_once_with(
@@ -530,8 +531,6 @@ class TestHandleDhcpMessage:
         dhcp_client._receive_dhcp_response.assert_called_once_with(time.monotonic() + 5)
         # If the initial message was good, receive is only called once.
         dhcp_client._parse_dhcp_response.assert_called_once()
-        # Called once if the message was valid.
-        dhcp_client._process_messaging_states.assert_called_once_with(message_type=0x00)
 
     @freeze_time("2022-5-5", auto_tick_seconds=1)
     def test_timeout_blocking_no_response(self, mocker, mock_wiznet5k):
@@ -546,7 +545,7 @@ class TestHandleDhcpMessage:
             dhcp_client, "_receive_dhcp_response", autospec=True, return_value=0
         )
         mocker.patch.object(
-            dhcp_client, "_parse_dhcp_response", autospec=True, return_value=0x00
+            dhcp_client, "_parse_dhcp_response", autospec=True, side_effect=[ValueError]
         )
         mocker.patch.object(
             dhcp_client,
@@ -564,9 +563,8 @@ class TestHandleDhcpMessage:
             dhcp_client._handle_dhcp_message()
         # Confirm that _receive_dhcp_response is called repeatedly.
         assert dhcp_client._receive_dhcp_response.call_count == 4
-        # Check that message parsing and processing not called.
+        # Check that message parsing not called.
         dhcp_client._parse_dhcp_response.assert_not_called()
-        dhcp_client._process_messaging_states.assert_not_called()
 
     @freeze_time("2022-5-5", auto_tick_seconds=1)
     def test_timeout_blocking_bad_message(self, mocker, mock_wiznet5k):
@@ -583,7 +581,7 @@ class TestHandleDhcpMessage:
             dhcp_client, "_receive_dhcp_response", autospec=True, return_value=300
         )
         mocker.patch.object(
-            dhcp_client, "_parse_dhcp_response", autospec=True, return_value=0x00
+            dhcp_client, "_parse_dhcp_response", autospec=True, side_effect=ValueError
         )
         mocker.patch.object(
             dhcp_client,
@@ -602,7 +600,6 @@ class TestHandleDhcpMessage:
         # Confirm that processing methods are called repeatedly.
         assert dhcp_client._receive_dhcp_response.call_count == 4
         assert dhcp_client._parse_dhcp_response.call_count == 4
-        assert dhcp_client._process_messaging_states.call_count == 4
 
     @freeze_time("2022-5-5")
     @pytest.mark.parametrize(
@@ -637,12 +634,11 @@ class TestHandleDhcpMessage:
         dhcp_client._blocking = blocking
         dhcp_client._renew = renew
         # Test.
-        dhcp_client._handle_dhcp_message()
+        assert dhcp_client._handle_dhcp_message() == 0
         dhcp_client._next_retry_time.assert_called_once_with(attempt=0)
         dhcp_client._receive_dhcp_response.assert_called_once_with(time.monotonic() + 5)
         # No bytes returned so don't call parse or process message.
         dhcp_client._parse_dhcp_response.assert_not_called()
-        dhcp_client._process_messaging_states.assert_not_called()
 
     @freeze_time("2022-5-5")
     @pytest.mark.parametrize(
@@ -662,7 +658,7 @@ class TestHandleDhcpMessage:
             dhcp_client, "_receive_dhcp_response", autospec=True, return_value=300
         )
         mocker.patch.object(
-            dhcp_client, "_parse_dhcp_response", autospec=True, return_value=0x00
+            dhcp_client, "_parse_dhcp_response", autospec=True, side_effect=ValueError
         )
         mocker.patch.object(
             dhcp_client,
@@ -677,13 +673,11 @@ class TestHandleDhcpMessage:
         dhcp_client._blocking = blocking
         dhcp_client._renew = renew
         # Test.
-        dhcp_client._handle_dhcp_message()
+        assert dhcp_client._handle_dhcp_message() == 0
         dhcp_client._next_retry_time.assert_called_once_with(attempt=0)
         dhcp_client._receive_dhcp_response.assert_called_once_with(time.monotonic() + 5)
         # Bad message returned so call parse and process message.
         dhcp_client._parse_dhcp_response.assert_called_once()
-        # Called once if the message was valid.
-        dhcp_client._process_messaging_states.assert_called_once()
 
 
 class TestReceiveResponse:
