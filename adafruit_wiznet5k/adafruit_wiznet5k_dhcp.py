@@ -156,8 +156,6 @@ class DHCP:
         self._dhcp_state = STATE_INIT
         self._transaction_id = randint(1, 0x7FFFFFFF)
         self._start_time = 0
-        self._retries = 0
-        self._max_retries = 0
         self._blocking = False
         self._renew = False
 
@@ -210,7 +208,6 @@ class DHCP:
         self.subnet_mask = UNASSIGNED_IP_ADDR
         self.dns_server_ip = UNASSIGNED_IP_ADDR
         self._renew = False
-        self._retries = 0
         self._increment_transaction_id()
         self._start_time = int(time.monotonic())
 
@@ -221,7 +218,7 @@ class DHCP:
             self._eth.socket_close(self._wiz_sock)
             self._wiz_sock = None
 
-    def _dhcp_connection_setup(self, timeout: int = 5) -> None:
+    def _dhcp_connection_setup(self, timeout: float = 5.0) -> None:
         """Initialise a UDP socket.
 
         Attempt to initialise a UDP socket. If the finite state machine (FSM) is in
@@ -246,12 +243,13 @@ class DHCP:
             self._eth.write_sock_port(self._wiz_sock, 68)  # Set DHCP client port.
             self._eth.write_sncr(self._wiz_sock, 0x01)  # Open the socket.
             while (
-                self._eth.read_sncr(self._wiz_sock) == 0
+                self._eth.read_sncr(self._wiz_sock) != 0
             ):  # Wait for command to complete.
                 time.sleep(0.001)
             if self._eth.read_snsr(self._wiz_sock) == bytes([0x22]):
-                self._eth.write_sndport(self._wiz_sock, DHCP_SERVER_PORT)
+                self._eth.write_sndport(2, DHCP_SERVER_PORT)
                 return
+        self._wiz_sock = None
         raise RuntimeError("Unable to initialize UDP socket.")
 
     def _increment_transaction_id(self) -> None:
@@ -283,32 +281,6 @@ class DHCP:
             raise ValueError("Retry interval must be > 1 second.")
         delay = 2**attempt * interval + randint(-1, 1) + time.monotonic()
         return delay
-
-    def _prepare_and_set_next_state(
-        self,
-        *,
-        next_state: int,
-        max_retries: int,
-    ) -> None:
-        """Generate a DHCP message and update the finite state machine state (FSM).
-
-        Creates and sends a DHCP message, resets retry parameters and updates the
-        FSM state.
-
-        :param int next_state: The state that the FSM will be set to.
-        :param int max_retries: Maximum attempts to resend the DHCP message.
-
-        :raises ValueError: If the next FSM state does not handle DHCP messages.
-        """
-        _debugging_message(
-            "Setting next FSM state to {}.".format(next_state),
-            self._debug,
-        )
-        if next_state not in (STATE_SELECTING, STATE_REQUESTING):
-            raise ValueError("The next state must be SELECTING or REQUESTING.")
-        self._max_retries = max_retries
-        self._retries = 0
-        self._dhcp_state = next_state
 
     def _receive_dhcp_response(self, timeout) -> int:
         """
@@ -363,10 +335,7 @@ class DHCP:
                 _debugging_message(
                     "FSM state is SELECTING with valid OFFER.", self._debug
                 )
-                self._prepare_and_set_next_state(
-                    next_state=STATE_REQUESTING,
-                    max_retries=3,
-                )
+                self._dhcp_state = STATE_REQUESTING
                 return True
             return False
 
@@ -433,7 +402,7 @@ class DHCP:
         if self._renew:
             return
         raise TimeoutError(
-            "No response from DHCP server after {} retries.".format(self._max_retries)
+            "No response from DHCP server after {} retries.".format(attempt)
         )
 
     def _dhcp_state_machine(self, *, blocking: bool = False) -> None:
@@ -474,34 +443,23 @@ class DHCP:
             self._renew = True
             self._dhcp_connection_setup()
             self._start_time = time.monotonic()
-            self._prepare_and_set_next_state(
-                next_state=STATE_REQUESTING,
-                max_retries=3,
-            )
+            self._dhcp_state = STATE_REQUESTING
 
         if self._dhcp_state == STATE_REBINDING:
             self._renew = True
             self.dhcp_server_ip = BROADCAST_SERVER_ADDR
             self._dhcp_connection_setup()
             self._start_time = time.monotonic()
-            self._prepare_and_set_next_state(
-                next_state=STATE_REQUESTING,
-                max_retries=3,
-            )
+            self._dhcp_state = STATE_REQUESTING
 
         if self._dhcp_state == STATE_INIT:
             self._dsm_reset()
-            self._prepare_and_set_next_state(
-                next_state=STATE_SELECTING,
-                max_retries=3,
-            )
+            self._dhcp_state = STATE_SELECTING
 
         if self._dhcp_state == STATE_SELECTING:
-            self._max_retries = 3
             self._handle_dhcp_message()
 
         if self._dhcp_state == STATE_REQUESTING:
-            self._max_retries = 3
             self._handle_dhcp_message()
 
         if self._renew:

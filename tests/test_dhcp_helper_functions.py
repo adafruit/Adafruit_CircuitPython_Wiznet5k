@@ -63,8 +63,8 @@ class TestDHCPInit:
         assert wiz_dhcp.DHCP_SERVER_PORT == const(67)
         # DHCP Lease Time, in seconds
         assert wiz_dhcp.DEFAULT_LEASE_TIME == const(900)
-        assert wiz_dhcp.BROADCAST_SERVER_ADDR == b"/xff/xff/xff/xff"
-        assert wiz_dhcp.UNASSIGNED_IP_ADDR == b"/x00/x00/x00/x00"
+        assert wiz_dhcp.BROADCAST_SERVER_ADDR == b"\xff\xff\xff\xff"
+        assert wiz_dhcp.UNASSIGNED_IP_ADDR == b"\x00\x00\x00\x00"
 
         # DHCP Response Options
         assert wiz_dhcp.MSG_TYPE == 53
@@ -362,38 +362,36 @@ class TestParseDhcpMessage:
             dhcp_client._parse_dhcp_response()
 
 
-class TestResetDsmReset:
-    def test_socket_reset(self, mock_wiznet5k):
-        dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, (1, 2, 3, 4, 5, 6))
+@freeze_time("2022-11-10")
+def test_dsm_reset(mocker, mock_wiznet5k):
+    dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, (1, 2, 3, 4, 5, 6))
+    mocker.patch.object(dhcp_client, "_dhcp_connection_setup", autospec=True)
+    mocker.patch.object(dhcp_client, "_socket_release", autospec=True)
+    dhcp_client.dhcp_server_ip = (1, 2, 3, 4)
+    dhcp_client.local_ip = (2, 3, 4, 5)
+    dhcp_client.subnet_mask = (3, 4, 5, 6)
+    dhcp_client.dns_server_ip = (7, 8, 8, 10)
+    dhcp_client._renew = True
+    dhcp_client._retries = 4
+    dhcp_client._transaction_id = 3
+    dhcp_client._start_time = None
 
-        dhcp_client._dsm_reset()
-        assert dhcp_client._wiz_sock is None
-
-        dhcp_client._dsm_reset()
-        assert dhcp_client._wiz_sock is None
-
-    @freeze_time("2022-11-10")
-    def test_reset_dsm_parameters(self, mock_wiznet5k):
-        dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, (1, 2, 3, 4, 5, 6))
-        dhcp_client.dhcp_server_ip = (1, 2, 3, 4)
-        dhcp_client.local_ip = (2, 3, 4, 5)
-        dhcp_client.subnet_mask = (3, 4, 5, 6)
-        dhcp_client.dns_server_ip = (7, 8, 8, 10)
-        dhcp_client._renew = True
-        dhcp_client._retries = 4
-        dhcp_client._transaction_id = 3
-        dhcp_client._start_time = None
-
-        dhcp_client._dsm_reset()
-
-        assert dhcp_client.dhcp_server_ip == wiz_dhcp.BROADCAST_SERVER_ADDR
-        assert dhcp_client.local_ip == wiz_dhcp.UNASSIGNED_IP_ADDR
-        assert dhcp_client.subnet_mask == wiz_dhcp.UNASSIGNED_IP_ADDR
-        assert dhcp_client.dns_server_ip == wiz_dhcp.UNASSIGNED_IP_ADDR
-        assert dhcp_client._renew is False
-        assert dhcp_client._retries == 0
-        assert dhcp_client._transaction_id == 4
-        assert dhcp_client._start_time == time.monotonic()
+    dhcp_client._dsm_reset()
+    dhcp_client._dhcp_connection_setup.assert_called_once()
+    dhcp_client._socket_release.assert_called_once()
+    assert mock_wiznet5k.ifconfig == (
+        wiz_dhcp.UNASSIGNED_IP_ADDR,
+        wiz_dhcp.UNASSIGNED_IP_ADDR,
+        wiz_dhcp.UNASSIGNED_IP_ADDR,
+        wiz_dhcp.UNASSIGNED_IP_ADDR,
+    )
+    assert dhcp_client.dhcp_server_ip == wiz_dhcp.BROADCAST_SERVER_ADDR
+    assert dhcp_client.local_ip == wiz_dhcp.UNASSIGNED_IP_ADDR
+    assert dhcp_client.subnet_mask == wiz_dhcp.UNASSIGNED_IP_ADDR
+    assert dhcp_client.dns_server_ip == wiz_dhcp.UNASSIGNED_IP_ADDR
+    assert dhcp_client._renew is False
+    assert dhcp_client._transaction_id == 4
+    assert dhcp_client._start_time == time.monotonic()
 
 
 class TestSocketRelease:
@@ -430,11 +428,9 @@ class TestSmallHelperFunctions:
         )
         now = time.monotonic()
         for retry in range(3):
-            dhcp_client._retries = retry
-            assert dhcp_client._next_retry_time() == int(
+            assert dhcp_client._next_retry_time(attempt=retry) == int(
                 2**retry * 4 + rand_int + now
             )
-            assert dhcp_client._retries == retry + 1
 
     @freeze_time("2022-10-10")
     @pytest.mark.parametrize("interval", (2, 7, 10))
@@ -447,51 +443,44 @@ class TestSmallHelperFunctions:
         )
         now = time.monotonic()
         for retry in range(3):
-            dhcp_client._retries = retry
-            assert dhcp_client._next_retry_time(interval=interval) == int(
-                2**retry * interval + now
-            )
+            assert dhcp_client._next_retry_time(
+                attempt=retry, interval=interval
+            ) == int(2**retry * interval + now)
 
-    def test_setup_socket_with_no_error(self, mock_wiznet5k):
-        mock_wiznet5k.get_socket.return_value = 2
+    @freeze_time("2022-7-6")
+    def test_setup_socket_with_no_error(self, mocker, mock_wiznet5k):
+        mocker.patch.object(mock_wiznet5k, "get_socket", return_value=2)
+        mocker.patch.object(mock_wiznet5k, "read_sncr", return_value=0)
+        mocker.patch.object(mock_wiznet5k, "read_snsr", return_value=b"\x22")
         dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, (1, 2, 3, 4, 5, 6))
         dhcp_client._dhcp_connection_setup()
         mock_wiznet5k.get_socket.assert_called_once()
-        # mock_wiznet5k.write
-        dhcp_client._wiz_sock.bind.assert_called_once_with((None, 68))
-        dhcp_client._wiz_sock.connect.assert_called_once_with(
-            (wiz_dhcp.BROADCAST_SERVER_ADDR, 67)
+        mock_wiznet5k.write_snmr.assert_called_once_with(2, 0x02)
+        mock_wiznet5k.write_sock_port(2, 68)
+        mock_wiznet5k.write_sncr(2, 0x01)
+        mock_wiznet5k.read_sncr.assert_called_with(2)
+        mock_wiznet5k.write_sndport.assert_called_once_with(
+            2, wiz_dhcp.DHCP_SERVER_PORT
         )
+        assert dhcp_client._wiz_sock == 2
 
-    def test_setup_socket_with_error_then_ok_blocking(
-        self, mocker, mock_wiznet5k, mock_socket
-    ):
+    @freeze_time("2022-7-6", auto_tick_seconds=2)
+    def test_setup_socket_with_timeout_on_get_socket(self, mocker, mock_wiznet5k):
+        mocker.patch.object(mock_wiznet5k, "get_socket", return_value=0xFF)
+        mocker.patch.object(mock_wiznet5k, "read_sncr", return_value=0)
+        mocker.patch.object(mock_wiznet5k, "read_snsr", return_value=b"\x22")
         dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, (1, 2, 3, 4, 5, 6))
-        dhcp_client._blocking = True
-        mock_socket.socket.side_effect = [RuntimeError, mocker.Mock()]
-        assert dhcp_client._dhcp_connection_setup() is None
-        # Function should ignore the error, then set the socket and call settimeout
-        dhcp_client._wiz_sock.settimeout.assert_called_once_with(
-            dhcp_client._response_timeout
-        )
-
-    def test_setup_socket_with_error_then_ok_nonblocking(
-        self, mocker, mock_wiznet5k, mock_socket
-    ):
-        dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, (1, 2, 3, 4, 5, 6))
-        dhcp_client._blocking = False
-        mock_socket.socket.side_effect = [RuntimeError, mocker.Mock()]
-        assert dhcp_client._dhcp_connection_setup() is None
-        # Function should ignore the error, then return, _sock is None
+        with pytest.raises(RuntimeError):
+            dhcp_client._dhcp_connection_setup()
         assert dhcp_client._wiz_sock is None
 
-    @freeze_time("2022-10-02", auto_tick_seconds=2)
-    def test_setup_socket_with_error_then_timeout(self, mock_wiznet5k, mock_socket):
+    @freeze_time("2022-7-6", auto_tick_seconds=2)
+    def test_setup_socket_with_timeout_on_socket_is_udp(self, mocker, mock_wiznet5k):
+        mocker.patch.object(mock_wiznet5k, "get_socket", return_value=2)
+        mocker.patch.object(mock_wiznet5k, "read_sncr", return_value=0)
+        mocker.patch.object(mock_wiznet5k, "read_snsr", return_value=b"\x21")
         dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, (1, 2, 3, 4, 5, 6))
-        dhcp_client._blocking = True
-        mock_socket.socket.side_effect = [RuntimeError, RuntimeError]
-        # Function should timeout, raise an exception and not set a socket
-        with pytest.raises(TimeoutError):
+        with pytest.raises(RuntimeError):
             dhcp_client._dhcp_connection_setup()
         assert dhcp_client._wiz_sock is None
 
