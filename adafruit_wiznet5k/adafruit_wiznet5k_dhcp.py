@@ -316,6 +316,44 @@ class DHCP:
         gc.collect()
         return bytes_read
 
+    def _process_messaging_states(self, *, message_type: int):
+        """
+        Process a message while the FSM is in SELECTING or REQUESTING state.
+
+        Check the message and update the FSM state if it is a valid type.
+
+        :param int message_type: The type of message received from the DHCP server.
+
+        :returns bool: True if the message was valid for the current state
+        """
+        if self._dhcp_state == STATE_SELECTING and message_type == DHCP_OFFER:
+            _debugging_message("FSM state is SELECTING with valid OFFER.", self._debug)
+            self._dhcp_state = STATE_REQUESTING
+            return True
+        if self._dhcp_state == STATE_REQUESTING:
+            _debugging_message("FSM state is REQUESTING.", self._debug)
+            if message_type == DHCP_NAK:
+                _debugging_message(
+                    "Message is NAK, setting FSM state to INIT.", self._debug
+                )
+                self._dhcp_state = STATE_INIT
+                return True
+            if message_type == DHCP_ACK:
+                _debugging_message(
+                    "Message is ACK, setting FSM state to BOUND.", self._debug
+                )
+                if self._lease_time == 0:
+                    self._lease_time = DEFAULT_LEASE_TIME
+                self._t1 = self._start_time + self._lease_time // 2
+                self._t2 = self._start_time + self._lease_time - self._lease_time // 8
+                self._lease_time += self._start_time
+                self._increment_transaction_id()
+                self._renew = False
+                self._socket_release()
+                self._dhcp_state = STATE_BOUND
+                return True
+        return False
+
     def _handle_dhcp_message(self) -> None:
         """Receive and process DHCP message then update the finite state machine (FSM).
 
@@ -328,46 +366,6 @@ class DHCP:
         :raises TimeoutError: If the FSM is in blocking mode and no valid response has
             been received before the timeout expires.
         """
-        # pylint: disable=too-many-branches, too-many-statements
-        def processing_state_selecting():
-            """Process a message while the FSM is in SELECTING state."""
-            if self._dhcp_state == STATE_SELECTING and msg_type == DHCP_OFFER:
-                _debugging_message(
-                    "FSM state is SELECTING with valid OFFER.", self._debug
-                )
-                self._dhcp_state = STATE_REQUESTING
-                return True
-            return False
-
-        def processing_state_requesting():
-            """Process a message while the FSM is in REQUESTING state."""
-            if self._dhcp_state == STATE_REQUESTING:
-                _debugging_message("FSM state is REQUESTING.", self._debug)
-                if msg_type == DHCP_NAK:
-                    _debugging_message(
-                        "Message is NAK, setting FSM state to INIT.", self._debug
-                    )
-                    self._dhcp_state = STATE_INIT
-                    return True
-                if msg_type == DHCP_ACK:
-                    _debugging_message(
-                        "Message is ACK, setting FSM state to BOUND.", self._debug
-                    )
-                    if self._lease_time == 0:
-                        self._lease_time = DEFAULT_LEASE_TIME
-                    self._t1 = self._start_time + self._lease_time // 2
-                    self._t2 = (
-                        self._start_time + self._lease_time - self._lease_time // 8
-                    )
-                    self._lease_time += self._start_time
-                    self._increment_transaction_id()
-                    self._renew = False
-                    self._socket_release()
-                    self._dhcp_state = STATE_BOUND
-                    return True
-            return False
-
-        # Main processing loop
         _debugging_message("Processing SELECTING or REQUESTING state.", self._debug)
         if self._dhcp_state == STATE_SELECTING:
             message_type = DHCP_DISCOVER
@@ -392,9 +390,7 @@ class DHCP:
                     except ValueError as error:
                         _debugging_message(error, self._debug)
                     else:
-                        if processing_state_selecting():
-                            return
-                        if processing_state_requesting():
+                        if self._process_messaging_states(message_type=message_type):
                             return
                 if not self._blocking:
                     _debugging_message("Nonblocking, exiting loop.", self._debug)
