@@ -282,7 +282,7 @@ class DHCP:
         delay = 2**attempt * interval + randint(-1, 1) + time.monotonic()
         return delay
 
-    def _receive_dhcp_response(self, timeout) -> int:
+    def _receive_dhcp_response(self, timeout: float) -> int:
         """
         Receive data from the socket in response to a DHCP query.
 
@@ -324,7 +324,7 @@ class DHCP:
 
         :param int message_type: The type of message received from the DHCP server.
 
-        :returns bool: True if the message was valid for the current state
+        :returns bool: True if the message was valid for the current state.
         """
         if self._dhcp_state == STATE_SELECTING and message_type == DHCP_OFFER:
             _debugging_message("FSM state is SELECTING with valid OFFER.", self._debug)
@@ -355,11 +355,12 @@ class DHCP:
         return False
 
     def _handle_dhcp_message(self) -> None:
-        """Receive and process DHCP message then update the finite state machine (FSM).
+        """Send, receive and process DHCP message. Update the finite state machine (FSM).
 
-        Wait for a response from the DHCP server, resending on an exponential fallback
-        schedule if no response is received. Process the response, sending messages,
-        setting attributes, and setting next FSM state according to the current state.
+        Send a message and wait for a response from the DHCP server, resending on an
+        exponential fallback schedule if no response is received. Process the response,
+        sending messages, setting attributes, and setting next FSM state according to the
+        current state.
 
         Only called when the FSM is in SELECTING or REQUESTING states.
 
@@ -368,35 +369,35 @@ class DHCP:
         """
         _debugging_message("Processing SELECTING or REQUESTING state.", self._debug)
         if self._dhcp_state == STATE_SELECTING:
-            message_type = DHCP_DISCOVER
+            msg_type_out = DHCP_DISCOVER
         elif self._dhcp_state == STATE_REQUESTING:
-            message_type = DHCP_REQUEST
+            msg_type_out = DHCP_REQUEST
         else:
             raise ValueError(
-                "FSM should only send messages in SELECTING or REQUESTING states."
+                "FSM should only send messages while in SELECTING or REQUESTING states."
             )
         for attempt in range(4):  # Initial attempt plus 3 retries.
-            message_length = self._generate_dhcp_message(message_type=message_type)
+            message_length = self._generate_dhcp_message(message_type=msg_type_out)
             self._eth.write_sndipr(self._wiz_sock, self.dhcp_server_ip)
             self._eth.socket_write(self._wiz_sock, _BUFF[:message_length])
             next_resend = self._next_retry_time(attempt=attempt)
             while time.monotonic() < next_resend:
                 if self._receive_dhcp_response(next_resend):
                     try:
-                        msg_type = self._parse_dhcp_response()
+                        msg_type_in = self._parse_dhcp_response()
                         _debugging_message(
-                            "Received message type {}".format(msg_type), self._debug
+                            "Received message type {}".format(msg_type_in), self._debug
                         )
                     except ValueError as error:
                         _debugging_message(error, self._debug)
                     else:
-                        if self._process_messaging_states(message_type=message_type):
+                        if self._process_messaging_states(message_type=msg_type_in):
                             return
-                if not self._blocking:
-                    _debugging_message("Nonblocking, exiting loop.", self._debug)
+                if not self._blocking or self._renew:
+                    _debugging_message(
+                        "Nonblocking or renewing, exiting loop.", self._debug
+                    )
                     return
-        if self._renew:
-            return
         raise TimeoutError(
             "No response from DHCP server after {} retries.".format(attempt)
         )

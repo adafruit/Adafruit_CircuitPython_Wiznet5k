@@ -484,50 +484,206 @@ class TestSmallHelperFunctions:
             dhcp_client._dhcp_connection_setup()
         assert dhcp_client._wiz_sock is None
 
-    @pytest.mark.parametrize(
-        "next_state, msg_type, retries",
-        (
-            (wiz_dhcp.STATE_SELECTING, wiz_dhcp.DHCP_DISCOVER, 2),
-            (wiz_dhcp.STATE_REQUESTING, wiz_dhcp.DHCP_REQUEST, 3),
-        ),
-    )
-    def test_send_message_set_next_state_good_data(
-        self, mocker, mock_wiznet5k, next_state, msg_type, retries
-    ):
-        mocker.patch.object(wiz_dhcp.DHCP, "_generate_dhcp_message")
-        mocker.patch.object(wiz_dhcp.DHCP, "_next_retry_time_and_retry")
-        message = bytearray(b"HelloWorld")
-        wiz_dhcp._BUFF = bytearray(message)
-        dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, (1, 2, 3, 4, 5, 6))
-        dhcp_client._wiz_sock = mocker.Mock()
-        dhcp_client._prepare_and_set_next_state(
-            next_state=next_state, max_retries=retries
-        )
-        assert dhcp_client._retries == 0
-        assert dhcp_client._max_retries == retries
-        assert dhcp_client._dhcp_state == next_state
-        dhcp_client._generate_dhcp_message.assert_called_once_with(
-            message_type=msg_type
-        )
-        dhcp_client._wiz_sock.send.assert_called_once_with(message)
-        dhcp_client._next_retry_time.assert_called_once()
 
+class TestHandleDhcpMessage:
     @pytest.mark.parametrize(
-        "next_state",
+        "fsm_state, msg_in",
         (
-            wiz_dhcp.STATE_INIT,
-            wiz_dhcp.STATE_REBINDING,
-            wiz_dhcp.STATE_RENEWING,
-            wiz_dhcp.STATE_BOUND,
+            (wiz_dhcp.STATE_SELECTING, wiz_dhcp.DHCP_DISCOVER),
+            (wiz_dhcp.STATE_REQUESTING, wiz_dhcp.DHCP_REQUEST),
         ),
     )
-    def test_send_message_set_next_state_bad_state(self, mock_wiznet5k, next_state):
-        # Test with all states that should not call this function.
+    @freeze_time("2022-5-5")
+    def test_good_data(self, mocker, mock_wiznet5k, fsm_state, msg_in):
         dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, (1, 2, 3, 4, 5, 6))
-        with pytest.raises(ValueError):
-            dhcp_client._prepare_and_set_next_state(
-                next_state=next_state, max_retries=4
-            )
+        # Mock out methods to allow _handle_dhcp_message to run.
+        mocker.patch.object(
+            dhcp_client, "_generate_dhcp_message", autospec=True, return_value=300
+        )
+        mocker.patch.object(dhcp_client, "_process_messaging_states", autospec=True)
+        mocker.patch.object(
+            dhcp_client, "_receive_dhcp_response", autospec=True, return_value=300
+        )
+        mocker.patch.object(
+            dhcp_client, "_parse_dhcp_response", autospec=True, return_value=0x00
+        )
+        mocker.patch.object(
+            dhcp_client,
+            "_next_retry_time",
+            autospec=True,
+            return_value=time.monotonic() + 5,
+        )
+        # Set initial FSM state.
+        dhcp_client._wiz_sock = 3
+        dhcp_client._dhcp_state = fsm_state
+        dhcp_client._blocking = True
+        dhcp_client._renew = False
+        # Test.
+        dhcp_client._handle_dhcp_message()
+        # Confirm that the msg_type sent matches the FSM state.
+        dhcp_client._generate_dhcp_message.assert_called_once_with(message_type=msg_in)
+        dhcp_client._eth.write_sndipr.assert_called_once_with(
+            3, dhcp_client.dhcp_server_ip
+        )
+        dhcp_client._eth.socket_write.assert_called_once_with(3, wiz_dhcp._BUFF[:300])
+        dhcp_client._next_retry_time.assert_called_once_with(attempt=0)
+        dhcp_client._receive_dhcp_response.assert_called_once_with(time.monotonic() + 5)
+        # If the initial message was good, receive is only called once.
+        dhcp_client._parse_dhcp_response.assert_called_once()
+        # Called once if the message was valid.
+        dhcp_client._process_messaging_states.assert_called_once_with(message_type=0x00)
+
+    @freeze_time("2022-5-5", auto_tick_seconds=1)
+    def test_timeout_blocking_no_response(self, mocker, mock_wiznet5k):
+        dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, (1, 2, 3, 4, 5, 6))
+        # Mock out methods to allow _handle_dhcp_message to run.
+        mocker.patch.object(
+            dhcp_client, "_generate_dhcp_message", autospec=True, return_value=300
+        )
+        mocker.patch.object(dhcp_client, "_process_messaging_states", autospec=True)
+        # No message bytes returned, so the handler should loop.
+        mocker.patch.object(
+            dhcp_client, "_receive_dhcp_response", autospec=True, return_value=0
+        )
+        mocker.patch.object(
+            dhcp_client, "_parse_dhcp_response", autospec=True, return_value=0x00
+        )
+        mocker.patch.object(
+            dhcp_client,
+            "_next_retry_time",
+            autospec=True,
+            return_value=time.monotonic() + 5,
+        )
+        # Set initial FSM state.
+        dhcp_client._wiz_sock = 3
+        dhcp_client._dhcp_state = wiz_dhcp.STATE_REQUESTING
+        dhcp_client._blocking = True
+        dhcp_client._renew = False
+        # Test that a TimeoutError is raised.
+        with pytest.raises(TimeoutError):
+            dhcp_client._handle_dhcp_message()
+        # Confirm that _receive_dhcp_response is called repeatedly.
+        assert dhcp_client._receive_dhcp_response.call_count == 4
+        # Check that message parsing and processing not called.
+        dhcp_client._parse_dhcp_response.assert_not_called()
+        dhcp_client._process_messaging_states.assert_not_called()
+
+    @freeze_time("2022-5-5", auto_tick_seconds=1)
+    def test_timeout_blocking_bad_message(self, mocker, mock_wiznet5k):
+        dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, (1, 2, 3, 4, 5, 6))
+        # Mock out methods to allow _handle_dhcp_message to run.
+        mocker.patch.object(
+            dhcp_client, "_generate_dhcp_message", autospec=True, return_value=300
+        )
+        # Return False to model a bad message type, which should loop.
+        mocker.patch.object(
+            dhcp_client, "_process_messaging_states", autospec=True, return_value=False
+        )
+        mocker.patch.object(
+            dhcp_client, "_receive_dhcp_response", autospec=True, return_value=300
+        )
+        mocker.patch.object(
+            dhcp_client, "_parse_dhcp_response", autospec=True, return_value=0x00
+        )
+        mocker.patch.object(
+            dhcp_client,
+            "_next_retry_time",
+            autospec=True,
+            return_value=time.monotonic() + 5,
+        )
+        # Set initial FSM state.
+        dhcp_client._wiz_sock = 3
+        dhcp_client._dhcp_state = wiz_dhcp.STATE_REQUESTING
+        dhcp_client._blocking = True
+        dhcp_client._renew = False
+        # Test that a TimeoutError is raised.
+        with pytest.raises(TimeoutError):
+            dhcp_client._handle_dhcp_message()
+        # Confirm that processing methods are called repeatedly.
+        assert dhcp_client._receive_dhcp_response.call_count == 4
+        assert dhcp_client._parse_dhcp_response.call_count == 4
+        assert dhcp_client._process_messaging_states.call_count == 4
+
+    @freeze_time("2022-5-5")
+    @pytest.mark.parametrize(
+        "renew, blocking", ((True, False), (True, True), (False, False))
+    )
+    def test_no_response_non_blocking_renewing(
+        self, mocker, mock_wiznet5k, renew, blocking
+    ):
+        dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, (1, 2, 3, 4, 5, 6))
+        # Mock out methods to allow _handle_dhcp_message to run.
+        mocker.patch.object(
+            dhcp_client, "_generate_dhcp_message", autospec=True, return_value=300
+        )
+        mocker.patch.object(dhcp_client, "_process_messaging_states", autospec=True)
+        # No message bytes returned, so the handler do nothing and return.
+        mocker.patch.object(
+            dhcp_client, "_receive_dhcp_response", autospec=True, return_value=0
+        )
+        mocker.patch.object(
+            dhcp_client, "_parse_dhcp_response", autospec=True, return_value=0x00
+        )
+        mocker.patch.object(
+            dhcp_client,
+            "_next_retry_time",
+            autospec=True,
+            return_value=time.monotonic() + 5,
+        )
+        # Set initial FSM state.
+        dhcp_client._wiz_sock = 3
+        dhcp_client._dhcp_state = wiz_dhcp.STATE_REQUESTING
+        # Combinations of renew and blocking that will not loop.
+        dhcp_client._blocking = blocking
+        dhcp_client._renew = renew
+        # Test.
+        dhcp_client._handle_dhcp_message()
+        dhcp_client._next_retry_time.assert_called_once_with(attempt=0)
+        dhcp_client._receive_dhcp_response.assert_called_once_with(time.monotonic() + 5)
+        # No bytes returned so don't call parse or process message.
+        dhcp_client._parse_dhcp_response.assert_not_called()
+        dhcp_client._process_messaging_states.assert_not_called()
+
+    @freeze_time("2022-5-5")
+    @pytest.mark.parametrize(
+        "renew, blocking", ((True, False), (True, True), (False, False))
+    )
+    def test_bad_message_non_blocking_renewing(
+        self, mocker, mock_wiznet5k, renew, blocking
+    ):
+        dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, (1, 2, 3, 4, 5, 6))
+        # Mock out methods to allow _handle_dhcp_message to run.
+        mocker.patch.object(
+            dhcp_client, "_generate_dhcp_message", autospec=True, return_value=300
+        )
+        # Bad message so check that the handler does not loop.
+        mocker.patch.object(dhcp_client, "_process_messaging_states", autospec=False)
+        mocker.patch.object(
+            dhcp_client, "_receive_dhcp_response", autospec=True, return_value=300
+        )
+        mocker.patch.object(
+            dhcp_client, "_parse_dhcp_response", autospec=True, return_value=0x00
+        )
+        mocker.patch.object(
+            dhcp_client,
+            "_next_retry_time",
+            autospec=True,
+            return_value=time.monotonic() + 5,
+        )
+        # Set initial FSM state.
+        dhcp_client._wiz_sock = 3
+        dhcp_client._dhcp_state = wiz_dhcp.STATE_REQUESTING
+        # Combinations of renew and blocking that will not loop.
+        dhcp_client._blocking = blocking
+        dhcp_client._renew = renew
+        # Test.
+        dhcp_client._handle_dhcp_message()
+        dhcp_client._next_retry_time.assert_called_once_with(attempt=0)
+        dhcp_client._receive_dhcp_response.assert_called_once_with(time.monotonic() + 5)
+        # Bad message returned so call parse and process message.
+        dhcp_client._parse_dhcp_response.assert_called_once()
+        # Called once if the message was valid.
+        dhcp_client._process_messaging_states.assert_called_once()
 
 
 class TestReceiveResponse:
