@@ -155,7 +155,7 @@ class DHCP:
         # DHCP state machine
         self._dhcp_state = STATE_INIT
         self._transaction_id = randint(1, 0x7FFFFFFF)
-        self._start_time = 0
+        self._start_time = 0.0
         self._blocking = False
         self._renew = False
 
@@ -209,7 +209,7 @@ class DHCP:
         self.dns_server_ip = UNASSIGNED_IP_ADDR
         self._renew = False
         self._increment_transaction_id()
-        self._start_time = int(time.monotonic())
+        self._start_time = time.monotonic()
 
     def _socket_release(self) -> None:
         """Close the socket if it exists."""
@@ -329,16 +329,14 @@ class DHCP:
         if self._dhcp_state == STATE_SELECTING and message_type == DHCP_OFFER:
             _debugging_message("FSM state is SELECTING with valid OFFER.", self._debug)
             self._dhcp_state = STATE_REQUESTING
-            return True
-        if self._dhcp_state == STATE_REQUESTING:
+        elif self._dhcp_state == STATE_REQUESTING:
             _debugging_message("FSM state is REQUESTING.", self._debug)
             if message_type == DHCP_NAK:
                 _debugging_message(
                     "Message is NAK, setting FSM state to INIT.", self._debug
                 )
                 self._dhcp_state = STATE_INIT
-                return True
-            if message_type == DHCP_ACK:
+            elif message_type == DHCP_ACK:
                 _debugging_message(
                     "Message is ACK, setting FSM state to BOUND.", self._debug
                 )
@@ -349,10 +347,7 @@ class DHCP:
                 self._lease_time += self._start_time
                 self._increment_transaction_id()
                 self._renew = False
-                self._socket_release()
                 self._dhcp_state = STATE_BOUND
-                return True
-        return False
 
     def _handle_dhcp_message(self) -> int:
         """Send, receive and process DHCP message. Update the finite state machine (FSM).
@@ -415,57 +410,61 @@ class DHCP:
             "FSM initial state is {}".format(self._dhcp_state), self._debug
         )
         self._blocking = blocking
-        if self._dhcp_state == STATE_BOUND:
-            now = time.monotonic()
-            if now < self._t1:
-                _debugging_message("No timers have expired. Exiting FSM.", self._debug)
-                return
-            if now > self._lease_time:
+        while True:
+            if self._dhcp_state == STATE_BOUND:
+                now = time.monotonic()
+                if now < self._t1:
+                    _debugging_message(
+                        "No timers have expired. Exiting FSM.", self._debug
+                    )
+                    self._socket_release()
+                    return
+                if now > self._lease_time:
+                    _debugging_message(
+                        "Lease has expired, switching state to INIT.", self._debug
+                    )
+                    self._blocking = True
+                    self._dhcp_state = STATE_INIT
+                elif now > self._t2:
+                    _debugging_message(
+                        "T2 has expired, switching state to REBINDING.", self._debug
+                    )
+                    self._dhcp_state = STATE_REBINDING
+                else:
+                    _debugging_message(
+                        "T1 has expired, switching state to RENEWING.", self._debug
+                    )
+                    self._dhcp_state = STATE_RENEWING
+
+            if self._dhcp_state == STATE_RENEWING:
+                self._renew = True
+                self._dhcp_connection_setup()
+                self._start_time = time.monotonic()
+                self._dhcp_state = STATE_REQUESTING
+
+            if self._dhcp_state == STATE_REBINDING:
+                self._renew = True
+                self.dhcp_server_ip = BROADCAST_SERVER_ADDR
+                self._dhcp_connection_setup()
+                self._start_time = time.monotonic()
+                self._dhcp_state = STATE_REQUESTING
+
+            if self._dhcp_state == STATE_INIT:
+                self._dsm_reset()
+                self._dhcp_state = STATE_SELECTING
+
+            if self._dhcp_state == STATE_SELECTING:
+                self._process_messaging_states(message_type=self._handle_dhcp_message())
+
+            if self._dhcp_state == STATE_REQUESTING:
+                self._process_messaging_states(message_type=self._handle_dhcp_message())
+
+            if self._renew:
                 _debugging_message(
-                    "Lease has expired, switching state to INIT.", self._debug
+                    "Lease has not expired, resetting state to BOUND and exiting FSM.",
+                    self._debug,
                 )
-                self._blocking = True
-                self._dhcp_state = STATE_INIT
-            elif now > self._t2:
-                _debugging_message(
-                    "T2 has expired, switching state to REBINDING.", self._debug
-                )
-                self._dhcp_state = STATE_REBINDING
-            else:
-                _debugging_message(
-                    "T1 has expired, switching state to RENEWING.", self._debug
-                )
-                self._dhcp_state = STATE_RENEWING
-
-        if self._dhcp_state == STATE_RENEWING:
-            self._renew = True
-            self._dhcp_connection_setup()
-            self._start_time = time.monotonic()
-            self._dhcp_state = STATE_REQUESTING
-
-        if self._dhcp_state == STATE_REBINDING:
-            self._renew = True
-            self.dhcp_server_ip = BROADCAST_SERVER_ADDR
-            self._dhcp_connection_setup()
-            self._start_time = time.monotonic()
-            self._dhcp_state = STATE_REQUESTING
-
-        if self._dhcp_state == STATE_INIT:
-            self._dsm_reset()
-            self._dhcp_state = STATE_SELECTING
-
-        if self._dhcp_state == STATE_SELECTING:
-            self._handle_dhcp_message()
-
-        if self._dhcp_state == STATE_REQUESTING:
-            self._handle_dhcp_message()
-
-        if self._renew:
-            _debugging_message(
-                "Lease has not expired, setting state to BOUND and exiting FSM.",
-                self._debug,
-            )
-            self._dhcp_state = STATE_BOUND
+                self._dhcp_state = STATE_BOUND
 
     def _generate_dhcp_message(
         self,

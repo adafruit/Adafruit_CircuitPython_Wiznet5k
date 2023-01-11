@@ -754,3 +754,85 @@ class TestReceiveResponse:
             mocker.call(1, 318),
             mocker.call(1, 118),
         ]
+
+
+class TestProcessMessagingStates:
+    @pytest.mark.parametrize(
+        "state, bad_messages",
+        (
+            (
+                wiz_dhcp.STATE_SELECTING,
+                (
+                    0,
+                    wiz_dhcp.DHCP_ACK,
+                    wiz_dhcp.DHCP_REQUEST,
+                    wiz_dhcp.DHCP_DECLINE,
+                    wiz_dhcp.DHCP_DISCOVER,
+                    wiz_dhcp.DHCP_NAK,
+                    wiz_dhcp.DHCP_INFORM,
+                    wiz_dhcp.DHCP_RELEASE,
+                ),
+            ),
+            (
+                wiz_dhcp.STATE_REQUESTING,
+                (
+                    0,
+                    wiz_dhcp.DHCP_OFFER,
+                    wiz_dhcp.DHCP_REQUEST,
+                    wiz_dhcp.DHCP_DECLINE,
+                    wiz_dhcp.DHCP_DISCOVER,
+                    wiz_dhcp.DHCP_INFORM,
+                    wiz_dhcp.DHCP_RELEASE,
+                ),
+            ),
+        ),
+    )
+    def test_called_with_bad_or_no_message(self, mock_dhcp, state, bad_messages):
+        # Setup with the current state.
+        mock_dhcp._dhcp_state = state
+        # Test against 0 (no message) and all bad message types.
+        for message_type in bad_messages:
+            # Test.
+            mock_dhcp._process_messaging_states(message_type=message_type)
+            # Confirm that a 0 message does not change state.
+            assert mock_dhcp._dhcp_state == state
+
+    def test_called_from_selecting_good_message(self, mock_dhcp):
+        # Setup with the required state.
+        mock_dhcp._dhcp_state = wiz_dhcp.STATE_SELECTING
+        # Test.
+        mock_dhcp._process_messaging_states(message_type=wiz_dhcp.DHCP_OFFER)
+        # Confirm correct new state.
+        assert mock_dhcp._dhcp_state == wiz_dhcp.STATE_REQUESTING
+
+    @freeze_time("2022-3-4")
+    @pytest.mark.parametrize("lease_time", (0, 8000))
+    def test_called_from_requesting_with_ack(self, mock_dhcp, lease_time):
+        # Setup with the required state.
+        mock_dhcp._dhcp_state = wiz_dhcp.STATE_REQUESTING
+        # Set the lease_time (zero forces a default to be used).
+        mock_dhcp._lease_time = lease_time
+        # Set renew to True to confirm that an ACK sets it to False.
+        mock_dhcp._renew = True
+        # Set a start time.
+        mock_dhcp._start_time = time.monotonic()
+        # Test.
+        mock_dhcp._process_messaging_states(message_type=wiz_dhcp.DHCP_ACK)
+        # Confirm timers are correctly set.
+        if lease_time == 0:
+            lease_time = wiz_dhcp.DEFAULT_LEASE_TIME
+        assert mock_dhcp._t1 == time.monotonic() + lease_time // 2
+        assert mock_dhcp._t2 == time.monotonic() + lease_time - lease_time // 8
+        assert mock_dhcp._lease_time == time.monotonic() + lease_time
+        # Check that renew is forced to False
+        assert mock_dhcp._renew is False
+        # FSM state should be bound.
+        assert mock_dhcp._dhcp_state == wiz_dhcp.STATE_BOUND
+
+    def test_called_from_requesting_with_nak(self, mock_dhcp):
+        # Setup with the required state.
+        mock_dhcp._dhcp_state = wiz_dhcp.STATE_REQUESTING
+        # Test.
+        mock_dhcp._process_messaging_states(message_type=wiz_dhcp.DHCP_NAK)
+        # FSM state should be init after receiving a NAK response.
+        assert mock_dhcp._dhcp_state == wiz_dhcp.STATE_INIT
