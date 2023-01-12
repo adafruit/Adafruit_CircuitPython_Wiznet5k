@@ -247,7 +247,7 @@ class DHCP:
             initialised.
         """
         stop_time = time.monotonic() + timeout
-        _debugging_message("Creating new socket instance for DHCP.", self._debug)
+        _debugging_message("Setting up connection for DHCP.", self._debug)
         while self._wiz_sock is None and time.monotonic() < stop_time:
             self._wiz_sock = self._eth.get_socket()
             if self._wiz_sock == 0xFF:
@@ -257,11 +257,12 @@ class DHCP:
             self._eth.write_sock_port(self._wiz_sock, 68)  # Set DHCP client port.
             self._eth.write_sncr(self._wiz_sock, 0x01)  # Open the socket.
             while (
-                self._eth.read_sncr(self._wiz_sock) != 0
+                self._eth.read_sncr(self._wiz_sock) != b"\x00"
             ):  # Wait for command to complete.
                 time.sleep(0.001)
-            if self._eth.read_snsr(self._wiz_sock) == bytes([0x22]):
+            if self._eth.read_snsr(self._wiz_sock) == b"\x22":
                 self._eth.write_sndport(2, DHCP_SERVER_PORT)
+                _debugging_message("+ Connection OK, port set.", self._debug)
                 return
         self._wiz_sock = None
         raise RuntimeError("Unable to initialize UDP socket.")
@@ -328,7 +329,7 @@ class DHCP:
             _BUFF[bytes_read:] = bytearray(BUFF_LENGTH - bytes_read)
         del buffer
         gc.collect()
-        _debugging_message(_BUFF, self._debug)
+        _debugging_message(_BUFF[:bytes_read], self._debug)
         return bytes_read
 
     def _process_messaging_states(self, *, message_type: int):
@@ -527,7 +528,7 @@ class DHCP:
             return data_end
 
         _debugging_message(
-            "Generating DHCP message tyoe {}".format(message_type), self._debug
+            "Generating DHCP message type {}".format(message_type), self._debug
         )
         # global _BUFF  # pylint: disable=global-variable-not-assigned
         _BUFF[:] = bytearray(BUFF_LENGTH)
@@ -574,8 +575,9 @@ class DHCP:
                 offset=pointer, option_code=54, option_data=self.dhcp_server_ip
             )
         _BUFF[pointer] = 0xFF
-        _debugging_message(_BUFF, self._debug)
-        return pointer + 1
+        pointer += 1
+        _debugging_message(_BUFF[:pointer], self._debug)
+        return pointer
 
     def _parse_dhcp_response(
         self,
