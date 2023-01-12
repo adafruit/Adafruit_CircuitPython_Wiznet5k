@@ -392,8 +392,8 @@ class DHCP:
         for attempt in range(4):  # Initial attempt plus 3 retries.
             message_length = self._generate_dhcp_message(message_type=msg_type_out)
             self._eth.write_sndipr(self._wiz_sock, self.dhcp_server_ip)
-            self._eth.socket_write(self._wiz_sock, _BUFF[:message_length])
             self._eth.write_sndport(self._wiz_sock, DHCP_SERVER_PORT)
+            self._eth.socket_write(self._wiz_sock, _BUFF[:message_length])
             next_resend = self._next_retry_time(attempt=attempt)
             while time.monotonic() < next_resend:
                 if self._receive_dhcp_response(next_resend):
