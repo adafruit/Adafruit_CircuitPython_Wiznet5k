@@ -86,7 +86,19 @@ _BUFF = bytearray(BUFF_LENGTH)
 def _debugging_message(message: Union[Exception, str], debugging: bool) -> None:
     """Helper function to print debugging messages."""
     if debugging:
+        if isinstance(message, (bytes, bytearray)):
+            temp = ""
+            for index, value in enumerate(message):
+                if not index % 16:
+                    temp += "\n"
+                elif not index % 8:
+                    temp += "  "
+                else:
+                    temp += " "
+                temp += "{:02x}".format(value)
+            message = temp
         print(message)
+        gc.collect()
 
 
 class DHCP:
