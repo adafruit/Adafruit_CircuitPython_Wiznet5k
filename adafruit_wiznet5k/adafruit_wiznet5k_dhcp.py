@@ -83,7 +83,9 @@ BUFF_LENGTH = 318
 _BUFF = bytearray(BUFF_LENGTH)
 
 
-def _debugging_message(message: Union[Exception, str], debugging: bool) -> None:
+def _debugging_message(
+    message: Union[Exception, str, bytes, bytearray], debugging: bool
+) -> None:
     """Helper function to print debugging messages."""
     if debugging:
         if isinstance(message, (bytes, bytearray)):
@@ -326,6 +328,7 @@ class DHCP:
             _BUFF[bytes_read:] = bytearray(BUFF_LENGTH - bytes_read)
         del buffer
         gc.collect()
+        _debugging_message(_BUFF, self._debug)
         return bytes_read
 
     def _process_messaging_states(self, *, message_type: int):
@@ -402,7 +405,7 @@ class DHCP:
                         _debugging_message(error, self._debug)
                 if not self._blocking or self._renew:
                     _debugging_message(
-                        "No message, nonblocking or renewing, exiting loop.",
+                        "No message, FSM is nonblocking or renewing, exiting loop.",
                         self._debug,
                     )
                     return 0  # Did not receive a response in a single attempt.
@@ -416,7 +419,7 @@ class DHCP:
         the main program. The initial lease...
         """
         _debugging_message(
-            "DHCP FSM called with blocking={}".format(blocking), self._debug
+            "DHCP FSM called with blocking = {}".format(blocking), self._debug
         )
         _debugging_message(
             "FSM initial state is {}".format(self._dhcp_state), self._debug
@@ -449,12 +452,14 @@ class DHCP:
                     self._dhcp_state = STATE_RENEWING
 
             if self._dhcp_state == STATE_RENEWING:
+                _debugging_message("FSM state is RENEWING.", self._debug)
                 self._renew = True
                 self._dhcp_connection_setup()
                 self._start_time = time.monotonic()
                 self._dhcp_state = STATE_REQUESTING
 
             if self._dhcp_state == STATE_REBINDING:
+                _debugging_message("FSM state is REBINDING.", self._debug)
                 self._renew = True
                 self.dhcp_server_ip = BROADCAST_SERVER_ADDR
                 self._dhcp_connection_setup()
@@ -462,13 +467,16 @@ class DHCP:
                 self._dhcp_state = STATE_REQUESTING
 
             if self._dhcp_state == STATE_INIT:
+                _debugging_message("FSM state is INIT.", self._debug)
                 self._dsm_reset()
                 self._dhcp_state = STATE_SELECTING
 
             if self._dhcp_state == STATE_SELECTING:
+                _debugging_message("FSM state is SELECTING.", self._debug)
                 self._process_messaging_states(message_type=self._handle_dhcp_message())
 
             if self._dhcp_state == STATE_REQUESTING:
+                _debugging_message("FSM state is REQUESTING.", self._debug)
                 self._process_messaging_states(message_type=self._handle_dhcp_message())
 
             if self._renew:
@@ -518,6 +526,9 @@ class DHCP:
             _BUFF[offset:data_end] = bytes(option_data)
             return data_end
 
+        _debugging_message(
+            "Generating DHCP message tyoe {}".format(message_type), self._debug
+        )
         # global _BUFF  # pylint: disable=global-variable-not-assigned
         _BUFF[:] = bytearray(BUFF_LENGTH)
         # OP.HTYPE.HLEN.HOPS
@@ -563,6 +574,7 @@ class DHCP:
                 offset=pointer, option_code=54, option_data=self.dhcp_server_ip
             )
         _BUFF[pointer] = 0xFF
+        _debugging_message(_BUFF, self._debug)
         return pointer + 1
 
     def _parse_dhcp_response(
@@ -598,6 +610,7 @@ class DHCP:
             option_data = _BUFF[pointer:data_end]
             return data_end, option_type, option_data
 
+        _debugging_message("Parsing DHCP message.", self._debug)
         # Validate OP
         if _BUFF[0] != DHCP_BOOT_REPLY:
             raise ValueError("DHCP message is not the expected DHCP Reply.")
@@ -653,7 +666,6 @@ class DHCP:
             ),
             self._debug,
         )
-        gc.collect()
         if msg_type is None:
             raise ValueError("No valid message type in response.")
         return msg_type
