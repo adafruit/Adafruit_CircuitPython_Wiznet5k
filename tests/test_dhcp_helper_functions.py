@@ -450,7 +450,7 @@ class TestSmallHelperFunctions:
     @freeze_time("2022-7-6")
     def test_setup_socket_with_no_error(self, mocker, mock_wiznet5k):
         mocker.patch.object(mock_wiznet5k, "get_socket", return_value=2)
-        mocker.patch.object(mock_wiznet5k, "read_sncr", return_value=0)
+        mocker.patch.object(mock_wiznet5k, "read_sncr", return_value=b"\x00")
         mocker.patch.object(mock_wiznet5k, "read_snsr", return_value=b"\x22")
         dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, (1, 2, 3, 4, 5, 6))
         dhcp_client._dhcp_connection_setup()
@@ -467,7 +467,7 @@ class TestSmallHelperFunctions:
     @freeze_time("2022-7-6", auto_tick_seconds=2)
     def test_setup_socket_with_timeout_on_get_socket(self, mocker, mock_wiznet5k):
         mocker.patch.object(mock_wiznet5k, "get_socket", return_value=0xFF)
-        mocker.patch.object(mock_wiznet5k, "read_sncr", return_value=0)
+        mocker.patch.object(mock_wiznet5k, "read_sncr", return_value=b"\x00")
         mocker.patch.object(mock_wiznet5k, "read_snsr", return_value=b"\x22")
         dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, (1, 2, 3, 4, 5, 6))
         with pytest.raises(RuntimeError):
@@ -477,7 +477,7 @@ class TestSmallHelperFunctions:
     @freeze_time("2022-7-6", auto_tick_seconds=2)
     def test_setup_socket_with_timeout_on_socket_is_udp(self, mocker, mock_wiznet5k):
         mocker.patch.object(mock_wiznet5k, "get_socket", return_value=2)
-        mocker.patch.object(mock_wiznet5k, "read_sncr", return_value=0)
+        mocker.patch.object(mock_wiznet5k, "read_sncr", return_value=b"\x00")
         mocker.patch.object(mock_wiznet5k, "read_snsr", return_value=b"\x21")
         dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, (1, 2, 3, 4, 5, 6))
         with pytest.raises(RuntimeError):
@@ -525,6 +525,9 @@ class TestHandleDhcpMessage:
         dhcp_client._generate_dhcp_message.assert_called_once_with(message_type=msg_in)
         dhcp_client._eth.write_sndipr.assert_called_once_with(
             3, dhcp_client.dhcp_server_ip
+        )
+        dhcp_client._eth.write_sndport.assert_called_once_with(
+            dhcp_client._wiz_sock, wiz_dhcp.DHCP_SERVER_PORT
         )
         dhcp_client._eth.socket_write.assert_called_once_with(3, wiz_dhcp._BUFF[:300])
         dhcp_client._next_retry_time.assert_called_once_with(attempt=0)

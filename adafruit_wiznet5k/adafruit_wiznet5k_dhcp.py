@@ -393,6 +393,7 @@ class DHCP:
             message_length = self._generate_dhcp_message(message_type=msg_type_out)
             self._eth.write_sndipr(self._wiz_sock, self.dhcp_server_ip)
             self._eth.socket_write(self._wiz_sock, _BUFF[:message_length])
+            self._eth.write_sndport(self._wiz_sock, DHCP_SERVER_PORT)
             next_resend = self._next_retry_time(attempt=attempt)
             while time.monotonic() < next_resend:
                 if self._receive_dhcp_response(next_resend):
@@ -543,6 +544,8 @@ class DHCP:
         # Flags (only bit 0 is used, all other bits must be 0)
         if broadcast:
             _BUFF[10] = 0b10000000
+        else:
+            _BUFF[10] = 0b00000000
         if renew:
             _BUFF[12:16] = bytes(self.local_ip)
         # chaddr
@@ -561,11 +564,23 @@ class DHCP:
         pointer = option_writer(
             offset=pointer, option_code=12, option_data=self._hostname
         )
+
+        # Option - Client ID
+        pointer = option_writer(
+            offset=pointer,
+            option_code=61,
+            option_data=tuple(b"\x01" + bytes(self._mac_address)),
+        )
+
+        # Request subnet mask, router and DNS server.
+        pointer = option_writer(offset=pointer, option_code=55, option_data=(1, 3, 6))
+
+        # Request a 90 day lease.
+        pointer = option_writer(
+            offset=pointer, option_code=51, option_data=b"\x00\x76\xa7\x00"
+        )
+
         if message_type == DHCP_REQUEST:
-            # Request subnet mask, router and DNS server.
-            pointer = option_writer(
-                offset=pointer, option_code=55, option_data=(1, 3, 6)
-            )
             # Set Requested IP Address to offered IP address.
             pointer = option_writer(
                 offset=pointer, option_code=50, option_data=self.local_ip
@@ -574,8 +589,11 @@ class DHCP:
             pointer = option_writer(
                 offset=pointer, option_code=54, option_data=self.dhcp_server_ip
             )
+
         _BUFF[pointer] = 0xFF
         pointer += 1
+        if pointer > BUFF_LENGTH:
+            raise ValueError("DHCP message too long.")
         _debugging_message(_BUFF[:pointer], self._debug)
         return pointer
 
