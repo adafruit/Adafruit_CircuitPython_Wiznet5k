@@ -28,8 +28,8 @@ server_port = 50007  # Port to listen on
 server.bind((server_ip, server_port))  # Bind to IP and Port
 server.listen()  # Begin listening for incoming clients
 
-conn, addr = server.accept()  # Wait for a connection from a client.
 while True:
+    conn, addr = server.accept()  # Wait for a connection from a client.
     with conn:
         data = conn.recv(1024)
         if data:  # Wait for receiving data
