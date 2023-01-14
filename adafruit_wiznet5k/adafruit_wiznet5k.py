@@ -82,7 +82,7 @@ SNSR_SOCK_LISTEN = const(0x14)
 _SNSR_SOCK_SYNSENT = const(0x15)
 SNSR_SOCK_SYNRECV = const(0x16)
 SNSR_SOCK_ESTABLISHED = const(0x17)
-_SNSR_SOCK_FIN_WAIT = const(0x18)
+SNSR_SOCK_FIN_WAIT = const(0x18)
 _SNSR_SOCK_CLOSING = const(0x1A)
 _SNSR_SOCK_TIME_WAIT = const(0x1B)
 _SNSR_SOCK_CLOSE_WAIT = const(0x1C)
@@ -825,7 +825,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         if status in (
             SNSR_SOCK_CLOSED,
             _SNSR_SOCK_TIME_WAIT,
-            _SNSR_SOCK_FIN_WAIT,
+            SNSR_SOCK_FIN_WAIT,
             _SNSR_SOCK_CLOSE_WAIT,
             _SNSR_SOCK_CLOSING,
             _SNSR_SOCK_UDP,
@@ -1051,7 +1051,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             if self.socket_status(socket_num)[0] in (
                 SNSR_SOCK_CLOSED,
                 _SNSR_SOCK_TIME_WAIT,
-                _SNSR_SOCK_FIN_WAIT,
+                SNSR_SOCK_FIN_WAIT,
                 _SNSR_SOCK_CLOSE_WAIT,
                 _SNSR_SOCK_CLOSING,
             ) or (timeout and time.monotonic() - stamp > timeout):

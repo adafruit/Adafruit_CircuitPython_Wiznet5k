@@ -179,7 +179,7 @@ class socket:
         if self._sock_type == SOCK_STREAM:
             self.disconnect()
             stamp = time.monotonic()
-            while self.status == wiznet5k.adafruit_wiznet5k._SNSR_SOCK_FIN_WAIT:
+            while self.status == wiznet5k.adafruit_wiznet5k.SNSR_SOCK_FIN_WAIT:
                 if time.monotonic() - stamp > 1000:
                     raise RuntimeError("Failed to disconnect socket")
         self.close()
@@ -228,7 +228,7 @@ class socket:
                 wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSED,
                 wiznet5k.adafruit_wiznet5k.SNSR_SOCK_LISTEN,
                 wiznet5k.adafruit_wiznet5k._SNSR_SOCK_TIME_WAIT,
-                wiznet5k.adafruit_wiznet5k._SNSR_SOCK_FIN_WAIT,
+                wiznet5k.adafruit_wiznet5k.SNSR_SOCK_FIN_WAIT,
             )
         if not result and status != wiznet5k.adafruit_wiznet5k.SNSR_SOCK_LISTEN:
             self.close()
