@@ -70,10 +70,10 @@ def htons(x: int) -> int:
 
 
 SOCK_STREAM = const(0x21)  # TCP
-TCP_MODE = 80
+_TCP_MODE = 80
 SOCK_DGRAM = const(0x02)  # UDP
 AF_INET = const(3)
-SOCKET_INVALID = const(255)
+_SOCKET_INVALID = const(255)
 
 
 # pylint: disable=too-many-arguments, unused-argument
@@ -169,7 +169,7 @@ class socket:
         self._listen_port = None
 
         self._socknum = _the_interface.get_socket()
-        if self._socknum == SOCKET_INVALID:
+        if self._socknum == _SOCKET_INVALID:
             raise RuntimeError("Failed to allocate socket.")
 
     def __enter__(self):
@@ -213,11 +213,13 @@ class socket:
 
         :return bool: Whether connected.
         """
+        # pylint: disable=protected-access
+
         if self.socknum >= _the_interface.max_sockets:
             return False
         status = _the_interface.socket_status(self.socknum)[0]
         if (
-            status == wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSE_WAIT
+            status == wiznet5k.adafruit_wiznet5k._SNSR_SOCK_CLOSE_WAIT
             and self.available() == 0
         ):
             result = False
@@ -225,7 +227,7 @@ class socket:
             result = status not in (
                 wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSED,
                 wiznet5k.adafruit_wiznet5k.SNSR_SOCK_LISTEN,
-                wiznet5k.adafruit_wiznet5k.SNSR_SOCK_TIME_WAIT,
+                wiznet5k.adafruit_wiznet5k._SNSR_SOCK_TIME_WAIT,
                 wiznet5k.adafruit_wiznet5k.SNSR_SOCK_FIN_WAIT,
             )
         if not result and status != wiznet5k.adafruit_wiznet5k.SNSR_SOCK_LISTEN:
