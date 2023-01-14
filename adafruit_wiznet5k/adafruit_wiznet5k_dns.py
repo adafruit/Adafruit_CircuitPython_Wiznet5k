@@ -167,11 +167,11 @@ def _parse_dns_response(
                         pointer += 1
                         break
             # Check for a type A answer.
-            if int.from_bytes(response[pointer : pointer + 2], "big") == TYPE_A:
+            if int.from_bytes(response[pointer : pointer + 2], "big") == _TYPE_A:
                 # Check for an IN class answer.
                 if (
                     int.from_bytes(response[pointer + 2 : pointer + 4], "big")
-                    == CLASS_IN
+                    == _CLASS_IN
                 ):
                     _debug_print(
                         debug=debug,
@@ -184,11 +184,11 @@ def _parse_dns_response(
                     # Confirm that the resource record is 4 bytes (an IPv4 address).
                     if (
                         int.from_bytes(response[pointer : pointer + 2], "big")
-                        == DATA_LEN
+                        == _DATA_LEN
                     ):
                         ipv4 = response[pointer + 2 : pointer + 6]
                         # Low probability that the response was truncated inside the 4 byte address.
-                        if len(ipv4) != DATA_LEN:
+                        if len(ipv4) != _DATA_LEN:
                             raise ValueError("IPv4 address is not 4 bytes.")
                         _debug_print(
                             debug=debug,
