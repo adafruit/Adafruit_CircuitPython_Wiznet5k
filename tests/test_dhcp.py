@@ -26,57 +26,57 @@ def wrench(mocker):
 class TestDHCPInit:
     def test_constants(self):
         # DHCP State Machine
-        assert wiz_dhcp.STATE_DHCP_START == const(0x00)
-        assert wiz_dhcp.STATE_DHCP_DISCOVER == const(0x01)
-        assert wiz_dhcp.STATE_DHCP_REQUEST == const(0x02)
-        assert wiz_dhcp.STATE_DHCP_LEASED == const(0x03)
-        assert wiz_dhcp.STATE_DHCP_REREQUEST == const(0x04)
-        assert wiz_dhcp.STATE_DHCP_RELEASE == const(0x05)
-        assert wiz_dhcp.STATE_DHCP_WAIT == const(0x06)
-        assert wiz_dhcp.STATE_DHCP_DISCONN == const(0x07)
+        assert wiz_dhcp._STATE_DHCP_START == const(0x00)
+        assert wiz_dhcp._STATE_DHCP_DISCOVER == const(0x01)
+        assert wiz_dhcp._STATE_DHCP_REQUEST == const(0x02)
+        assert wiz_dhcp._STATE_DHCP_LEASED == const(0x03)
+        assert wiz_dhcp._STATE_DHCP_REREQUEST == const(0x04)
+        assert wiz_dhcp._STATE_DHCP_RELEASE == const(0x05)
+        assert wiz_dhcp._STATE_DHCP_WAIT == const(0x06)
+        assert wiz_dhcp._STATE_DHCP_DISCONN == const(0x07)
 
         # DHCP wait time between attempts
-        assert wiz_dhcp.DHCP_WAIT_TIME == const(60)
+        assert wiz_dhcp._DHCP_WAIT_TIME == const(60)
 
         # DHCP Message Types
-        assert wiz_dhcp.DHCP_DISCOVER == const(1)
-        assert wiz_dhcp.DHCP_OFFER == const(2)
-        assert wiz_dhcp.DHCP_REQUEST == const(3)
-        assert wiz_dhcp.DHCP_DECLINE == const(4)
-        assert wiz_dhcp.DHCP_ACK == const(5)
-        assert wiz_dhcp.DHCP_NAK == const(6)
-        assert wiz_dhcp.DHCP_RELEASE == const(7)
-        assert wiz_dhcp.DHCP_INFORM == const(8)
+        assert wiz_dhcp._DHCP_DISCOVER == const(1)
+        assert wiz_dhcp._DHCP_OFFER == const(2)
+        assert wiz_dhcp._DHCP_REQUEST == const(3)
+        assert wiz_dhcp._DHCP_DECLINE == const(4)
+        assert wiz_dhcp._DHCP_ACK == const(5)
+        assert wiz_dhcp._DHCP_NAK == const(6)
+        assert wiz_dhcp._DHCP_RELEASE == const(7)
+        assert wiz_dhcp._DHCP_INFORM == const(8)
 
         # DHCP Message OP Codes
-        assert wiz_dhcp.DHCP_BOOT_REQUEST == const(0x01)
-        assert wiz_dhcp.DHCP_BOOT_REPLY == const(0x02)
+        assert wiz_dhcp._DHCP_BOOT_REQUEST == const(0x01)
+        assert wiz_dhcp._DHCP_BOOT_REPLY == const(0x02)
 
-        assert wiz_dhcp.DHCP_HTYPE10MB == const(0x01)
-        assert wiz_dhcp.DHCP_HTYPE100MB == const(0x02)
+        assert wiz_dhcp._DHCP_HTYPE10MB == const(0x01)
+        assert wiz_dhcp._DHCP_HTYPE100MB == const(0x02)
 
-        assert wiz_dhcp.DHCP_HLENETHERNET == const(0x06)
-        assert wiz_dhcp.DHCP_HOPS == const(0x00)
+        assert wiz_dhcp._DHCP_HLENETHERNET == const(0x06)
+        assert wiz_dhcp._DHCP_HOPS == const(0x00)
 
-        assert wiz_dhcp.MAGIC_COOKIE == b"c\x82Sc"
-        assert wiz_dhcp.MAX_DHCP_OPT == const(0x10)
+        assert wiz_dhcp._MAGIC_COOKIE == b"c\x82Sc"
+        assert wiz_dhcp._MAX_DHCP_OPT == const(0x10)
 
         # Default DHCP Server port
-        assert wiz_dhcp.DHCP_SERVER_PORT == const(67)
+        assert wiz_dhcp._DHCP_SERVER_PORT == const(67)
         # DHCP Lease Time, in seconds
-        assert wiz_dhcp.DEFAULT_LEASE_TIME == const(900)
-        assert wiz_dhcp.BROADCAST_SERVER_ADDR == (255, 255, 255, 255)
+        assert wiz_dhcp._DEFAULT_LEASE_TIME == const(900)
+        assert wiz_dhcp._BROADCAST_SERVER_ADDR == (255, 255, 255, 255)
 
         # DHCP Response Options
-        assert wiz_dhcp.MSG_TYPE == 53
-        assert wiz_dhcp.SUBNET_MASK == 1
-        assert wiz_dhcp.ROUTERS_ON_SUBNET == 3
-        assert wiz_dhcp.DNS_SERVERS == 6
-        assert wiz_dhcp.DHCP_SERVER_ID == 54
-        assert wiz_dhcp.T1_VAL == 58
-        assert wiz_dhcp.T2_VAL == 59
-        assert wiz_dhcp.LEASE_TIME == 51
-        assert wiz_dhcp.OPT_END == 255
+        assert wiz_dhcp._MSG_TYPE == 53
+        assert wiz_dhcp._SUBNET_MASK == 1
+        assert wiz_dhcp._ROUTERS_ON_SUBNET == 3
+        assert wiz_dhcp._DNS_SERVERS == 6
+        assert wiz_dhcp._DHCP_SERVER_ID == 54
+        assert wiz_dhcp._T1_VAL == 58
+        assert wiz_dhcp._T2_VAL == 59
+        assert wiz_dhcp._LEASE_TIME == 51
+        assert wiz_dhcp._OPT_END == 255
 
         # Packet buffer
         assert wiz_dhcp._BUFF == bytearray(318)
@@ -102,12 +102,12 @@ class TestDHCPInit:
         assert dhcp_client._mac_address == mac_address
         wrench.set_interface.assert_called_once_with(wiznet)
         assert dhcp_client._sock is None
-        assert dhcp_client._dhcp_state == wiz_dhcp.STATE_DHCP_START
+        assert dhcp_client._dhcp_state == wiz_dhcp._STATE_DHCP_START
         assert dhcp_client._initial_xid == 0
         mock_randint.assert_called_once()
         assert dhcp_client._transaction_id == 0x1234567
         assert dhcp_client._start_time == 0
-        assert dhcp_client.dhcp_server_ip == wiz_dhcp.BROADCAST_SERVER_ADDR
+        assert dhcp_client.dhcp_server_ip == wiz_dhcp._BROADCAST_SERVER_ADDR
         assert dhcp_client.local_ip == 0
         assert dhcp_client.gateway_ip == 0
         assert dhcp_client.subnet_mask == 0
@@ -219,7 +219,7 @@ class TestSendDHCPMessage:
             (
                 (4, 5, 6, 7, 8, 9),
                 None,
-                wiz_dhcp.STATE_DHCP_DISCOVER,
+                wiz_dhcp._STATE_DHCP_DISCOVER,
                 23.4,
                 False,
                 0,
@@ -229,7 +229,7 @@ class TestSendDHCPMessage:
             (
                 (24, 35, 46, 57, 68, 79),
                 "bert.co.uk",
-                wiz_dhcp.STATE_DHCP_REQUEST,
+                wiz_dhcp._STATE_DHCP_REQUEST,
                 35.5,
                 False,
                 (192, 168, 3, 4),
@@ -239,7 +239,7 @@ class TestSendDHCPMessage:
             (
                 (255, 97, 36, 101, 42, 99),
                 "clash.net",
-                wiz_dhcp.STATE_DHCP_REQUEST,
+                wiz_dhcp._STATE_DHCP_REQUEST,
                 35.5,
                 True,
                 (10, 10, 10, 43),
@@ -412,7 +412,7 @@ class TestParseDhcpMessage:
         self.BAD_DATA[0] = 0
         dhcp_client._transaction_id = 0x7FFFFFFF
         dhcp_client._initial_xid = dhcp_client._transaction_id.to_bytes(4, "little")
-        with pytest.raises(ValueError):
+        with pytest.raises(RuntimeError):
             dhcp_client.parse_dhcp_response()
         self.BAD_DATA[0] = 2  # Reset to good value
         # No server ID.
@@ -430,13 +430,13 @@ class TestStateMachine:
     @pytest.mark.parametrize(
         "dhcp_state, socket_state",
         (
-            (wiz_dhcp.STATE_DHCP_START, "Socket"),
-            (wiz_dhcp.STATE_DHCP_DISCOVER, None),
-            (wiz_dhcp.STATE_DHCP_REQUEST, None),
-            (wiz_dhcp.STATE_DHCP_LEASED, None),
-            (wiz_dhcp.STATE_DHCP_REREQUEST, None),
-            (wiz_dhcp.STATE_DHCP_RELEASE, None),
-            (wiz_dhcp.STATE_DHCP_WAIT, None),
+            (wiz_dhcp._STATE_DHCP_START, "Socket"),
+            (wiz_dhcp._STATE_DHCP_DISCOVER, None),
+            (wiz_dhcp._STATE_DHCP_REQUEST, None),
+            (wiz_dhcp._STATE_DHCP_LEASED, None),
+            (wiz_dhcp._STATE_DHCP_REREQUEST, None),
+            (wiz_dhcp._STATE_DHCP_RELEASE, None),
+            (wiz_dhcp._STATE_DHCP_WAIT, None),
         ),
     )
     def test_link_is_down_state_not_disconnected(
@@ -461,7 +461,7 @@ class TestStateMachine:
         # Test.
         dhcp_client._dhcp_state_machine()
         # DHCP state machine in correct state.
-        assert dhcp_client._dhcp_state == wiz_dhcp.STATE_DHCP_DISCONN
+        assert dhcp_client._dhcp_state == wiz_dhcp._STATE_DHCP_DISCONN
         # Check that configurations are returned to defaults.
         assert dhcp_client._eth.ifconfig == (
             (0, 0, 0, 0),
@@ -470,7 +470,7 @@ class TestStateMachine:
             (0, 0, 0, 0),
         )
         assert dhcp_client._last_lease_time == 0
-        assert dhcp_client.dhcp_server_ip == wiz_dhcp.BROADCAST_SERVER_ADDR
+        assert dhcp_client.dhcp_server_ip == wiz_dhcp._BROADCAST_SERVER_ADDR
         assert dhcp_client._sock is None
 
     def test_link_is_down_state_disconnected(self, wiznet):
@@ -485,11 +485,11 @@ class TestStateMachine:
         dhcp_client._last_lease_time = 1
         dhcp_client.dhcp_server_ip = (192, 234, 1, 75)
         dhcp_client._sock = "socket"
-        dhcp_client._dhcp_state = wiz_dhcp.STATE_DHCP_DISCONN
+        dhcp_client._dhcp_state = wiz_dhcp._STATE_DHCP_DISCONN
         # Test.
         dhcp_client._dhcp_state_machine()
         # DHCP state machine in correct state.
-        assert dhcp_client._dhcp_state == wiz_dhcp.STATE_DHCP_DISCONN
+        assert dhcp_client._dhcp_state == wiz_dhcp._STATE_DHCP_DISCONN
         # Check that configurations are not altered because state has not changed.
         assert dhcp_client._eth.ifconfig == (
             (1, 1, 1, 1),
@@ -505,8 +505,8 @@ class TestStateMachine:
         dhcp_client = wiz_dhcp.DHCP(wiznet, (1, 2, 3, 4, 5, 6))
         wrench.socket.side_effect = [RuntimeError]
         dhcp_client._eth.link_status = True
-        dhcp_client._dhcp_state = wiz_dhcp.STATE_DHCP_DISCONN
+        dhcp_client._dhcp_state = wiz_dhcp._STATE_DHCP_DISCONN
         # Test.
         dhcp_client._dhcp_state_machine()
         # Assume state is set to START then becomes WAIT after START fails to set a socket
-        assert dhcp_client._dhcp_state == wiz_dhcp.STATE_DHCP_WAIT
+        assert dhcp_client._dhcp_state == wiz_dhcp._STATE_DHCP_WAIT

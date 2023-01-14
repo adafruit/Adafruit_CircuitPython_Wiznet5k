@@ -30,22 +30,22 @@ from random import getrandbits
 from micropython import const
 import adafruit_wiznet5k.adafruit_wiznet5k_socket as socket
 
-QUERY_FLAG = const(0x00)
-OPCODE_STANDARD_QUERY = const(0x00)
-RECURSION_DESIRED_FLAG = 1 << 8
+_QUERY_FLAG = const(0x00)
+_OPCODE_STANDARD_QUERY = const(0x00)
+_RECURSION_DESIRED_FLAG = 1 << 8
 
-TYPE_A = const(0x0001)
-CLASS_IN = const(0x0001)
-DATA_LEN = const(0x0004)
+_TYPE_A = const(0x0001)
+_CLASS_IN = const(0x0001)
+_DATA_LEN = const(0x0004)
 
 # Return codes for gethostbyname
-SUCCESS = const(1)
-TIMED_OUT = const(-1)
-INVALID_SERVER = const(-2)
-TRUNCATED = const(-3)
-INVALID_RESPONSE = const(-4)
+_SUCCESS = const(1)
+_TIMED_OUT = const(-1)
+_INVALID_SERVER = const(-2)
+_TRUNCATED = const(-3)
+_INVALID_RESPONSE = const(-4)
 
-DNS_PORT = const(0x35)  # port used for DNS request
+_DNS_PORT = const(0x35)  # port used for DNS request
 
 
 def _debug_print(*, debug: bool, message: str) -> None:
@@ -248,14 +248,13 @@ class DNS:
         :return Union[int, bytes] The IPv4 address if successful, -1 otherwise.
         """
         if self._dns_server is None:
-            return INVALID_SERVER
-
+            return _INVALID_SERVER
         # build DNS request packet
         self._query_id, self._query_length, buffer = _build_dns_query(hostname)
 
         # Send DNS request packet
-        self._sock.bind((None, DNS_PORT))
-        self._sock.connect((self._dns_server, DNS_PORT))
+        self._sock.bind((None, _DNS_PORT))
+        self._sock.connect((self._dns_server, _DNS_PORT))
         _debug_print(debug=self._debug, message="* DNS: Sending request packet...")
         self._sock.send(buffer)
 
