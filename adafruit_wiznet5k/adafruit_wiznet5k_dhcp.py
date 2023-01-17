@@ -314,11 +314,14 @@ class DHCP:
         minimum_packet_length = 236
         buffer = bytearray(b"")
         bytes_read = 0
+        _debugging_message("+ Beginning to receive…", self._debug)
         while bytes_read <= minimum_packet_length and time.monotonic() < timeout:
-            buffer.extend(
-                self._eth.read_udp(self._wiz_sock, BUFF_LENGTH - bytes_read)[1]
-            )
+            x = self._eth.read_udp(self._wiz_sock, BUFF_LENGTH - bytes_read)[1]
+            buffer.extend(x)
             bytes_read = len(buffer)
+            _debugging_message("+ Bytes read so far {}".format(bytes_read), self._debug)
+            _debugging_message(x, self._debug)
+
             if bytes_read == BUFF_LENGTH:
                 break
         _debugging_message("Received {} bytes".format(bytes_read), self._debug)
