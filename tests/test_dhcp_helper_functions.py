@@ -29,12 +29,12 @@ class TestDHCPInit:
     def test_constants(self):
         """Test all the constants in the DHCP module."""
         # DHCP State Machine
-        assert wiz_dhcp.STATE_INIT == const(0x01)
-        assert wiz_dhcp.STATE_SELECTING == const(0x02)
-        assert wiz_dhcp.STATE_REQUESTING == const(0x03)
-        assert wiz_dhcp.STATE_BOUND == const(0x04)
-        assert wiz_dhcp.STATE_RENEWING == const(0x05)
-        assert wiz_dhcp.STATE_REBINDING == const(0x06)
+        assert wiz_dhcp._STATE_INIT == const(0x01)
+        assert wiz_dhcp._STATE_SELECTING == const(0x02)
+        assert wiz_dhcp._STATE_REQUESTING == const(0x03)
+        assert wiz_dhcp._STATE_BOUND == const(0x04)
+        assert wiz_dhcp._STATE_RENEWING == const(0x05)
+        assert wiz_dhcp._STATE_REBINDING == const(0x06)
 
         # DHCP Message Types
         assert wiz_dhcp.DHCP_DISCOVER == const(1)
@@ -64,7 +64,7 @@ class TestDHCPInit:
         # DHCP Lease Time, in seconds
         assert wiz_dhcp.DEFAULT_LEASE_TIME == const(900)
         assert wiz_dhcp.BROADCAST_SERVER_ADDR == b"\xff\xff\xff\xff"
-        assert wiz_dhcp.UNASSIGNED_IP_ADDR == b"\x00\x00\x00\x00"
+        assert wiz_dhcp._UNASSIGNED_IP_ADDR == b"\x00\x00\x00\x00"
 
         # DHCP Response Options
         assert wiz_dhcp.MSG_TYPE == 53
@@ -78,7 +78,7 @@ class TestDHCPInit:
         assert wiz_dhcp.OPT_END == 255
 
         # Packet buffer
-        assert wiz_dhcp.BUFF_LENGTH == 318
+        assert wiz_dhcp._BUFF_LENGTH == 318
         assert wiz_dhcp._BUFF == bytearray(318)
 
     @pytest.mark.parametrize(
@@ -102,15 +102,15 @@ class TestDHCPInit:
         assert dhcp_client._debug is False
         assert dhcp_client._mac_address == mac_address
         assert dhcp_client._wiz_sock is None
-        assert dhcp_client._dhcp_state == wiz_dhcp.STATE_INIT
+        assert dhcp_client._dhcp_state == wiz_dhcp._STATE_INIT
         mock_randint.assert_called_once()
         assert dhcp_client._transaction_id == 0x1234567
         assert dhcp_client._start_time == 0
         assert dhcp_client.dhcp_server_ip == wiz_dhcp.BROADCAST_SERVER_ADDR
-        assert dhcp_client.local_ip == wiz_dhcp.UNASSIGNED_IP_ADDR
-        assert dhcp_client.gateway_ip == wiz_dhcp.UNASSIGNED_IP_ADDR
-        assert dhcp_client.subnet_mask == wiz_dhcp.UNASSIGNED_IP_ADDR
-        assert dhcp_client.dns_server_ip == wiz_dhcp.UNASSIGNED_IP_ADDR
+        assert dhcp_client.local_ip == wiz_dhcp._UNASSIGNED_IP_ADDR
+        assert dhcp_client.gateway_ip == wiz_dhcp._UNASSIGNED_IP_ADDR
+        assert dhcp_client.subnet_mask == wiz_dhcp._UNASSIGNED_IP_ADDR
+        assert dhcp_client.dns_server_ip == wiz_dhcp._UNASSIGNED_IP_ADDR
         assert dhcp_client._lease_time == 0
         assert dhcp_client._t1 == 0
         assert dhcp_client._t2 == 0
@@ -380,15 +380,15 @@ def test_dsm_reset(mocker, mock_wiznet5k):
     dhcp_client._dhcp_connection_setup.assert_called_once()
     dhcp_client._socket_release.assert_called_once()
     assert mock_wiznet5k.ifconfig == (
-        wiz_dhcp.UNASSIGNED_IP_ADDR,
-        wiz_dhcp.UNASSIGNED_IP_ADDR,
-        wiz_dhcp.UNASSIGNED_IP_ADDR,
-        wiz_dhcp.UNASSIGNED_IP_ADDR,
+        wiz_dhcp._UNASSIGNED_IP_ADDR,
+        wiz_dhcp._UNASSIGNED_IP_ADDR,
+        wiz_dhcp._UNASSIGNED_IP_ADDR,
+        wiz_dhcp._UNASSIGNED_IP_ADDR,
     )
     assert dhcp_client.dhcp_server_ip == wiz_dhcp.BROADCAST_SERVER_ADDR
-    assert dhcp_client.local_ip == wiz_dhcp.UNASSIGNED_IP_ADDR
-    assert dhcp_client.subnet_mask == wiz_dhcp.UNASSIGNED_IP_ADDR
-    assert dhcp_client.dns_server_ip == wiz_dhcp.UNASSIGNED_IP_ADDR
+    assert dhcp_client.local_ip == wiz_dhcp._UNASSIGNED_IP_ADDR
+    assert dhcp_client.subnet_mask == wiz_dhcp._UNASSIGNED_IP_ADDR
+    assert dhcp_client.dns_server_ip == wiz_dhcp._UNASSIGNED_IP_ADDR
     assert dhcp_client._renew is False
     assert dhcp_client._transaction_id == 4
     assert dhcp_client._start_time == time.monotonic()
@@ -489,8 +489,8 @@ class TestHandleDhcpMessage:
     @pytest.mark.parametrize(
         "fsm_state, msg_in",
         (
-            (wiz_dhcp.STATE_SELECTING, wiz_dhcp.DHCP_DISCOVER),
-            (wiz_dhcp.STATE_REQUESTING, wiz_dhcp.DHCP_REQUEST),
+            (wiz_dhcp._STATE_SELECTING, wiz_dhcp.DHCP_DISCOVER),
+            (wiz_dhcp._STATE_REQUESTING, wiz_dhcp.DHCP_REQUEST),
         ),
     )
     @freeze_time("2022-5-5")
@@ -558,7 +558,7 @@ class TestHandleDhcpMessage:
         )
         # Set initial FSM state.
         dhcp_client._wiz_sock = 3
-        dhcp_client._dhcp_state = wiz_dhcp.STATE_REQUESTING
+        dhcp_client._dhcp_state = wiz_dhcp._STATE_REQUESTING
         dhcp_client._blocking = True
         dhcp_client._renew = False
         # Test that a TimeoutError is raised.
@@ -594,7 +594,7 @@ class TestHandleDhcpMessage:
         )
         # Set initial FSM state.
         dhcp_client._wiz_sock = 3
-        dhcp_client._dhcp_state = wiz_dhcp.STATE_REQUESTING
+        dhcp_client._dhcp_state = wiz_dhcp._STATE_REQUESTING
         dhcp_client._blocking = True
         dhcp_client._renew = False
         # Test that a TimeoutError is raised.
@@ -632,7 +632,7 @@ class TestHandleDhcpMessage:
         )
         # Set initial FSM state.
         dhcp_client._wiz_sock = 3
-        dhcp_client._dhcp_state = wiz_dhcp.STATE_REQUESTING
+        dhcp_client._dhcp_state = wiz_dhcp._STATE_REQUESTING
         # Combinations of renew and blocking that will not loop.
         dhcp_client._blocking = blocking
         dhcp_client._renew = renew
@@ -671,7 +671,7 @@ class TestHandleDhcpMessage:
         )
         # Set initial FSM state.
         dhcp_client._wiz_sock = 3
-        dhcp_client._dhcp_state = wiz_dhcp.STATE_REQUESTING
+        dhcp_client._dhcp_state = wiz_dhcp._STATE_REQUESTING
         # Combinations of renew and blocking that will not loop.
         dhcp_client._blocking = blocking
         dhcp_client._renew = renew
@@ -689,7 +689,7 @@ class TestReceiveResponse:
 
     @freeze_time("2022-10-10")
     @pytest.mark.parametrize(
-        "bytes_on_socket", (wiz_dhcp.BUFF_LENGTH, minimum_packet_length + 1)
+        "bytes_on_socket", (wiz_dhcp._BUFF_LENGTH, minimum_packet_length + 1)
     )
     def test_receive_response_good_data(self, mock_dhcp, bytes_on_socket):
         mock_dhcp._eth.read_udp.return_value = (
@@ -726,9 +726,9 @@ class TestReceiveResponse:
     def test_buffer_handling(self, mock_dhcp, bytes_returned):
         total_bytes = sum(bytes_returned)
         mock_dhcp._next_resend = time.monotonic() + 15
-        wiz_dhcp._BUFF = bytearray([1] * wiz_dhcp.BUFF_LENGTH)
+        wiz_dhcp._BUFF = bytearray([1] * wiz_dhcp._BUFF_LENGTH)
         expected_result = bytearray([2] * total_bytes) + (
-            bytes([0] * (wiz_dhcp.BUFF_LENGTH - total_bytes))
+            bytes([0] * (wiz_dhcp._BUFF_LENGTH - total_bytes))
         )
         mock_dhcp._eth.read_udp.side_effect = (
             (x, bytes([2] * x)) for x in bytes_returned
@@ -741,11 +741,11 @@ class TestReceiveResponse:
         mock_dhcp._wiz_sock = 1
         mock_dhcp._next_resend = time.monotonic() + 15
         mock_dhcp._eth.read_udp.return_value = (
-            wiz_dhcp.BUFF_LENGTH,
-            bytes([2] * wiz_dhcp.BUFF_LENGTH),
+            wiz_dhcp._BUFF_LENGTH,
+            bytes([2] * wiz_dhcp._BUFF_LENGTH),
         )
         mock_dhcp._receive_dhcp_response(time.monotonic() + 10)
-        mock_dhcp._eth.read_udp.assert_called_once_with(1, wiz_dhcp.BUFF_LENGTH)
+        mock_dhcp._eth.read_udp.assert_called_once_with(1, wiz_dhcp._BUFF_LENGTH)
         mock_dhcp._eth.read_udp.reset_mock()
         mock_dhcp._eth.read_udp.side_effect = [
             (200, bytes([2] * 200)),
@@ -764,7 +764,7 @@ class TestProcessMessagingStates:
         "state, bad_messages",
         (
             (
-                wiz_dhcp.STATE_SELECTING,
+                wiz_dhcp._STATE_SELECTING,
                 (
                     0,
                     wiz_dhcp.DHCP_ACK,
@@ -777,7 +777,7 @@ class TestProcessMessagingStates:
                 ),
             ),
             (
-                wiz_dhcp.STATE_REQUESTING,
+                wiz_dhcp._STATE_REQUESTING,
                 (
                     0,
                     wiz_dhcp.DHCP_OFFER,
@@ -802,17 +802,17 @@ class TestProcessMessagingStates:
 
     def test_called_from_selecting_good_message(self, mock_dhcp):
         # Setup with the required state.
-        mock_dhcp._dhcp_state = wiz_dhcp.STATE_SELECTING
+        mock_dhcp._dhcp_state = wiz_dhcp._STATE_SELECTING
         # Test.
         mock_dhcp._process_messaging_states(message_type=wiz_dhcp.DHCP_OFFER)
         # Confirm correct new state.
-        assert mock_dhcp._dhcp_state == wiz_dhcp.STATE_REQUESTING
+        assert mock_dhcp._dhcp_state == wiz_dhcp._STATE_REQUESTING
 
     @freeze_time("2022-3-4")
     @pytest.mark.parametrize("lease_time", (0, 8000))
     def test_called_from_requesting_with_ack(self, mock_dhcp, lease_time):
         # Setup with the required state.
-        mock_dhcp._dhcp_state = wiz_dhcp.STATE_REQUESTING
+        mock_dhcp._dhcp_state = wiz_dhcp._STATE_REQUESTING
         # Set the lease_time (zero forces a default to be used).
         mock_dhcp._lease_time = lease_time
         # Set renew to True to confirm that an ACK sets it to False.
@@ -830,12 +830,12 @@ class TestProcessMessagingStates:
         # Check that renew is forced to False
         assert mock_dhcp._renew is False
         # FSM state should be bound.
-        assert mock_dhcp._dhcp_state == wiz_dhcp.STATE_BOUND
+        assert mock_dhcp._dhcp_state == wiz_dhcp._STATE_BOUND
 
     def test_called_from_requesting_with_nak(self, mock_dhcp):
         # Setup with the required state.
-        mock_dhcp._dhcp_state = wiz_dhcp.STATE_REQUESTING
+        mock_dhcp._dhcp_state = wiz_dhcp._STATE_REQUESTING
         # Test.
         mock_dhcp._process_messaging_states(message_type=wiz_dhcp.DHCP_NAK)
         # FSM state should be init after receiving a NAK response.
-        assert mock_dhcp._dhcp_state == wiz_dhcp.STATE_INIT
+        assert mock_dhcp._dhcp_state == wiz_dhcp._STATE_INIT

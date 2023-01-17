@@ -29,22 +29,22 @@ from micropython import const
 import adafruit_wiznet5k.adafruit_wiznet5k_socket as socket
 from adafruit_wiznet5k.adafruit_wiznet5k_socket import htons
 
-QUERY_FLAG = const(0x00)
-OPCODE_STANDARD_QUERY = const(0x00)
-RECURSION_DESIRED_FLAG = 1 << 8
+_QUERY_FLAG = const(0x00)
+_OPCODE_STANDARD_QUERY = const(0x00)
+_RECURSION_DESIRED_FLAG = 1 << 8
 
-TYPE_A = const(0x0001)
-CLASS_IN = const(0x0001)
-DATA_LEN = const(0x0004)
+_TYPE_A = const(0x0001)
+_CLASS_IN = const(0x0001)
+_DATA_LEN = const(0x0004)
 
 # Return codes for gethostbyname
-SUCCESS = const(1)
-TIMED_OUT = const(-1)
-INVALID_SERVER = const(-2)
-TRUNCATED = const(-3)
-INVALID_RESPONSE = const(-4)
+_SUCCESS = const(1)
+_TIMED_OUT = const(-1)
+_INVALID_SERVER = const(-2)
+_TRUNCATED = const(-3)
+_INVALID_RESPONSE = const(-4)
 
-DNS_PORT = const(0x35)  # port used for DNS request
+_DNS_PORT = const(0x35)  # port used for DNS request
 
 
 class DNS:
@@ -81,15 +81,15 @@ class DNS:
         :return Union[int, bytes] The IPv4 address if successful, -1 otherwise.
         """
         if self._dns_server is None:
-            return INVALID_SERVER
+            return _INVALID_SERVER
         self._host = hostname
         # build DNS request packet
         self._build_dns_header()
         self._build_dns_question()
 
         # Send DNS request packet
-        self._sock.bind((None, DNS_PORT))
-        self._sock.connect((self._dns_server, DNS_PORT))
+        self._sock.bind((None, _DNS_PORT))
+        self._sock.connect((self._dns_server, _DNS_PORT))
         if self._debug:
             print("* DNS: Sending request packet...")
         self._sock.send(self._pkt_buf)
@@ -176,7 +176,7 @@ class DNS:
 
         # Validate Query is Type A
         q_type = int.from_bytes(self._pkt_buf[ptr : ptr + 2], "big")
-        if not q_type == TYPE_A:
+        if not q_type == _TYPE_A:
             if self._debug:
                 print("* DNS ERROR: Incorrect Query Type: ", q_type)
             return -1
@@ -184,7 +184,7 @@ class DNS:
 
         # Validate Query is Type A
         q_class = int.from_bytes(self._pkt_buf[ptr : ptr + 2], "big")
-        if not q_class == TYPE_A:
+        if not q_class == _TYPE_A:
             if self._debug:
                 print("* DNS ERROR: Incorrect Query Class: ", q_class)
             return -1
@@ -201,7 +201,7 @@ class DNS:
 
         # Validate Answer Type A
         ans_type = int.from_bytes(self._pkt_buf[ptr : ptr + 2], "big")
-        if not ans_type == TYPE_A:
+        if not ans_type == _TYPE_A:
             if self._debug:
                 print("* DNS ERROR: Incorrect Answer Type: ", ans_type)
             return -1
@@ -209,7 +209,7 @@ class DNS:
 
         # Validate Answer Class IN
         ans_class = int.from_bytes(self._pkt_buf[ptr : ptr + 2], "big")
-        if not ans_class == TYPE_A:
+        if not ans_class == _TYPE_A:
             if self._debug:
                 print("* DNS ERROR: Incorrect Answer Class: ", ans_class)
             return -1
@@ -220,7 +220,7 @@ class DNS:
 
         # Validate addr is IPv4
         data_len = int.from_bytes(self._pkt_buf[ptr : ptr + 2], "big")
-        if not data_len == DATA_LEN:
+        if not data_len == _DATA_LEN:
             if self._debug:
                 print("* DNS ERROR: Unexpected Data Length: ", data_len)
             return -1
@@ -267,8 +267,8 @@ class DNS:
         # end of the name
         self._pkt_buf.append(0x00)
         # Type A record
-        self._pkt_buf.append(htons(TYPE_A) & 0xFF)
-        self._pkt_buf.append(htons(TYPE_A) >> 8)
+        self._pkt_buf.append(htons(_TYPE_A) & 0xFF)
+        self._pkt_buf.append(htons(_TYPE_A) >> 8)
         # Class IN
-        self._pkt_buf.append(htons(CLASS_IN) & 0xFF)
-        self._pkt_buf.append(htons(CLASS_IN) >> 8)
+        self._pkt_buf.append(htons(_CLASS_IN) & 0xFF)
+        self._pkt_buf.append(htons(_CLASS_IN) >> 8)

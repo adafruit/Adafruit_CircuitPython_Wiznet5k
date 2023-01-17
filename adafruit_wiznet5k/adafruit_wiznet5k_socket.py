@@ -70,10 +70,10 @@ def htons(x: int) -> int:
 
 
 SOCK_STREAM = const(0x21)  # TCP
-TCP_MODE = 80
+_TCP_MODE = 80
 SOCK_DGRAM = const(0x02)  # UDP
 AF_INET = const(3)
-SOCKET_INVALID = const(255)
+_SOCKET_INVALID = const(255)
 
 
 # pylint: disable=too-many-arguments, unused-argument
@@ -101,7 +101,7 @@ def getaddrinfo(
     :return List[Tuple[int, int, int, str, Tuple[str, int]]]: Address info entries.
     """
     if not isinstance(port, int):
-        raise RuntimeError("Port must be an integer")
+        raise ValueError("Port must be an integer")
     if is_ipv4(host):
         return [(AF_INET, socktype, proto, "", (host, port))]
     return [(AF_INET, socktype, proto, "", (gethostbyname(host), port))]
@@ -169,7 +169,7 @@ class socket:
         self._listen_port = None
 
         self._socknum = _the_interface.get_socket()
-        if self._socknum == SOCKET_INVALID:
+        if self._socknum == _SOCKET_INVALID:
             raise RuntimeError("Failed to allocate socket.")
 
     def __enter__(self):
@@ -213,11 +213,13 @@ class socket:
 
         :return bool: Whether connected.
         """
+        # pylint: disable=protected-access
+
         if self.socknum >= _the_interface.max_sockets:
             return False
         status = _the_interface.socket_status(self.socknum)[0]
         if (
-            status == wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSE_WAIT
+            status == wiznet5k.adafruit_wiznet5k._SNSR_SOCK_CLOSE_WAIT
             and self.available() == 0
         ):
             result = False
@@ -225,7 +227,7 @@ class socket:
             result = status not in (
                 wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSED,
                 wiznet5k.adafruit_wiznet5k.SNSR_SOCK_LISTEN,
-                wiznet5k.adafruit_wiznet5k.SNSR_SOCK_TIME_WAIT,
+                wiznet5k.adafruit_wiznet5k._SNSR_SOCK_TIME_WAIT,
                 wiznet5k.adafruit_wiznet5k.SNSR_SOCK_FIN_WAIT,
             )
         if not result and status != wiznet5k.adafruit_wiznet5k.SNSR_SOCK_LISTEN:
@@ -283,7 +285,8 @@ class socket:
 
         :param Optional[int] backlog: Included for compatibility but ignored.
         """
-        assert self._listen_port is not None, "Use bind to set the port before listen!"
+        if self._listen_port is None:
+            raise RuntimeError("Use bind to set the port before listen!")
         _the_interface.socket_listen(self.socknum, self._listen_port)
         self._buffer = b""
 
@@ -340,9 +343,10 @@ class socket:
         :param Optional[int] conntype: Raises an exception if set to 3, unused otherwise, defaults
             to None.
         """
-        assert (
-            conntype != 0x03
-        ), "Error: SSL/TLS is not currently supported by CircuitPython."
+        if conntype == 0x03:
+            raise NotImplementedError(
+                "Error: SSL/TLS is not currently supported by CircuitPython."
+            )
         host, port = address
 
         if hasattr(host, "split"):
@@ -565,7 +569,8 @@ class socket:
 
     def disconnect(self) -> None:
         """Disconnect a TCP socket."""
-        assert self._sock_type == SOCK_STREAM, "Socket must be a TCP socket."
+        if self._sock_type != SOCK_STREAM:
+            raise RuntimeError("Socket must be a TCP socket.")
         _the_interface.socket_disconnect(self.socknum)
 
     def close(self) -> None:
