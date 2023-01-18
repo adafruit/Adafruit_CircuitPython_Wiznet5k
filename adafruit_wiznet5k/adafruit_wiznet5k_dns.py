@@ -3,8 +3,6 @@
 #
 # SPDX-License-Identifier: MIT
 
-# Each function only has one return statement. Pylint seems confused.
-# pylint: disable=inconsistent-return-statements
 """
 `adafruit_wiznet5k_dns`
 ================================================================================
