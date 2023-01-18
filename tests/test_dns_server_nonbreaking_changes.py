@@ -28,22 +28,22 @@ def wrench(mocker):
 
 class TestDNSInit:
     def test_constants(self):
-        assert wiz_dns.QUERY_FLAG == const(0x00)
-        assert wiz_dns.OPCODE_STANDARD_QUERY == const(0x00)
-        assert wiz_dns.RECURSION_DESIRED_FLAG == 1 << 8
+        assert wiz_dns._QUERY_FLAG == const(0x00)
+        assert wiz_dns._OPCODE_STANDARD_QUERY == const(0x00)
+        assert wiz_dns._RECURSION_DESIRED_FLAG == 1 << 8
 
-        assert wiz_dns.TYPE_A == const(0x0001)
-        assert wiz_dns.CLASS_IN == const(0x0001)
-        assert wiz_dns.DATA_LEN == const(0x0004)
+        assert wiz_dns._TYPE_A == const(0x0001)
+        assert wiz_dns._CLASS_IN == const(0x0001)
+        assert wiz_dns._DATA_LEN == const(0x0004)
 
         # Return codes for gethostbyname
-        assert wiz_dns.SUCCESS == const(1)
-        assert wiz_dns.TIMED_OUT == const(-1)
-        assert wiz_dns.INVALID_SERVER == const(-2)
-        assert wiz_dns.TRUNCATED == const(-3)
-        assert wiz_dns.INVALID_RESPONSE == const(-4)
+        assert wiz_dns._SUCCESS == const(1)
+        assert wiz_dns._TIMED_OUT == const(-1)
+        assert wiz_dns._INVALID_SERVER == const(-2)
+        assert wiz_dns._TRUNCATED == const(-3)
+        assert wiz_dns._INVALID_RESPONSE == const(-4)
 
-        assert wiz_dns.DNS_PORT == const(0x35)  # port used for DNS request
+        assert wiz_dns._DNS_PORT == const(0x35)  # port used for DNS request
 
     def test_dns_setup_default(self, wiznet, wrench):
         # Test with DNS address as string and default values.
