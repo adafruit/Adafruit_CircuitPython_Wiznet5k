@@ -5,12 +5,12 @@
 # pylint: disable=no-self-use, redefined-outer-name, protected-access, invalid-name, too-many-arguments
 """Tests to confirm that there are no changes in behaviour to public methods and funtions."""
 import pytest
-
+import freezegun
 from micropython import const
 import adafruit_wiznet5k.adafruit_wiznet5k_dns as wiz_dns
 from adafruit_wiznet5k.adafruit_wiznet5k_socket import socket
 
-#
+
 DEFAULT_DEBUG_ON = True
 
 
@@ -179,6 +179,7 @@ class TestDnsGetHostByName:
         dns_server._sock.available.assert_called()
         assert len(dns_server._sock.available.call_args_list) == 5
 
+    @freezegun.freeze_time("2022-3-4", auto_tick_seconds=0.1)
     def test_retries_with_no_data_on_socket(self, wiznet, wrench):
         """Confirm correct calls made to socket when no data available."""
         # Pylint does not understand that the wrench fixture is required.
@@ -191,7 +192,7 @@ class TestDnsGetHostByName:
 
         # Check how many times the socket was polled for data before giving up.
         dns_server._sock.available.assert_called()
-        assert len(dns_server._sock.available.call_args_list) == 21
+        assert len(dns_server._sock.available.call_args_list) == 12
         # Check that no attempt made to read data from the socket.
         dns_server._sock.recv.assert_not_called()
 
