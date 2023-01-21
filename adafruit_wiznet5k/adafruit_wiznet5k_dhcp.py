@@ -117,9 +117,8 @@ class DHCP:
     until successful. If the lease expires, the client attempts to obtain a new lease in
     blocking mode when the maintenance routine is run.
 
-    In most circumstances, call `DHCP.request_lease` to obtain a lease, then periodically call
-    `DHCP.maintain_lease` in non-blocking mode so that the FSM can check whether the lease
-    needs to be renewed, and can then renew it.
+    These class methods are not designed to be called directly. They should be called via
+    methods in the WIZNET5K class.
 
     Since DHCP uses UDP, messages may be lost. The DHCP protocol uses exponential backoff
     for retrying. Retries occur after 4, 8, and 16 seconds (the final retry is followed by
@@ -306,6 +305,8 @@ class DHCP:
         stored in the global buffer and the number of bytes received is returned.
         If the packet is too short, it is discarded and zero is returned. The
         maximum packet size is limited by the size of the global buffer.
+
+        :param float timeout: Seconds to wait for a process to complete.
 
         :returns int: The number of bytes stored in the global buffer.
         """
@@ -606,14 +607,14 @@ class DHCP:
         """Parse DHCP response from DHCP server.
 
         Check that the message is for this client. Extract data from the fixed positions
-         in the first 236 bytes of the message, then cycle through the options for
-         additional data.
+        in the first 236 bytes of the message, then cycle through the options for
+        additional data.
 
         :returns Tuple[int, bytearray]: DHCP packet type and ID.
 
         :raises ValueError: Checks that the message is a reply, the transaction ID
-        matches, a client ID exists and the 'magic cookie' is set. If any of these tests
-        fail or no message type is found in the options, raises a ValueError.
+            matches, a client ID exists and the 'magic cookie' is set. If any of these tests
+            fail or no message type is found in the options, raises a ValueError.
         """
         # pylint: disable=too-many-branches
         def option_reader(pointer: int) -> Tuple[int, int, bytes]:
