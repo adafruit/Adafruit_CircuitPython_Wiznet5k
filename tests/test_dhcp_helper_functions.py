@@ -8,7 +8,8 @@ import time
 # pylint: disable=no-self-use, redefined-outer-name, protected-access, invalid-name, too-many-arguments
 import pytest
 from freezegun import freeze_time
-from micropython import const
+
+# from micropython import const
 import dhcp_dummy_data as dhcp_data
 import adafruit_wiznet5k.adafruit_wiznet5k_dhcp as wiz_dhcp
 
@@ -28,58 +29,6 @@ def mock_dhcp(mock_wiznet5k):
 class TestDHCPInit:
     def test_constants(self):
         """Test all the constants in the DHCP module."""
-        # DHCP State Machine
-        assert wiz_dhcp._STATE_INIT == const(0x01)
-        assert wiz_dhcp._STATE_SELECTING == const(0x02)
-        assert wiz_dhcp._STATE_REQUESTING == const(0x03)
-        assert wiz_dhcp._STATE_BOUND == const(0x04)
-        assert wiz_dhcp._STATE_RENEWING == const(0x05)
-        assert wiz_dhcp._STATE_REBINDING == const(0x06)
-
-        # DHCP Message Types
-        assert wiz_dhcp.DHCP_DISCOVER == const(1)
-        assert wiz_dhcp.DHCP_OFFER == const(2)
-        assert wiz_dhcp.DHCP_REQUEST == const(3)
-        assert wiz_dhcp.DHCP_DECLINE == const(4)
-        assert wiz_dhcp.DHCP_ACK == const(5)
-        assert wiz_dhcp.DHCP_NAK == const(6)
-        assert wiz_dhcp.DHCP_RELEASE == const(7)
-        assert wiz_dhcp.DHCP_INFORM == const(8)
-
-        # DHCP Message OP Codes
-        assert wiz_dhcp.DHCP_BOOT_REQUEST == const(0x01)
-        assert wiz_dhcp.DHCP_BOOT_REPLY == const(0x02)
-
-        assert wiz_dhcp.DHCP_HTYPE10MB == const(0x01)
-        assert wiz_dhcp.DHCP_HTYPE100MB == const(0x02)
-
-        assert wiz_dhcp.DHCP_HLENETHERNET == const(0x06)
-        assert wiz_dhcp.DHCP_HOPS == const(0x00)
-
-        assert wiz_dhcp.MAGIC_COOKIE == b"c\x82Sc"
-        assert wiz_dhcp.MAX_DHCP_OPT == const(0x10)
-
-        # Default DHCP Server port
-        assert wiz_dhcp.DHCP_SERVER_PORT == const(67)
-        # DHCP Lease Time, in seconds
-        assert wiz_dhcp.DEFAULT_LEASE_TIME == const(900)
-        assert wiz_dhcp.BROADCAST_SERVER_ADDR == b"\xff\xff\xff\xff"
-        assert wiz_dhcp._UNASSIGNED_IP_ADDR == b"\x00\x00\x00\x00"
-
-        # DHCP Response Options
-        assert wiz_dhcp.MSG_TYPE == 53
-        assert wiz_dhcp.SUBNET_MASK == 1
-        assert wiz_dhcp.ROUTERS_ON_SUBNET == 3
-        assert wiz_dhcp.DNS_SERVERS == 6
-        assert wiz_dhcp.DHCP_SERVER_ID == 54
-        assert wiz_dhcp.T1_VAL == 58
-        assert wiz_dhcp.T2_VAL == 59
-        assert wiz_dhcp.LEASE_TIME == 51
-        assert wiz_dhcp.OPT_END == 255
-
-        # Packet buffer
-        assert wiz_dhcp._BUFF_LENGTH == 318
-        assert wiz_dhcp._BUFF == bytearray(318)
 
     @pytest.mark.parametrize(
         "mac_address",

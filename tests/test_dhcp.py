@@ -25,18 +25,6 @@ def wrench(mocker):
 
 class TestDHCPInit:
     def test_constants(self):
-        # DHCP State Machine
-        assert wiz_dhcp._STATE_DHCP_START == const(0x00)
-        assert wiz_dhcp._STATE_DHCP_DISCOVER == const(0x01)
-        assert wiz_dhcp._STATE_DHCP_REQUEST == const(0x02)
-        assert wiz_dhcp._STATE_DHCP_LEASED == const(0x03)
-        assert wiz_dhcp._STATE_DHCP_REREQUEST == const(0x04)
-        assert wiz_dhcp._STATE_DHCP_RELEASE == const(0x05)
-        assert wiz_dhcp._STATE_DHCP_WAIT == const(0x06)
-        assert wiz_dhcp._STATE_DHCP_DISCONN == const(0x07)
-
-        # DHCP wait time between attempts
-        assert wiz_dhcp._DHCP_WAIT_TIME == const(60)
 
         # DHCP Message Types
         assert wiz_dhcp._DHCP_DISCOVER == const(1)
@@ -51,13 +39,10 @@ class TestDHCPInit:
         # DHCP Message OP Codes
         assert wiz_dhcp._DHCP_BOOT_REQUEST == const(0x01)
         assert wiz_dhcp._DHCP_BOOT_REPLY == const(0x02)
-
         assert wiz_dhcp._DHCP_HTYPE10MB == const(0x01)
         assert wiz_dhcp._DHCP_HTYPE100MB == const(0x02)
-
         assert wiz_dhcp._DHCP_HLENETHERNET == const(0x06)
         assert wiz_dhcp._DHCP_HOPS == const(0x00)
-
         assert wiz_dhcp._MAGIC_COOKIE == b"c\x82Sc"
         assert wiz_dhcp._MAX_DHCP_OPT == const(0x10)
 
@@ -66,6 +51,14 @@ class TestDHCPInit:
         # DHCP Lease Time, in seconds
         assert wiz_dhcp._DEFAULT_LEASE_TIME == const(900)
         assert wiz_dhcp._BROADCAST_SERVER_ADDR == (255, 255, 255, 255)
+
+        # DHCP State Machine
+        assert wiz_dhcp._STATE_INIT == const(0x01)
+        assert wiz_dhcp._STATE_SELECTING == const(0x02)
+        assert wiz_dhcp._STATE_REQUESTING == const(0x03)
+        assert wiz_dhcp._STATE_BOUND == const(0x04)
+        assert wiz_dhcp._STATE_RENEWING == const(0x05)
+        assert wiz_dhcp._STATE_REBINDING == const(0x06)
 
         # DHCP Response Options
         assert wiz_dhcp._MSG_TYPE == 53
@@ -79,6 +72,7 @@ class TestDHCPInit:
         assert wiz_dhcp._OPT_END == 255
 
         # Packet buffer
+        assert wiz_dhcp._BUFF_LENGTH == 318
         assert wiz_dhcp._BUFF == bytearray(318)
 
     @pytest.mark.parametrize(
@@ -219,7 +213,7 @@ class TestSendDHCPMessage:
             (
                 (4, 5, 6, 7, 8, 9),
                 None,
-                wiz_dhcp._STATE_DHCP_DISCOVER,
+                wiz_dhcp._DHCP_DISCOVER,
                 23.4,
                 False,
                 0,
@@ -229,7 +223,7 @@ class TestSendDHCPMessage:
             (
                 (24, 35, 46, 57, 68, 79),
                 "bert.co.uk",
-                wiz_dhcp._STATE_DHCP_REQUEST,
+                wiz_dhcp._DHCP_REQUEST,
                 35.5,
                 False,
                 (192, 168, 3, 4),
@@ -239,7 +233,7 @@ class TestSendDHCPMessage:
             (
                 (255, 97, 36, 101, 42, 99),
                 "clash.net",
-                wiz_dhcp._STATE_DHCP_REQUEST,
+                wiz_dhcp._DHCP_REQUEST,
                 35.5,
                 True,
                 (10, 10, 10, 43),

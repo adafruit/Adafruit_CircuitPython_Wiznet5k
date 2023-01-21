@@ -68,15 +68,15 @@ _BROADCAST_SERVER_ADDR = b"\xff\xff\xff\xff"  # (255.255.255.255)
 _UNASSIGNED_IP_ADDR = b"\x00\x00\x00\x00"  # (0.0.0.0)
 
 # DHCP Response Options
-_MSG_TYPE = 53
-_SUBNET_MASK = 1
-_ROUTERS_ON_SUBNET = 3
-_DNS_SERVERS = 6
-_DHCP_SERVER_ID = 54
-_T1_VAL = 58
-_T2_VAL = 59
-_LEASE_TIME = 51
-_OPT_END = 255
+_MSG_TYPE = const(53)
+_SUBNET_MASK = const(1)
+_ROUTERS_ON_SUBNET = const(3)
+_DNS_SERVERS = const(6)
+_DHCP_SERVER_ID = const(54)
+_T1_VAL = const(58)
+_T2_VAL = const(59)
+_LEASE_TIME = const(51)
+_OPT_END = const(255)
 
 # Packet buffer
 _BUFF_LENGTH = 318
