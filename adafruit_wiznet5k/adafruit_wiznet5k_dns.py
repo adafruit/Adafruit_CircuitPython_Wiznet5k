@@ -220,7 +220,7 @@ class DNS:
         self,
         iface: WIZNET5K,
         dns_address: Union[str, Tuple[int, int, int, int]],
-        debug: bool = True,
+        debug: bool = False,
     ) -> None:
         """
         :param adafruit_wiznet5k.WIZNET5K: Ethernet network connection.
