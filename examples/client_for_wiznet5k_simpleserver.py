@@ -3,7 +3,8 @@ import socket
 import time
 
 print("A simple client for the wiznet5k_simpleserver.py example in this directory")
-print("Run this on any device connected to the same network as the server, after editing this script with the correct HOST & PORT\n")
+print("Run this on any device connected to the same network as the server, after "
+      "editing this script with the correct HOST & PORT\n")
 # Or, use any TCP-based client that can easily send 1024 bytes. For example:
 #     python -c 'print("1234"*256)' | nc 192.168.10.1 50007
 
