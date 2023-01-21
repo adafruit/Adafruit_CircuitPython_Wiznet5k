@@ -55,7 +55,7 @@ class TestDHCPInit:
         mock_randint.assert_called_once()
         assert dhcp_client._transaction_id == 0x1234567
         assert dhcp_client._start_time == 0
-        assert dhcp_client.dhcp_server_ip == wiz_dhcp.BROADCAST_SERVER_ADDR
+        assert dhcp_client.dhcp_server_ip == wiz_dhcp._BROADCAST_SERVER_ADDR
         assert dhcp_client.local_ip == wiz_dhcp._UNASSIGNED_IP_ADDR
         assert dhcp_client.gateway_ip == wiz_dhcp._UNASSIGNED_IP_ADDR
         assert dhcp_client.subnet_mask == wiz_dhcp._UNASSIGNED_IP_ADDR
@@ -95,7 +95,7 @@ class TestSendDHCPMessage:
         dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, (4, 5, 6, 7, 8, 9))
         dhcp_client._transaction_id = 0x6FFFFFFF
         dhcp_client._start_time = time.monotonic() - 23.4
-        dhcp_client._generate_dhcp_message(message_type=wiz_dhcp.DHCP_DISCOVER)
+        dhcp_client._generate_dhcp_message(message_type=wiz_dhcp._DHCP_DISCOVER)
         assert wiz_dhcp._BUFF == dhcp_data.DHCP_SEND_01
         assert len(wiz_dhcp._BUFF) == 318
 
@@ -106,7 +106,7 @@ class TestSendDHCPMessage:
             (
                 (4, 5, 6, 7, 8, 9),
                 None,
-                wiz_dhcp.DHCP_DISCOVER,
+                wiz_dhcp._DHCP_DISCOVER,
                 23.4,
                 False,
                 False,
@@ -117,7 +117,7 @@ class TestSendDHCPMessage:
             (
                 (24, 35, 46, 57, 68, 79),
                 "bert.co.uk",
-                wiz_dhcp.DHCP_DISCOVER,
+                wiz_dhcp._DHCP_DISCOVER,
                 35.5,
                 True,
                 True,
@@ -128,7 +128,7 @@ class TestSendDHCPMessage:
             (
                 (255, 97, 36, 101, 42, 99),
                 "clash.net",
-                wiz_dhcp.DHCP_DISCOVER,
+                wiz_dhcp._DHCP_DISCOVER,
                 35.5,
                 False,
                 True,
@@ -175,7 +175,7 @@ class TestSendDHCPMessage:
             (
                 (255, 97, 36, 101, 42, 99),
                 "helicopter.org",
-                wiz_dhcp.DHCP_REQUEST,
+                wiz_dhcp._DHCP_REQUEST,
                 16.3,
                 False,
                 True,
@@ -186,7 +186,7 @@ class TestSendDHCPMessage:
             (
                 (75, 63, 166, 4, 200, 101),
                 None,
-                wiz_dhcp.DHCP_REQUEST,
+                wiz_dhcp._DHCP_REQUEST,
                 72.4,
                 False,
                 True,
@@ -334,7 +334,7 @@ def test_dsm_reset(mocker, mock_wiznet5k):
         wiz_dhcp._UNASSIGNED_IP_ADDR,
         wiz_dhcp._UNASSIGNED_IP_ADDR,
     )
-    assert dhcp_client.dhcp_server_ip == wiz_dhcp.BROADCAST_SERVER_ADDR
+    assert dhcp_client.dhcp_server_ip == wiz_dhcp._BROADCAST_SERVER_ADDR
     assert dhcp_client.local_ip == wiz_dhcp._UNASSIGNED_IP_ADDR
     assert dhcp_client.subnet_mask == wiz_dhcp._UNASSIGNED_IP_ADDR
     assert dhcp_client.dns_server_ip == wiz_dhcp._UNASSIGNED_IP_ADDR
@@ -409,7 +409,7 @@ class TestSmallHelperFunctions:
         mock_wiznet5k.write_sncr(2, 0x01)
         mock_wiznet5k.read_sncr.assert_called_with(2)
         mock_wiznet5k.write_sndport.assert_called_once_with(
-            2, wiz_dhcp.DHCP_SERVER_PORT
+            2, wiz_dhcp._DHCP_SERVER_PORT
         )
         assert dhcp_client._wiz_sock == 2
 
@@ -438,8 +438,8 @@ class TestHandleDhcpMessage:
     @pytest.mark.parametrize(
         "fsm_state, msg_in",
         (
-            (wiz_dhcp._STATE_SELECTING, wiz_dhcp.DHCP_DISCOVER),
-            (wiz_dhcp._STATE_REQUESTING, wiz_dhcp.DHCP_REQUEST),
+            (wiz_dhcp._STATE_SELECTING, wiz_dhcp._DHCP_DISCOVER),
+            (wiz_dhcp._STATE_REQUESTING, wiz_dhcp._DHCP_REQUEST),
         ),
     )
     @freeze_time("2022-5-5")
@@ -476,7 +476,7 @@ class TestHandleDhcpMessage:
             3, dhcp_client.dhcp_server_ip
         )
         dhcp_client._eth.write_sndport.assert_called_once_with(
-            dhcp_client._wiz_sock, wiz_dhcp.DHCP_SERVER_PORT
+            dhcp_client._wiz_sock, wiz_dhcp._DHCP_SERVER_PORT
         )
         dhcp_client._eth.socket_write.assert_called_once_with(3, wiz_dhcp._BUFF[:300])
         dhcp_client._next_retry_time.assert_called_once_with(attempt=0)
@@ -716,25 +716,25 @@ class TestProcessMessagingStates:
                 wiz_dhcp._STATE_SELECTING,
                 (
                     0,
-                    wiz_dhcp.DHCP_ACK,
-                    wiz_dhcp.DHCP_REQUEST,
-                    wiz_dhcp.DHCP_DECLINE,
-                    wiz_dhcp.DHCP_DISCOVER,
-                    wiz_dhcp.DHCP_NAK,
-                    wiz_dhcp.DHCP_INFORM,
-                    wiz_dhcp.DHCP_RELEASE,
+                    wiz_dhcp._DHCP_ACK,
+                    wiz_dhcp._DHCP_REQUEST,
+                    wiz_dhcp._DHCP_DECLINE,
+                    wiz_dhcp._DHCP_DISCOVER,
+                    wiz_dhcp._DHCP_NAK,
+                    wiz_dhcp._DHCP_INFORM,
+                    wiz_dhcp._DHCP_RELEASE,
                 ),
             ),
             (
                 wiz_dhcp._STATE_REQUESTING,
                 (
                     0,
-                    wiz_dhcp.DHCP_OFFER,
-                    wiz_dhcp.DHCP_REQUEST,
-                    wiz_dhcp.DHCP_DECLINE,
-                    wiz_dhcp.DHCP_DISCOVER,
-                    wiz_dhcp.DHCP_INFORM,
-                    wiz_dhcp.DHCP_RELEASE,
+                    wiz_dhcp._DHCP_OFFER,
+                    wiz_dhcp._DHCP_REQUEST,
+                    wiz_dhcp._DHCP_DECLINE,
+                    wiz_dhcp._DHCP_DISCOVER,
+                    wiz_dhcp._DHCP_INFORM,
+                    wiz_dhcp._DHCP_RELEASE,
                 ),
             ),
         ),
@@ -753,7 +753,7 @@ class TestProcessMessagingStates:
         # Setup with the required state.
         mock_dhcp._dhcp_state = wiz_dhcp._STATE_SELECTING
         # Test.
-        mock_dhcp._process_messaging_states(message_type=wiz_dhcp.DHCP_OFFER)
+        mock_dhcp._process_messaging_states(message_type=wiz_dhcp._DHCP_OFFER)
         # Confirm correct new state.
         assert mock_dhcp._dhcp_state == wiz_dhcp._STATE_REQUESTING
 
@@ -769,10 +769,10 @@ class TestProcessMessagingStates:
         # Set a start time.
         mock_dhcp._start_time = time.monotonic()
         # Test.
-        mock_dhcp._process_messaging_states(message_type=wiz_dhcp.DHCP_ACK)
+        mock_dhcp._process_messaging_states(message_type=wiz_dhcp._DHCP_ACK)
         # Confirm timers are correctly set.
         if lease_time == 0:
-            lease_time = wiz_dhcp.DEFAULT_LEASE_TIME
+            lease_time = wiz_dhcp._DEFAULT_LEASE_TIME
         assert mock_dhcp._t1 == time.monotonic() + lease_time // 2
         assert mock_dhcp._t2 == time.monotonic() + lease_time - lease_time // 8
         assert mock_dhcp._lease_time == time.monotonic() + lease_time
@@ -785,6 +785,6 @@ class TestProcessMessagingStates:
         # Setup with the required state.
         mock_dhcp._dhcp_state = wiz_dhcp._STATE_REQUESTING
         # Test.
-        mock_dhcp._process_messaging_states(message_type=wiz_dhcp.DHCP_NAK)
+        mock_dhcp._process_messaging_states(message_type=wiz_dhcp._DHCP_NAK)
         # FSM state should be init after receiving a NAK response.
         assert mock_dhcp._dhcp_state == wiz_dhcp._STATE_INIT
