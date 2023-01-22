@@ -48,6 +48,7 @@ import time
 from micropython import const
 
 from adafruit_bus_device.spi_device import SPIDevice
+from adafruit_wiznet5k import debug_msg
 import adafruit_wiznet5k.adafruit_wiznet5k_dhcp as dhcp
 import adafruit_wiznet5k.adafruit_wiznet5k_dns as dns
 
@@ -210,8 +211,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             if self.link_status or ((time.monotonic() - start_time) > 5):
                 break
             time.sleep(1)
-            if self._debug:
-                print("My Link is:", self.link_status)
+            debug_msg("My Link is: {}".format(self.link_status), self._debug)
         self._dhcp_client = None
 
         # Set DHCP
@@ -236,23 +236,18 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
         :return int: 0 if DHCP configured, -1 otherwise.
         """
-        if self._debug:
-            print("* Initializing DHCP")
-
+        debug_msg("* Initializing DHCP", self._debug)
         # Return IP assigned by DHCP
         self._dhcp_client = dhcp.DHCP(
             self, self.mac_address, hostname, response_timeout, debug=self._debug
         )
         ret = self._dhcp_client.request_dhcp_lease()
         if ret == 1:
-            if self._debug:
-                _ifconfig = self.ifconfig
-                print("* Found DHCP Server:")
-                print(
-                    "IP: {}\nSubnet Mask: {}\nGW Addr: {}\nDNS Server: {}".format(
-                        *_ifconfig
-                    )
-                )
+            debug_msg(
+                "Found DHCP Server:\nIP: {}\n  Subnet Mask: {}\n  GW Addr: {}"
+                "\n  DNS Server: {}".format(*self.ifconfig),
+                self._debug,
+            )
             return 0
         return -1
 
@@ -269,15 +264,13 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
         :return Union[int, bytes]: a 4 bytearray.
         """
-        if self._debug:
-            print("* Get host by name")
+        debug_msg("Get host by name", self._debug)
         if isinstance(hostname, str):
             hostname = bytes(hostname, "utf-8")
         # Return IP assigned by DHCP
         _dns_client = dns.DNS(self, self._dns, debug=self._debug)
         ret = _dns_client.gethostbyname(hostname)
-        if self._debug:
-            print("* Resolved IP: ", ret)
+        debug_msg("* Resolved IP: {}".format(ret), self._debug)
         if ret == -1:
             raise RuntimeError("Failed to resolve hostname!")
         return ret
@@ -627,12 +620,12 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
         :return int: Number of bytes available to read.
         """
-        if self._debug:
-            print(
-                "* socket_available called on socket {}, protocol {}".format(
-                    socket_num, sock_type
-                )
-            )
+        debug_msg(
+            "socket_available called on socket {}, protocol {}".format(
+                socket_num, sock_type
+            ),
+            self._debug,
+        )
         if socket_num > self.max_sockets:
             raise ValueError("Provided socket exceeds max_sockets.")
 
@@ -689,12 +682,12 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         """
         if not self.link_status:
             raise ConnectionError("Ethernet cable disconnected!")
-        if self._debug:
-            print(
-                "* w5k socket connect, protocol={}, port={}, ip={}".format(
-                    conn_mode, port, self.pretty_ip(dest)
-                )
-            )
+        debug_msg(
+            "W5K socket connect, protocol={}, port={}, ip={}".format(
+                conn_mode, port, self.pretty_ip(dest)
+            ),
+            self._debug,
+        )
         # initialize a socket and set the mode
         res = self.socket_open(socket_num, conn_mode=conn_mode)
         if res == 1:
@@ -709,8 +702,9 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             # wait for tcp connection establishment
             while self.socket_status(socket_num)[0] != SNSR_SOCK_ESTABLISHED:
                 time.sleep(0.001)
-                if self._debug:
-                    print("SN_SR:", self.socket_status(socket_num)[0])
+                debug_msg(
+                    "SNSR: {}".format(self.socket_status(socket_num)[0]), self._debug
+                )
                 if self.socket_status(socket_num)[0] == SNSR_SOCK_CLOSED:
                     raise ConnectionError("Failed to establish connection.")
         elif conn_mode == SNMR_UDP:
@@ -721,8 +715,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         """Send a socket command to a socket."""
         self.write_sncr(socket, cmd)
         while self.read_sncr(socket) != b"\x00":
-            if self._debug:
-                print("waiting for sncr to clear...")
+            debug_msg("waiting for SNCR to clear...", self._debug)
 
     def get_socket(self) -> int:
         """Request, allocate and return a socket from the W5k chip.
@@ -731,8 +724,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
         :return int: The first available socket. Returns 0xFF if no sockets are free.
         """
-        if self._debug:
-            print("*** Get socket")
+        debug_msg("get_socket", self._debug)
 
         sock = _SOCKET_INVALID
         for _sock in range(self.max_sockets):
@@ -740,9 +732,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             if status == SNSR_SOCK_CLOSED:
                 sock = _sock
                 break
-
-        if self._debug:
-            print("Allocated socket #{}".format(sock))
+        debug_msg("Allocated socket #{}".format(sock), self._debug)
         return sock
 
     def socket_listen(
@@ -758,12 +748,12 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         """
         if not self.link_status:
             raise ConnectionError("Ethernet cable disconnected!")
-        if self._debug:
-            print(
-                "* Listening on port={}, ip={}".format(
-                    port, self.pretty_ip(self.ip_address)
-                )
-            )
+        debug_msg(
+            "* Listening on port={}, ip={}".format(
+                port, self.pretty_ip(self.ip_address)
+            ),
+            self._debug,
+        )
         # Initialize a socket and set the mode
         self.src_port = port
         res = self.socket_open(socket_num, conn_mode=conn_mode)
@@ -802,12 +792,12 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         dest_ip = self.remote_ip(socket_num)
         dest_port = self.remote_port(socket_num)
         next_socknum = self.get_socket()
-        if self._debug:
-            print(
-                "* Dest is ({}, {}), Next listen socknum is #{}".format(
-                    dest_ip, dest_port, next_socknum
-                )
-            )
+        debug_msg(
+            "Dest is ({}, {}), Next listen socknum is #{}".format(
+                dest_ip, dest_port, next_socknum
+            ),
+            self._debug,
+        )
         return next_socknum, (dest_ip, dest_port)
 
     def socket_open(self, socket_num: int, conn_mode: int = _SNMR_TCP) -> int:
@@ -823,8 +813,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         """
         if not self.link_status:
             raise ConnectionError("Ethernet cable disconnected!")
-        if self._debug:
-            print("*** Opening socket %d" % socket_num)
+        debug_msg("*** Opening socket {}".format(socket_num), self._debug)
         status = self.read_snsr(socket_num)[0]
         if status in (
             SNSR_SOCK_CLOSED,
@@ -834,8 +823,9 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             _SNSR_SOCK_CLOSING,
             _SNSR_SOCK_UDP,
         ):
-            if self._debug:
-                print("* Opening W5k Socket, protocol={}".format(conn_mode))
+            debug_msg(
+                "* Opening W5k Socket, protocol={}".format(conn_mode), self._debug
+            )
             time.sleep(0.00025)
 
             self.write_snmr(socket_num, conn_mode)
@@ -865,8 +855,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
         :param int socket_num: The socket to close.
         """
-        if self._debug:
-            print("*** Closing socket #%d" % socket_num)
+        debug_msg("*** Closing socket {}".format(socket_num), self._debug)
         self.write_sncr(socket_num, _CMD_SOCK_CLOSE)
         while self.read_sncr(socket_num):
             time.sleep(0.0001)
@@ -879,8 +868,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
         :param int socket_num: The socket to close.
         """
-        if self._debug:
-            print("*** Disconnecting socket #%d" % socket_num)
+        debug_msg("*** Disconnecting socket {}".format(socket_num), self._debug)
         self.write_sncr(socket_num, _CMD_SOCK_DISCON)
         self.read_sncr(socket_num)
 
@@ -905,8 +893,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         # Check if there is data available on the socket
         resp = b""
         ret = self._get_rx_rcv_size(socket_num)
-        if self._debug:
-            print("Bytes avail. on sock: ", ret)
+        debug_msg("Bytes avail. on sock: {}".format(ret), self._debug)
         if ret == 0:
             # no data on socket?
             status = self._read_snmr(socket_num)
@@ -919,8 +906,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             # set ret to the length of buffer
             ret = length
         if ret > 0:
-            if self._debug:
-                print("\t * Processing {} bytes of data".format(ret))
+            debug_msg("* Processing {} bytes of data".format(ret), self._debug)
             # Read the starting save address of the received data
             ptr = self._read_snrx_rd(socket_num)
 
