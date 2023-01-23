@@ -18,12 +18,12 @@ cs = digitalio.DigitalInOut(board.D10)
 spi_bus = busio.SPI(board.SCK, MOSI=board.MOSI, MISO=board.MISO)
 
 # Initialize ethernet interface
-eth = WIZNET5K(spi_bus, cs, is_dhcp=False)
+eth = WIZNET5K(spi_bus, cs, is_dhcp=True)
 
 # Initialize a socket for our server
 socket.set_interface(eth)
 server = socket.socket()  # Allocate socket for the server
-server_ip = "192.168.10.1"  # IP address of server
+server_ip = eth.pretty_ip(eth.ip_address)  # IP address of server
 server_port = 50007  # Port to listen on
 server.bind((server_ip, server_port))  # Bind to IP and Port
 server.listen()  # Begin listening for incoming clients
