@@ -61,6 +61,8 @@ _DHCP_HOPS = const(0x00)
 _MAGIC_COOKIE = b"c\x82Sc"  # Four bytes 99.130.83.99
 _MAX_DHCP_OPT = const(0x10)
 
+_SNMR_UDP = const(0x02)
+
 # Default DHCP Server port
 _DHCP_SERVER_PORT = const(67)
 # DHCP Lease Time, in seconds
@@ -294,12 +296,12 @@ class DHCP:
         bytes_read = 0
         debug_msg("+ Beginning to receive…", self._debug)
         while bytes_read <= minimum_packet_length and time.monotonic() < timeout:
-            x = self._eth.read_udp(self._wiz_sock, _BUFF_LENGTH - bytes_read)[1]
-            buffer.extend(x)
-            bytes_read = len(buffer)
-            debug_msg("+ Bytes read so far {}".format(bytes_read), self._debug)
-            debug_msg(x, self._debug)
-
+            if self._eth.socket_available(self._wiz_sock, _SNMR_UDP):
+                x = self._eth.read_udp(self._wiz_sock, _BUFF_LENGTH - bytes_read)[1]
+                buffer.extend(x)
+                bytes_read = len(buffer)
+                debug_msg("+ Bytes read so far {}".format(bytes_read), self._debug)
+                debug_msg(x, self._debug)
             if bytes_read == _BUFF_LENGTH:
                 break
         debug_msg("Received {} bytes".format(bytes_read), self._debug)
@@ -368,7 +370,12 @@ class DHCP:
             )
         for attempt in range(4):  # Initial attempt plus 3 retries.
             message_length = self._generate_dhcp_message(message_type=msg_type_out)
-            self._eth.write_sndipr(self._wiz_sock, self.dhcp_server_ip)
+
+            if self._renew:
+                dhcp_server_address = self.dhcp_server_ip
+            else:
+                dhcp_server_address = _BROADCAST_SERVER_ADDR
+            self._eth.write_sndipr(self._wiz_sock, dhcp_server_address)
             self._eth.write_sndport(self._wiz_sock, _DHCP_SERVER_PORT)
             self._eth.socket_write(self._wiz_sock, _BUFF[:message_length])
             next_resend = self._next_retry_time(attempt=attempt)
