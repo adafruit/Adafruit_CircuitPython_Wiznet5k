@@ -2,7 +2,9 @@
 # SPDX-FileCopyrightText: 2020 Brent Rubell for Adafruit Industries
 #
 # SPDX-License-Identifier: MIT
-
+#
+# CPython uses type as an argument in socket.socket, so disable checking in Pylint
+# pylint: disable=redefined-builtin
 """
 `adafruit_wiznet5k_socket`
 ================================================================================
@@ -154,7 +156,7 @@ def getaddrinfo(
     host: str,
     port: int,
     family: int = 0,
-    soc_type: int = 0,
+    type: int = 0,
     proto: int = 0,
     flags: int = 0,
 ) -> List[Tuple[int, int, int, str, Tuple[str, int]]]:
@@ -166,7 +168,7 @@ def getaddrinfo(
         None.
     :param int port: Port number to connect to (0 - 65536).
     :param int family: Ignored and hardcoded as 0x03 (the only family implemented) by the function.
-    :param int soc_type: The type of socket, either SOCK_STREAM (0x21) for TCP or SOCK_DGRAM (0x02)
+    :param int type: The type of socket, either SOCK_STREAM (0x21) for TCP or SOCK_DGRAM (0x02)
         for UDP, defaults to 0.
     :param int proto: Unused in this implementation of socket.
     :param int flags: Unused in this implementation of socket.
@@ -181,7 +183,7 @@ def getaddrinfo(
         raise ValueError("Port must be an integer")
     if not _is_ipv4_string(host):
         host = gethostbyname(host)
-    return [(AF_INET, soc_type, proto, "", (host, port))]
+    return [(AF_INET, type, proto, "", (host, port))]
 
 
 def gethostbyname(hostname: str) -> str:
