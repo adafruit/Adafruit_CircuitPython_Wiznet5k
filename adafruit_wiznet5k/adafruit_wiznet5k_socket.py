@@ -271,7 +271,7 @@ class socket:
             return False
         status = _the_interface.socket_status(self._socknum)[0]
         if (
-            status == wiznet5k.adafruit_wiznet5k._SNSR_SOCK_CLOSE_WAIT
+            status == wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSE_WAIT
             and self._available() == 0
         ):
             result = False
@@ -279,7 +279,7 @@ class socket:
             result = status not in (
                 wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSED,
                 wiznet5k.adafruit_wiznet5k.SNSR_SOCK_LISTEN,
-                wiznet5k.adafruit_wiznet5k._SNSR_SOCK_TIME_WAIT,
+                wiznet5k.adafruit_wiznet5k.SNSR_SOCK_TIME_WAIT,
                 wiznet5k.adafruit_wiznet5k.SNSR_SOCK_FIN_WAIT,
             )
         if not result and status != wiznet5k.adafruit_wiznet5k.SNSR_SOCK_LISTEN:
@@ -609,7 +609,7 @@ class socket:
         If zero is given, the socket is put in non-blocking mode. If None is given,
         the socket is put in blocking mode..
 
-        :param fOptional[float] value: Socket read timeout in seconds.
+        :param Optional[float] value: Socket read timeout in seconds.
         """
         if value is None or (isinstance(value, (int, float)) and value >= 0):
             self._timeout = value
