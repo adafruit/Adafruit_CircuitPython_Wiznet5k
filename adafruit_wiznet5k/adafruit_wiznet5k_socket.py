@@ -24,8 +24,8 @@ except ImportError:
 
 import gc
 import time
+from sys import byteorder
 from micropython import const
-
 import adafruit_wiznet5k as wiznet5k
 
 # pylint: disable=invalid-name
@@ -90,6 +90,8 @@ def htonl(x: int) -> int:
 
     :return int: 32-bit positive integer in network byte order.
     """
+    if byteorder == "big":
+        return x
     return int.from_bytes(x.to_bytes(4, "little"), "big")
 
 
@@ -101,6 +103,8 @@ def htons(x: int) -> int:
 
     :return int: 16-bit positive integer in network byte order.
     """
+    if byteorder == "big":
+        return x
     return ((x << 8) & 0xFF00) | ((x >> 8) & 0xFF)
 
 
