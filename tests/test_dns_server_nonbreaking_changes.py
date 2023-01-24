@@ -11,7 +11,7 @@ import adafruit_wiznet5k.adafruit_wiznet5k_dns as wiz_dns
 from adafruit_wiznet5k.adafruit_wiznet5k_socket import socket
 
 
-DEFAULT_DEBUG_ON = False
+DEFAULT_DEBUG_ON = True
 
 
 @pytest.fixture
