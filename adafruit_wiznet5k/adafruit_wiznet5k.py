@@ -952,6 +952,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             If the read was unsuccessful then (0, b"") is returned.
         """
         if self.udp_datasize[socket_num] > 0:
+            print("+ bytes on socket.")
             if self.udp_datasize[socket_num] <= length:
                 ret, resp = self.socket_read(socket_num, self.udp_datasize[socket_num])
             else:
@@ -960,6 +961,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
                 self.socket_read(socket_num, self.udp_datasize[socket_num] - length)
             self.udp_datasize[socket_num] = 0
             return ret, resp
+        print("+ No bytes on socket.")
         return 0, b""
 
     def socket_write(
