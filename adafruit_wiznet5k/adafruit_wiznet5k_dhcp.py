@@ -603,7 +603,7 @@ class DHCP:
             data_length = _BUFF[pointer]
             pointer += 1
             data_end = pointer + data_length
-            option_data = _BUFF[pointer:data_end]
+            option_data = bytes(_BUFF[pointer:data_end])
             return data_end, option_type, option_data
 
         debug_msg("Parsing DHCP message.", self._debug)
@@ -614,14 +614,14 @@ class DHCP:
         xid = _BUFF[4:8]
         if xid != self._transaction_id.to_bytes(4, "big"):
             raise ValueError("DHCP response ID mismatch.")
-        # Set the IP address to Claddr
-        self.local_ip = tuple(_BUFF[16:20])
         # Check that there is a client ID.
         if _BUFF[28:34] == b"\x00\x00\x00\x00\x00\x00":
             raise ValueError("No client hardware MAC address in the response.")
         # Check for the magic cookie.
         if _BUFF[236:240] != _MAGIC_COOKIE:
             raise ValueError("No DHCP Magic Cookie in the response.")
+        # Set the IP address to Claddr
+        self.local_ip = bytes(_BUFF[16:20])
 
         # Parse options
         msg_type = None
@@ -631,15 +631,15 @@ class DHCP:
             if data_type == _MSG_TYPE:
                 msg_type = data[0]
             elif data_type == _SUBNET_MASK:
-                self.subnet_mask = tuple(data)
+                self.subnet_mask = data
             elif data_type == _DHCP_SERVER_ID:
-                self.dhcp_server_ip = tuple(data)
+                self.dhcp_server_ip = data
             elif data_type == _LEASE_TIME:
                 self._lease_time = int.from_bytes(data, "big")
             elif data_type == _ROUTERS_ON_SUBNET:
-                self.gateway_ip = tuple(data[:4])
+                self.gateway_ip = data[:4]
             elif data_type == _DNS_SERVERS:
-                self.dns_server_ip = tuple(data[:4])
+                self.dns_server_ip = data[:4]
             elif data_type == _T1_VAL:
                 self._t1 = int.from_bytes(data, "big")
             elif data_type == _T2_VAL:

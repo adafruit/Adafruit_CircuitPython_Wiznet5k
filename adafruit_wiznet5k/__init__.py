@@ -18,10 +18,10 @@ def debug_msg(
     message: Union[Exception, str, bytes, bytearray], debugging: bool
 ) -> None:
     """
-    Helper function to print debugging messages.
+    Helper function to print debugging messages. If the message is a bytes type
+    object, create a hexdump.
 
-    :param Union[Exception, str, bytes, bytearray] message: The message to print. If the
-        message is a bytes type object, create a hexdump.
+    :param Union[Exception, str, bytes, bytearray] message: The message to print.
     :param bool debugging: Only print if debugging is True.
     """
     if debugging:
