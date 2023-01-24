@@ -310,9 +310,18 @@ class socket:
         :raises ValueError: If the IPv4 address specified is not the address
             assigned to the WIZNET5K interface.
         """
-        # Check to see if the socket is bound is disabled to allow socket.accept to swap sockets.
-        # if self._listen_port:
-        #     raise ConnectionError("The socket is already bound.")
+        # Check to see if the socket is bound.
+        if self._listen_port:
+            raise ConnectionError("The socket is already bound.")
+        self._bind(address)
+
+    def _bind(self, address: Tuple[Optional[str], int]) -> None:
+        """
+        Helper function to allow bind() to check for an existing connection and for
+        accept() to generate a new socket connection.
+
+        :param Tuple[Optional[str], int] address: Address as a (host, port) tuple.
+        """
         if address[0]:
             if gethostbyname(address[0]) != _the_interface.pretty_ip(
                 _the_interface.ip_address
@@ -373,7 +382,7 @@ class socket:
         client_sock = socket()
         client_sock._socknum = current_socknum  # pylint: disable=protected-access
         self._socknum = new_listen_socknum
-        self.bind((None, self._listen_port))
+        self._bind((None, self._listen_port))
         self.listen()
         while self._status != wiznet5k.adafruit_wiznet5k.SNSR_SOCK_LISTEN:
             raise RuntimeError("Failed to open new listening socket")
