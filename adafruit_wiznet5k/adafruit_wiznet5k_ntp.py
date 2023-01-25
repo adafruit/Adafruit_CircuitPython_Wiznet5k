@@ -74,7 +74,7 @@ class NTP:
             self._sock.sendto(self._pkt_buf_, (self._ntp_server, 123))
             end_time = time.monotonic() + 0.2 * 2**retry
             while time.monotonic() < end_time:
-                data = self._sock.recv()
+                data = self._sock.recv(64)  # NTP returns a 48 byte message.
                 if data:
                     sec = data[40:44]
                     int_cal = int.from_bytes(sec, "big")
