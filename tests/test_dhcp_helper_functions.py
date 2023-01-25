@@ -47,7 +47,6 @@ class TestDHCPInit:
         mock_randint.return_value = 0x1234567
         dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, mac_address)
         assert dhcp_client._eth == mock_wiznet5k
-        assert dhcp_client._response_timeout == 30.0
         assert dhcp_client._debug is False
         assert dhcp_client._mac_address == mac_address
         assert dhcp_client._wiz_sock is None
@@ -75,11 +74,9 @@ class TestDHCPInit:
             mock_wiznet5k,
             mac_address,
             hostname="fred.com",
-            response_timeout=25.0,
             debug=True,
         )
 
-        assert dhcp_client._response_timeout == 25.0
         assert dhcp_client._debug is True
         mac_string = "".join("{:02X}".format(o) for o in mac_address)
         assert dhcp_client._hostname == bytes(
@@ -101,7 +98,6 @@ class TestDHCPInit:
                 mock_wiznet5k,
                 mac_address,
                 hostname="fred.com",
-                response_timeout=25.0,
                 debug=True,
             )
 

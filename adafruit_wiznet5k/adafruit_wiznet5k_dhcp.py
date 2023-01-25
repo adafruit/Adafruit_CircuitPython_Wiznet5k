@@ -103,8 +103,8 @@ class DHCP:
     methods in the WIZNET5K class.
 
     Since DHCP uses UDP, messages may be lost. The DHCP protocol uses exponential backoff
-    for retrying. Retries occur after 4, 8, and 16 seconds (the final retry is followed by
-    a wait of 32 seconds) so it will take about a minute to decide that no DHCP server
+    for retrying. Retries occur after 4, 8, and 16 +/- 1 seconds (the final retry is followed
+    by a wait of 32 seconds) so it takes about a minute to decide that no DHCP server
     is available.
 
     The DHCP client cannot check whether the allocated IP address is already in use because
@@ -123,7 +123,6 @@ class DHCP:
         eth: WIZNET5K,
         mac_address: bytes,
         hostname: Optional[str] = None,
-        response_timeout: float = 30.0,
         debug: bool = False,
     ) -> None:
         """
@@ -131,12 +130,10 @@ class DHCP:
         :param bytes mac_address: Hardware MAC address.
         :param Optional[str] hostname: The desired hostname, with optional {} to fill
             in the MAC address, defaults to None.
-        :param float response_timeout: DHCP Response timeout in seconds, defaults to 30.
         :param bool debug: Enable debugging output.
         """
         self._debug = debug
-        debug_msg("Initialising DHCP instance.", self._debug)
-        self._response_timeout = response_timeout
+        debug_msg("Initialising DHCP client instance.", self._debug)
 
         if not isinstance(mac_address, bytes):
             raise TypeError("MAC address must be a bytes object.")
