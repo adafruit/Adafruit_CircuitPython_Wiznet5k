@@ -466,7 +466,6 @@ class socket:
 
         :return bytes: All data available from the connection.
         """
-        # print("Socket read", bufsize)
         ret = None
         avail = self.available()
         if avail:
@@ -476,7 +475,6 @@ class socket:
                 self._buffer += _the_interface.read_udp(self.socknum, avail)[1]
         gc.collect()
         ret = self._buffer
-        # print("RET ptr:", id(ret), id(self._buffer))
         self._buffer = b""
         gc.collect()
         return ret
