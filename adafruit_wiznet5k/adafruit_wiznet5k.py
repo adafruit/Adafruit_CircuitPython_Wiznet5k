@@ -158,7 +158,6 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         is_dhcp: bool = True,
         mac: Union[List[int], Tuple[int]] = _DEFAULT_MAC,
         hostname: Optional[str] = None,
-        dhcp_timeout: float = 30.0,
         debug: bool = False,
     ) -> None:
         """
@@ -170,7 +169,6 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             (0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED).
         :param str hostname: The desired hostname, with optional {} to fill in the MAC
             address, defaults to None.
-        :param float dhcp_timeout: Timeout in seconds for DHCP response, defaults to 30.0.
         :param bool debug: Enable debugging output, defaults to False.
         """
         self._debug = debug
@@ -216,31 +214,25 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
         # Set DHCP
         if is_dhcp:
-            ret = self.set_dhcp(hostname, dhcp_timeout)
+            ret = self.set_dhcp(hostname)
             if ret != 0:
                 self._dhcp_client = None
             if ret != 0:
                 raise RuntimeError("Failed to configure DHCP Server!")
 
-    def set_dhcp(
-        self, hostname: Optional[str] = None, response_timeout: float = 30
-    ) -> int:
+    def set_dhcp(self, hostname: Optional[str] = None) -> int:
         """
         Initialize the DHCP client and attempt to retrieve and set network
         configuration from the DHCP server.
 
-        :param Optional[str] hostname: The desired hostname for the DHCP server with optional {} to
-            fill in the MAC address, defaults to None.
-        :param float response_timeout: Time to wait for server to return packet in seconds,
-            defaults to 30.0.
+        :param Optional[str] hostname: The desired hostname for the DHCP server with
+            optional {} to fill in the MAC address, defaults to None.
 
         :return int: 0 if DHCP configured, -1 otherwise.
         """
         debug_msg("* Initializing DHCP", self._debug)
         # Return IP assigned by DHCP
-        self._dhcp_client = dhcp.DHCP(
-            self, self.mac_address, hostname, response_timeout, debug=self._debug
-        )
+        self._dhcp_client = dhcp.DHCP(self, self.mac_address, hostname, self._debug)
         ret = self._dhcp_client.request_dhcp_lease()
         if ret == 1:
             debug_msg(
