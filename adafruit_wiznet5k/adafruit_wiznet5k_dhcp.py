@@ -66,7 +66,6 @@ _SNMR_UDP = const(0x02)
 # Default DHCP Server port
 _DHCP_SERVER_PORT = const(67)
 # DHCP Lease Time, in seconds
-_DEFAULT_LEASE_TIME = const(900)
 _BROADCAST_SERVER_ADDR = b"\xff\xff\xff\xff"  # (255.255.255.255)
 _UNASSIGNED_IP_ADDR = b"\x00\x00\x00\x00"  # (0.0.0.0)
 
@@ -337,8 +336,6 @@ class DHCP:
                 self._dhcp_state = _STATE_INIT
             elif message_type == _DHCP_ACK:
                 debug_msg("Message is ACK, setting FSM state to BOUND.", self._debug)
-                if self._lease_time == 0:
-                    self._lease_time = _DEFAULT_LEASE_TIME
                 self._t1 = self._start_time + self._lease_time // 2
                 self._t2 = self._start_time + self._lease_time - self._lease_time // 8
                 self._lease_time += self._start_time
