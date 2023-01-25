@@ -461,6 +461,7 @@ class DHCP:
                     self._debug,
                 )
                 self._dhcp_state = _STATE_BOUND
+            gc.collect()
 
     def _generate_dhcp_message(
         self,
