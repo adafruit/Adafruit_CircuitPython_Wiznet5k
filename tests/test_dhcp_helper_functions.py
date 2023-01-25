@@ -22,7 +22,7 @@ def mock_wiznet5k(mocker):
 
 @pytest.fixture
 def mock_dhcp(mock_wiznet5k):
-    dhcp = wiz_dhcp.DHCP(mock_wiznet5k, (1, 2, 3, 4, 5, 6))
+    dhcp = wiz_dhcp.DHCP(mock_wiznet5k, bytes((1, 2, 3, 4, 5, 6)))
     return dhcp
 
 
@@ -33,9 +33,9 @@ class TestDHCPInit:
     @pytest.mark.parametrize(
         "mac_address",
         (
-            [1, 2, 3, 4, 5, 6],
-            (7, 8, 9, 10, 11, 12),
-            bytes([1, 2, 4, 6, 7, 8]),
+            bytes((1, 2, 3, 4, 5, 6)),
+            bytes((7, 8, 9, 10, 11, 12)),
+            bytes((1, 2, 4, 6, 7, 8)),
         ),
     )
     def test_dhcp_setup_default(self, mocker, mock_wiznet5k, mac_address):
@@ -70,7 +70,7 @@ class TestDHCPInit:
 
     def test_dhcp_setup_other_args(self, mock_wiznet5k):
         """Test instantiating DHCP with none default values."""
-        mac_address = (7, 8, 9, 10, 11, 12)
+        mac_address = bytes((7, 8, 9, 10, 11, 12))
         dhcp_client = wiz_dhcp.DHCP(
             mock_wiznet5k,
             mac_address,
@@ -86,13 +86,32 @@ class TestDHCPInit:
             "fred.com".split(".", maxsplit=1)[0].format(mac_string)[:42], "utf-8"
         )
 
+    @pytest.mark.parametrize(
+        "mac_address, error_type",
+        (
+            ("fdsafa", TypeError),
+            ((1, 2, 3, 4, 5, 6), TypeError),
+            (b"12345", ValueError),
+            (b"1234567", ValueError),
+        ),
+    )
+    def test_mac_address_checking(self, mock_wiznet5k, mac_address, error_type):
+        with pytest.raises(error_type):
+            wiz_dhcp.DHCP(
+                mock_wiznet5k,
+                mac_address,
+                hostname="fred.com",
+                response_timeout=25.0,
+                debug=True,
+            )
+
 
 @freeze_time("2022-10-20")
 class TestSendDHCPMessage:
     def test_generate_message_with_default_attributes(self, mock_wiznet5k):
         """Test the _generate_message function with default values."""
         assert len(wiz_dhcp._BUFF) == 318
-        dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, (4, 5, 6, 7, 8, 9))
+        dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, bytes((4, 5, 6, 7, 8, 9)))
         dhcp_client._transaction_id = 0x6FFFFFFF
         dhcp_client._start_time = time.monotonic() - 23.4
         dhcp_client._generate_dhcp_message(message_type=wiz_dhcp._DHCP_DISCOVER)
@@ -104,7 +123,7 @@ class TestSendDHCPMessage:
         broadcast_only, local_ip, server_ip, result",
         (
             (
-                (4, 5, 6, 7, 8, 9),
+                bytes((4, 5, 6, 7, 8, 9)),
                 None,
                 wiz_dhcp._DHCP_DISCOVER,
                 23.4,
@@ -115,7 +134,7 @@ class TestSendDHCPMessage:
                 dhcp_data.DHCP_SEND_02,
             ),
             (
-                (24, 35, 46, 57, 68, 79),
+                bytes((24, 35, 46, 57, 68, 79)),
                 "bert.co.uk",
                 wiz_dhcp._DHCP_DISCOVER,
                 35.5,
@@ -126,7 +145,7 @@ class TestSendDHCPMessage:
                 dhcp_data.DHCP_SEND_03,
             ),
             (
-                (255, 97, 36, 101, 42, 99),
+                bytes((255, 97, 36, 101, 42, 99)),
                 "clash.net",
                 wiz_dhcp._DHCP_DISCOVER,
                 35.5,
@@ -173,25 +192,25 @@ class TestSendDHCPMessage:
         broadcast_only, local_ip, server_ip, result",
         (
             (
-                (255, 97, 36, 101, 42, 99),
+                bytes((255, 97, 36, 101, 42, 99)),
                 "helicopter.org",
                 wiz_dhcp._DHCP_REQUEST,
                 16.3,
                 False,
                 True,
-                (10, 10, 10, 43),
-                (145, 66, 45, 22),
+                bytes((10, 10, 10, 43)),
+                bytes((145, 66, 45, 22)),
                 dhcp_data.DHCP_SEND_05,
             ),
             (
-                (75, 63, 166, 4, 200, 101),
+                bytes((75, 63, 166, 4, 200, 101)),
                 None,
                 wiz_dhcp._DHCP_REQUEST,
                 72.4,
                 False,
                 True,
-                (100, 101, 102, 4),
-                (245, 166, 5, 11),
+                bytes((100, 101, 102, 4)),
+                bytes((245, 166, 5, 11)),
                 dhcp_data.DHCP_SEND_06,
             ),
         ),
@@ -272,7 +291,7 @@ class TestParseDhcpMessage:
         response,
     ):
         wiz_dhcp._BUFF = response
-        dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, (1, 2, 3, 4, 5, 6))
+        dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, bytes((1, 2, 3, 4, 5, 6)))
         dhcp_client._transaction_id = xid
         response_type = dhcp_client._parse_dhcp_response()
         assert response_type == msg_type
@@ -288,7 +307,7 @@ class TestParseDhcpMessage:
     def test_parsing_failures(self, mock_wiznet5k):
         # Test for bad OP code, ID mismatch, no server ID, bad Magic Cookie
         bad_data = dhcp_data.BAD_DATA
-        dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, (1, 2, 3, 4, 5, 6))
+        dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, bytes((1, 2, 3, 4, 5, 6)))
         dhcp_client._eth._read_socket.return_value = (len(bad_data), bad_data)
         # Transaction ID mismatch.
         dhcp_client._transaction_id = 0x42424242
@@ -313,13 +332,13 @@ class TestParseDhcpMessage:
 
 @freeze_time("2022-11-10")
 def test_dsm_reset(mocker, mock_wiznet5k):
-    dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, (1, 2, 3, 4, 5, 6))
+    dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, bytes((1, 2, 3, 4, 5, 6)))
     mocker.patch.object(dhcp_client, "_dhcp_connection_setup", autospec=True)
     mocker.patch.object(dhcp_client, "_socket_release", autospec=True)
-    dhcp_client.dhcp_server_ip = (1, 2, 3, 4)
-    dhcp_client.local_ip = (2, 3, 4, 5)
-    dhcp_client.subnet_mask = (3, 4, 5, 6)
-    dhcp_client.dns_server_ip = (7, 8, 8, 10)
+    dhcp_client.dhcp_server_ip = bytes((1, 2, 3, 4))
+    dhcp_client.local_ip = bytes((2, 3, 4, 5))
+    dhcp_client.subnet_mask = bytes((3, 4, 5, 6))
+    dhcp_client.dns_server_ip = bytes((7, 8, 8, 10))
     dhcp_client._renew = True
     dhcp_client._retries = 4
     dhcp_client._transaction_id = 3
@@ -345,7 +364,7 @@ def test_dsm_reset(mocker, mock_wiznet5k):
 
 class TestSocketRelease:
     def test_socket_set_to_none(self, mock_wiznet5k):
-        dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, (1, 2, 3, 4, 5, 6))
+        dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, bytes((1, 2, 3, 4, 5, 6)))
         dhcp_client._socket_release()
         assert dhcp_client._wiz_sock is None
 
@@ -356,7 +375,7 @@ class TestSocketRelease:
 
 class TestSmallHelperFunctions:
     def test_increment_transaction_id(self, mock_wiznet5k):
-        dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, (1, 2, 3, 4, 5, 6))
+        dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, bytes((1, 2, 3, 4, 5, 6)))
         # Test that transaction_id increments.
         dhcp_client._transaction_id = 4
         dhcp_client._increment_transaction_id()
@@ -369,7 +388,7 @@ class TestSmallHelperFunctions:
     @freeze_time("2022-10-10")
     @pytest.mark.parametrize("rand_int", (-1, 0, 1))
     def test_next_retry_time_default_attrs(self, mocker, mock_wiznet5k, rand_int):
-        dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, (1, 2, 3, 4, 5, 6))
+        dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, bytes((1, 2, 3, 4, 5, 6)))
         mocker.patch(
             "adafruit_wiznet5k.adafruit_wiznet5k_dhcp.randint",
             autospec=True,
@@ -384,7 +403,7 @@ class TestSmallHelperFunctions:
     @freeze_time("2022-10-10")
     @pytest.mark.parametrize("interval", (2, 7, 10))
     def test_next_retry_time_optional_attrs(self, mocker, mock_wiznet5k, interval):
-        dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, (1, 2, 3, 4, 5, 6))
+        dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, bytes((1, 2, 3, 4, 5, 6)))
         mocker.patch(
             "adafruit_wiznet5k.adafruit_wiznet5k_dhcp.randint",
             autospec=True,
@@ -401,7 +420,7 @@ class TestSmallHelperFunctions:
         mocker.patch.object(mock_wiznet5k, "get_socket", return_value=2)
         mocker.patch.object(mock_wiznet5k, "read_sncr", return_value=b"\x00")
         mocker.patch.object(mock_wiznet5k, "read_snsr", return_value=b"\x22")
-        dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, (1, 2, 3, 4, 5, 6))
+        dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, bytes((1, 2, 3, 4, 5, 6)))
         dhcp_client._dhcp_connection_setup()
         mock_wiznet5k.get_socket.assert_called_once()
         mock_wiznet5k.write_snmr.assert_called_once_with(2, 0x02)
@@ -418,7 +437,7 @@ class TestSmallHelperFunctions:
         mocker.patch.object(mock_wiznet5k, "get_socket", return_value=0xFF)
         mocker.patch.object(mock_wiznet5k, "read_sncr", return_value=b"\x00")
         mocker.patch.object(mock_wiznet5k, "read_snsr", return_value=b"\x22")
-        dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, (1, 2, 3, 4, 5, 6))
+        dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, bytes((1, 2, 3, 4, 5, 6)))
         with pytest.raises(RuntimeError):
             dhcp_client._dhcp_connection_setup()
         assert dhcp_client._wiz_sock is None
@@ -428,7 +447,7 @@ class TestSmallHelperFunctions:
         mocker.patch.object(mock_wiznet5k, "get_socket", return_value=2)
         mocker.patch.object(mock_wiznet5k, "read_sncr", return_value=b"\x00")
         mocker.patch.object(mock_wiznet5k, "read_snsr", return_value=b"\x21")
-        dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, (1, 2, 3, 4, 5, 6))
+        dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, bytes((1, 2, 3, 4, 5, 6)))
         with pytest.raises(RuntimeError):
             dhcp_client._dhcp_connection_setup()
         assert dhcp_client._wiz_sock is None
@@ -444,7 +463,7 @@ class TestHandleDhcpMessage:
     )
     @freeze_time("2022-5-5")
     def test_good_data(self, mocker, mock_wiznet5k, fsm_state, msg_in):
-        dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, (1, 2, 3, 4, 5, 6))
+        dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, bytes((1, 2, 3, 4, 5, 6)))
         # Mock out methods to allow _handle_dhcp_message to run.
         mocker.patch.object(
             dhcp_client, "_generate_dhcp_message", autospec=True, return_value=300
@@ -486,7 +505,7 @@ class TestHandleDhcpMessage:
 
     @freeze_time("2022-5-5", auto_tick_seconds=1)
     def test_timeout_blocking_no_response(self, mocker, mock_wiznet5k):
-        dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, (1, 2, 3, 4, 5, 6))
+        dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, bytes((1, 2, 3, 4, 5, 6)))
         # Mock out methods to allow _handle_dhcp_message to run.
         mocker.patch.object(
             dhcp_client, "_generate_dhcp_message", autospec=True, return_value=300
@@ -520,7 +539,7 @@ class TestHandleDhcpMessage:
 
     @freeze_time("2022-5-5", auto_tick_seconds=1)
     def test_timeout_blocking_bad_message(self, mocker, mock_wiznet5k):
-        dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, (1, 2, 3, 4, 5, 6))
+        dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, bytes((1, 2, 3, 4, 5, 6)))
         # Mock out methods to allow _handle_dhcp_message to run.
         mocker.patch.object(
             dhcp_client, "_generate_dhcp_message", autospec=True, return_value=300
@@ -560,7 +579,7 @@ class TestHandleDhcpMessage:
     def test_no_response_non_blocking_renewing(
         self, mocker, mock_wiznet5k, renew, blocking
     ):
-        dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, (1, 2, 3, 4, 5, 6))
+        dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, bytes((1, 2, 3, 4, 5, 6)))
         # Mock out methods to allow _handle_dhcp_message to run.
         mocker.patch.object(
             dhcp_client, "_generate_dhcp_message", autospec=True, return_value=300
@@ -599,7 +618,7 @@ class TestHandleDhcpMessage:
     def test_bad_message_non_blocking_renewing(
         self, mocker, mock_wiznet5k, renew, blocking
     ):
-        dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, (1, 2, 3, 4, 5, 6))
+        dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, bytes((1, 2, 3, 4, 5, 6)))
         # Mock out methods to allow _handle_dhcp_message to run.
         mocker.patch.object(
             dhcp_client, "_generate_dhcp_message", autospec=True, return_value=300

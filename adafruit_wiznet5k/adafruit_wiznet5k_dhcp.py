@@ -17,7 +17,7 @@ Pure-Python implementation of Jordan Terrell's DHCP library v0.3
 from __future__ import annotations
 
 try:
-    from typing import TYPE_CHECKING, Optional, Union, Tuple, Sequence
+    from typing import TYPE_CHECKING, Optional, Union, Tuple
 
     if TYPE_CHECKING:
         from adafruit_wiznet5k.adafruit_wiznet5k import WIZNET5K
@@ -122,14 +122,14 @@ class DHCP:
     def __init__(
         self,
         eth: WIZNET5K,
-        mac_address: Sequence[Union[int, bytes]],
+        mac_address: bytes,
         hostname: Optional[str] = None,
         response_timeout: float = 30.0,
         debug: bool = False,
     ) -> None:
         """
         :param adafruit_wiznet5k.WIZNET5K eth: Wiznet 5k object
-        :param Sequence[Union[int, bytes]] mac_address: Hardware MAC address.
+        :param bytes mac_address: Hardware MAC address.
         :param Optional[str] hostname: The desired hostname, with optional {} to fill
             in the MAC address, defaults to None.
         :param float response_timeout: DHCP Response timeout in seconds, defaults to 30.
@@ -139,9 +139,11 @@ class DHCP:
         debug_msg("Initialising DHCP instance.", self._debug)
         self._response_timeout = response_timeout
 
+        if not isinstance(mac_address, bytes):
+            raise TypeError("MAC address must be a bytes object.")
         # Prevent buffer overrun in send_dhcp_message()
         if len(mac_address) != 6:
-            raise ValueError("The MAC address must be 6 bytes.")
+            raise ValueError("MAC address must be 6 bytes.")
         self._mac_address = mac_address
 
         # Set socket interface
@@ -545,7 +547,7 @@ class DHCP:
         pointer = option_writer(
             offset=pointer,
             option_code=61,
-            option_data=tuple(b"\x01" + bytes(self._mac_address)),
+            option_data=b"\x01" + self._mac_address,
         )
 
         # Request subnet mask, router and DNS server.
