@@ -113,14 +113,17 @@ class WSGIServer:
         the application callable will be invoked.
         """
         for sock in self._client_sock:
-            if sock.available():
+            if sock._available():  # pylint: disable=protected-access
                 environ = self._get_environ(sock)
                 result = self.application(environ, self._start_response)
                 self.finish_response(result, sock)
                 self._client_sock.remove(sock)
                 break
         for sock in self._client_sock:
-            if sock.status == wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSED:
+            if (
+                sock._status  # pylint: disable=protected-access
+                == wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSED
+            ):
                 self._client_sock.remove(sock)
         for _ in range(len(self._client_sock), self.MAX_SOCK_NUM):
             try:
@@ -161,7 +164,7 @@ class WSGIServer:
                         client.send(data_chunk)
             gc.collect()
         finally:
-            client.disconnect()
+            client._disconnect()  # pylint: disable=protected-access
             client.close()
 
     def _start_response(
@@ -189,7 +192,7 @@ class WSGIServer:
         :return Dict: Data for the application callable.
         """
         env = {}
-        line = str(client.readline(), "utf-8")
+        line = str(client._readline(), "utf-8")  # pylint: disable=protected-access
         (method, path, ver) = line.rstrip("\r\n").split(None, 2)
 
         env["wsgi.version"] = (1, 0)
@@ -211,7 +214,9 @@ class WSGIServer:
 
         headers = {}
         while True:
-            header = str(client.readline(), "utf-8")
+            header = str(
+                client._readline(), "utf-8"  # pylint: disable=protected-access
+            )
             if header == "":
                 break
             title, content = header.split(": ", 1)
@@ -224,7 +229,7 @@ class WSGIServer:
             body = client.recv(int(env["CONTENT_LENGTH"]))
             env["wsgi.input"] = io.StringIO(body)
         else:
-            body = client.recv()
+            body = client.recv(1024)
             env["wsgi.input"] = io.StringIO(body)
         for name, value in headers.items():
             key = "HTTP_" + name.replace("-", "_").upper()
