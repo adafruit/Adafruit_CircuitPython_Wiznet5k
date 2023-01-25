@@ -328,21 +328,29 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         return bytes(octets)
 
     @property
-    def mac_address(self) -> bytearray:
+    def mac_address(self) -> bytes:
         """
         Ethernet hardware's MAC address.
 
         :return bytearray: Six byte MAC address."""
-        return self.read(_REG_SHAR, 0x00, 6)
+        return bytes(self.read(_REG_SHAR, 0x00, 6))
 
     @mac_address.setter
-    def mac_address(self, address: Sequence[Union[int, bytes]]) -> None:
+    def mac_address(self, address: Tuple[int]) -> None:
         """
-        Sets the hardware MAC address.
+        Set the hardware MAC address.
 
-        :param tuple address: Hardware MAC address.
+        :param Tuple address: A 6 byte hardware MAC address.
+
+        :raises ValueError: If the MAC address in invalid
         """
-        self.write(_REG_SHAR, 0x04, address)
+        # Check that the MAC is a valid 6 byte address.
+        if len(address) == 6 and False not in [
+            (isinstance(x, int) and 0 <= x <= 255) for x in address
+        ]:
+            self.write(_REG_SHAR, 0x04, address)
+        else:
+            raise ValueError("Invalid MAC address.")
 
     def pretty_mac(
         self,
