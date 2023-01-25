@@ -777,7 +777,7 @@ class TestProcessMessagingStates:
         assert mock_dhcp._dhcp_state == wiz_dhcp._STATE_REQUESTING
 
     @freeze_time("2022-3-4")
-    @pytest.mark.parametrize("lease_time", (0, 8000))
+    @pytest.mark.parametrize("lease_time", (200, 8000))
     def test_called_from_requesting_with_ack(self, mock_dhcp, lease_time):
         # Setup with the required state.
         mock_dhcp._dhcp_state = wiz_dhcp._STATE_REQUESTING
@@ -790,8 +790,6 @@ class TestProcessMessagingStates:
         # Test.
         mock_dhcp._process_messaging_states(message_type=wiz_dhcp._DHCP_ACK)
         # Confirm timers are correctly set.
-        if lease_time == 0:
-            lease_time = wiz_dhcp._DEFAULT_LEASE_TIME
         assert mock_dhcp._t1 == time.monotonic() + lease_time // 2
         assert mock_dhcp._t2 == time.monotonic() + lease_time - lease_time // 8
         assert mock_dhcp._lease_time == time.monotonic() + lease_time
