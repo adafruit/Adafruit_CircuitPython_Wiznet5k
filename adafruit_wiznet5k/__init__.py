@@ -26,16 +26,25 @@ def debug_msg(
     """
     if debugging:
         if isinstance(message, (bytes, bytearray)):
-            temp = ""
-            for index, value in enumerate(message):
-                if not index % 16:
-                    temp += "\n"
-                elif not index % 8:
-                    temp += "  "
-                else:
-                    temp += " "
-                temp += "{:02x}".format(value)
-            message = temp
+            message = _hexdump(message)
         print(message)
         del message
         gc.collect()
+
+
+def _hexdump(src: bytes, length: int = 16):
+    """
+    Create a hexdump of a bytes object.
+
+    :param bytes src: The bytes object to hexdump.
+    :param int length: The number of bytes per line of the hexdump. Defaults to 16.
+
+    :returns str: The hexdump.
+    """
+    result = []
+    for i in range(0, len(src), length):
+        chunk = src[i : i + length]
+        hexa = " ".join(("%0*X" % (2, x) for x in chunk))
+        text = "".join((chr(x) if 0x20 <= x < 0x7F else "." for x in chunk))
+        result.append("%04X   %-*s   %s" % (i, length * (2 + 1), hexa, text))
+    return "\n".join(result)
