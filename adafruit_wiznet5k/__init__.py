@@ -32,19 +32,18 @@ def debug_msg(
         gc.collect()
 
 
-def _hexdump(src: bytes, length: int = 16):
+def _hexdump(src: bytes):
     """
-    Create a hexdump of a bytes object.
+    Create a 16 column hexdump of a bytes object.
 
     :param bytes src: The bytes object to hexdump.
-    :param int length: The number of bytes per line of the hexdump. Defaults to 16.
 
     :returns str: The hexdump.
     """
     result = []
-    for i in range(0, len(src), length):
-        chunk = src[i : i + length]
-        hexa = " ".join(("%0*X" % (2, x) for x in chunk))
+    for i in range(0, len(src), 16):
+        chunk = src[i : i + 16]
+        hexa = " ".join(("{:02x}".format(x) for x in chunk))
         text = "".join((chr(x) if 0x20 <= x < 0x7F else "." for x in chunk))
-        result.append("%04X   %-*s   %s" % (i, length * (2 + 1), hexa, text))
+        result.append("{:04x}   {:<48}   {}".format(i, hexa, text))
     return "\n".join(result)
