@@ -172,13 +172,20 @@ class DHCP:
         )
 
     def request_dhcp_lease(self) -> bool:
-        """Request to renew or acquire a DHCP lease."""
+        """
+        Request acquire a DHCP lease.
+
+        :returns bool: A lease has been acquired.
+        """
         debug_msg("Requesting DHCP lease.", self._debug)
         self._dhcp_state_machine(blocking=True)
         return self._dhcp_state == _STATE_BOUND
 
     def maintain_dhcp_lease(self, blocking: bool = False) -> None:
-        """Maintain DHCP lease"""
+        """
+        Maintain a DHCP lease.
+        :param bool blocking: Run the DHCP FSM in blocking mode.
+        """
         debug_msg("Maintaining lease with blocking = {}".format(blocking), self._debug)
         self._dhcp_state_machine(blocking=blocking)
 
