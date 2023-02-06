@@ -174,10 +174,10 @@ class TestSendDHCPMessage:
         dhcp_client.dhcp_server_ip = server_ip
         dhcp_client._transaction_id = 0x6FFFFFFF
         dhcp_client._start_time = time.monotonic() - time_elapsed
+        dhcp_client._renew = renew
         # Test
         dhcp_client._generate_dhcp_message(
             message_type=msg_type,
-            renew=renew,
             broadcast=broadcast_only,
         )
         assert len(wiz_dhcp._BUFF) == 318
@@ -218,7 +218,6 @@ class TestSendDHCPMessage:
         hostname,
         msg_type,
         time_elapsed,
-        renew,
         broadcast_only,
         local_ip,
         server_ip,
@@ -232,7 +231,7 @@ class TestSendDHCPMessage:
         dhcp_client._start_time = time.monotonic() - time_elapsed
         # Test
         dhcp_client._generate_dhcp_message(
-            message_type=msg_type, renew=renew, broadcast=broadcast_only
+            message_type=msg_type, broadcast=broadcast_only
         )
         assert len(wiz_dhcp._BUFF) == 318
         assert wiz_dhcp._BUFF == result

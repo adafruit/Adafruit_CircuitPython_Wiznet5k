@@ -184,7 +184,7 @@ class DHCP:
     def maintain_dhcp_lease(self, blocking: bool = False) -> None:
         """
         Maintain a DHCP lease.
-        :param bool blocking: Run the DHCP FSM in blocking mode.
+        :param bool blocking: Run the DHCP FSM in non-blocking mode.
         """
         debug_msg("Maintaining lease with blocking = {}".format(blocking), self._debug)
         self._dhcp_state_machine(blocking=blocking)
@@ -344,6 +344,13 @@ class DHCP:
                 self._t2 = self._start_time + self._lease_time - self._lease_time // 8
                 self._lease_time += self._start_time
                 self._increment_transaction_id()
+                if not self._renew:
+                    self._eth.ifconfig = (
+                        self.local_ip,
+                        self.subnet_mask,
+                        self.gateway_ip,
+                        self.dns_server_ip,
+                    )
                 self._renew = False
                 self._dhcp_state = _STATE_BOUND
 
@@ -475,7 +482,6 @@ class DHCP:
         *,
         message_type: int,
         broadcast: bool = False,
-        renew: bool = False,
     ) -> int:
         """
         Assemble a DHCP message. The content will vary depending on which type of
@@ -484,7 +490,6 @@ class DHCP:
         :param int message_type: Type of message to generate.
         :param bool broadcast: Used to set the flag requiring a broadcast reply from the
             DHCP server. Defaults to False which matches the DHCP standard.
-        :param bool renew: Set True for renewing and rebinding operations, defaults to False.
 
         :returns int: The length of the DHCP message.
         """
@@ -526,7 +531,7 @@ class DHCP:
             _BUFF[10] = 0b10000000
         else:
             _BUFF[10] = 0b00000000
-        if renew:
+        if self._renew:
             _BUFF[12:16] = bytes(self.local_ip)
         # chaddr
         _BUFF[28:34] = self._mac_address
