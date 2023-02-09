@@ -160,10 +160,10 @@ class DHCP:
         self.subnet_mask = _UNASSIGNED_IP_ADDR
         self.dns_server_ip = _UNASSIGNED_IP_ADDR
 
-        # Lease configuration
-        self._lease_time = 0
+        # Lease expiry times
         self._t1 = 0
         self._t2 = 0
+        self._lease = 0
 
         # Host name
         mac_string = "".join("{:02X}".format(o) for o in mac_address)
@@ -340,9 +340,9 @@ class DHCP:
                 self._dhcp_state = _STATE_INIT
             elif message_type == _DHCP_ACK:
                 debug_msg("Message is ACK, setting FSM state to BOUND.", self._debug)
-                self._t1 = self._start_time + self._lease_time // 2
-                self._t2 = self._start_time + self._lease_time - self._lease_time // 8
-                self._lease_time += self._start_time
+                self._t1 = self._start_time + self._lease // 2
+                self._t2 = self._start_time + self._lease - self._lease // 8
+                self._lease += self._start_time
                 self._increment_transaction_id()
                 if not self._renew:
                     self._eth.ifconfig = (
@@ -424,7 +424,7 @@ class DHCP:
                     debug_msg("No timers have expired. Exiting FSM.", self._debug)
                     self._socket_release()
                     return
-                if now > self._lease_time:
+                if now > self._lease:
                     debug_msg(
                         "Lease has expired, switching state to INIT.", self._debug
                     )
@@ -646,7 +646,7 @@ class DHCP:
             elif data_type == _DHCP_SERVER_ID:
                 self.dhcp_server_ip = data
             elif data_type == _LEASE_TIME:
-                self._lease_time = int.from_bytes(data, "big")
+                self._lease = int.from_bytes(data, "big")
             elif data_type == _ROUTERS_ON_SUBNET:
                 self.gateway_ip = data[:4]
             elif data_type == _DNS_SERVERS:
@@ -669,7 +669,7 @@ class DHCP:
                 self.local_ip,
                 self._t1,
                 self._t2,
-                self._lease_time,
+                self._lease,
             ),
             self._debug,
         )

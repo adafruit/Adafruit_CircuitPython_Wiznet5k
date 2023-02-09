@@ -59,7 +59,7 @@ class TestDHCPInit:
         assert dhcp_client.gateway_ip == wiz_dhcp._UNASSIGNED_IP_ADDR
         assert dhcp_client.subnet_mask == wiz_dhcp._UNASSIGNED_IP_ADDR
         assert dhcp_client.dns_server_ip == wiz_dhcp._UNASSIGNED_IP_ADDR
-        assert dhcp_client._lease_time == 0
+        assert dhcp_client._lease == 0
         assert dhcp_client._t1 == 0
         assert dhcp_client._t2 == 0
         mac_string = "".join("{:02X}".format(o) for o in mac_address)
@@ -293,7 +293,7 @@ class TestParseDhcpMessage:
         assert dhcp_client.dhcp_server_ip == dhcp_ip
         assert dhcp_client.gateway_ip == gate_ip
         assert dhcp_client.dns_server_ip == dns_ip
-        assert dhcp_client._lease_time == lease
+        assert dhcp_client._lease == lease
         assert dhcp_client._t1 == t1
         assert dhcp_client._t2 == t2
 
@@ -775,7 +775,7 @@ class TestProcessMessagingStates:
         # Setup with the required state.
         mock_dhcp._dhcp_state = wiz_dhcp._STATE_REQUESTING
         # Set the lease_time (zero forces a default to be used).
-        mock_dhcp._lease_time = lease_time
+        mock_dhcp._lease = lease_time
         # Set renew to "renew" to confirm that an ACK sets it to None.
         mock_dhcp._renew = "renew"
         # Set a start time.
@@ -785,7 +785,7 @@ class TestProcessMessagingStates:
         # Confirm timers are correctly set.
         assert mock_dhcp._t1 == time.monotonic() + lease_time // 2
         assert mock_dhcp._t2 == time.monotonic() + lease_time - lease_time // 8
-        assert mock_dhcp._lease_time == time.monotonic() + lease_time
+        assert mock_dhcp._lease == time.monotonic() + lease_time
         # Check that renew is forced to None
         assert mock_dhcp._renew is None
         # FSM state should be bound.
