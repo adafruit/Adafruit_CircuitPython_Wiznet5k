@@ -184,7 +184,7 @@ class TestSendDHCPMessage:
         assert wiz_dhcp._BUFF == result
 
     @pytest.mark.parametrize(
-        "mac_address, hostname, msg_type, time_elapsed, renew, \
+        "mac_address, hostname, msg_type, time_elapsed,  \
         broadcast_only, local_ip, server_ip, result",
         (
             (
@@ -192,7 +192,6 @@ class TestSendDHCPMessage:
                 "helicopter.org",
                 wiz_dhcp._DHCP_REQUEST,
                 16.3,
-                False,
                 True,
                 bytes((10, 10, 10, 43)),
                 bytes((145, 66, 45, 22)),
@@ -203,7 +202,6 @@ class TestSendDHCPMessage:
                 None,
                 wiz_dhcp._DHCP_REQUEST,
                 72.4,
-                False,
                 True,
                 bytes((100, 101, 102, 4)),
                 bytes((245, 166, 5, 11)),
@@ -352,7 +350,7 @@ def test_dsm_reset(mocker, mock_wiznet5k):
     assert dhcp_client.local_ip == wiz_dhcp._UNASSIGNED_IP_ADDR
     assert dhcp_client.subnet_mask == wiz_dhcp._UNASSIGNED_IP_ADDR
     assert dhcp_client.dns_server_ip == wiz_dhcp._UNASSIGNED_IP_ADDR
-    assert dhcp_client._renew is False
+    assert dhcp_client._renew is None
     assert dhcp_client._transaction_id == 4
     assert dhcp_client._start_time == time.monotonic()
 
@@ -569,7 +567,7 @@ class TestHandleDhcpMessage:
 
     @freeze_time("2022-5-5")
     @pytest.mark.parametrize(
-        "renew, blocking", ((True, False), (True, True), (False, False))
+        "renew, blocking", (("renew", False), ("renew", True), (None, False))
     )
     def test_no_response_non_blocking_renewing(
         self, mocker, mock_wiznet5k, renew, blocking
@@ -608,7 +606,7 @@ class TestHandleDhcpMessage:
 
     @freeze_time("2022-5-5")
     @pytest.mark.parametrize(
-        "renew, blocking", ((True, False), (True, True), (False, False))
+        "renew, blocking", (("renew", False), ("renew", True), (None, False))
     )
     def test_bad_message_non_blocking_renewing(
         self, mocker, mock_wiznet5k, renew, blocking
@@ -778,8 +776,8 @@ class TestProcessMessagingStates:
         mock_dhcp._dhcp_state = wiz_dhcp._STATE_REQUESTING
         # Set the lease_time (zero forces a default to be used).
         mock_dhcp._lease_time = lease_time
-        # Set renew to True to confirm that an ACK sets it to False.
-        mock_dhcp._renew = True
+        # Set renew to "renew" to confirm that an ACK sets it to None.
+        mock_dhcp._renew = "renew"
         # Set a start time.
         mock_dhcp._start_time = time.monotonic()
         # Test.
@@ -788,8 +786,8 @@ class TestProcessMessagingStates:
         assert mock_dhcp._t1 == time.monotonic() + lease_time // 2
         assert mock_dhcp._t2 == time.monotonic() + lease_time - lease_time // 8
         assert mock_dhcp._lease_time == time.monotonic() + lease_time
-        # Check that renew is forced to False
-        assert mock_dhcp._renew is False
+        # Check that renew is forced to None
+        assert mock_dhcp._renew is None
         # FSM state should be bound.
         assert mock_dhcp._dhcp_state == wiz_dhcp._STATE_BOUND
 

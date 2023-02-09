@@ -151,7 +151,7 @@ class DHCP:
         self._transaction_id = randint(1, 0x7FFFFFFF)
         self._start_time = 0.0
         self._blocking = False
-        self._renew = False
+        self._renew = None
 
         # DHCP binding configuration
         self.dhcp_server_ip = _BROADCAST_SERVER_ADDR
@@ -206,7 +206,7 @@ class DHCP:
         self.local_ip = _UNASSIGNED_IP_ADDR
         self.subnet_mask = _UNASSIGNED_IP_ADDR
         self.dns_server_ip = _UNASSIGNED_IP_ADDR
-        self._renew = False
+        self._renew = None
         self._increment_transaction_id()
         self._start_time = time.monotonic()
 
@@ -351,7 +351,7 @@ class DHCP:
                         self.gateway_ip,
                         self.dns_server_ip,
                     )
-                self._renew = False
+                self._renew = None
                 self._dhcp_state = _STATE_BOUND
 
     def _handle_dhcp_message(self) -> int:
@@ -443,14 +443,14 @@ class DHCP:
 
             if self._dhcp_state == _STATE_RENEWING:
                 debug_msg("FSM state is RENEWING.", self._debug)
-                self._renew = True
+                self._renew = "renew"
                 self._dhcp_connection_setup()
                 self._start_time = time.monotonic()
                 self._dhcp_state = _STATE_REQUESTING
 
             if self._dhcp_state == _STATE_REBINDING:
                 debug_msg("FSM state is REBINDING.", self._debug)
-                self._renew = True
+                self._renew = "rebind"
                 self.dhcp_server_ip = _BROADCAST_SERVER_ADDR
                 self._dhcp_connection_setup()
                 self._start_time = time.monotonic()
@@ -572,9 +572,10 @@ class DHCP:
                 offset=pointer, option_code=50, option_data=self.local_ip
             )
             # Set Server ID to chosen DHCP server IP address.
-            pointer = option_writer(
-                offset=pointer, option_code=54, option_data=self.dhcp_server_ip
-            )
+            if self._renew != "rebind":
+                pointer = option_writer(
+                    offset=pointer, option_code=54, option_data=self.dhcp_server_ip
+                )
 
         _BUFF[pointer] = 0xFF
         pointer += 1
