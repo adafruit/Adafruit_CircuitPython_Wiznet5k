@@ -273,7 +273,7 @@ class DNS:
                     return -1
                 time.sleep(0.05)
             # recv packet into buf
-            buffer = self._sock.recv()
+            buffer = self._sock.recv(512)
             _debug_print(
                 debug=self._debug,
                 message="DNS Packet Received: {}".format(buffer),
