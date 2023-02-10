@@ -28,7 +28,9 @@ import gc
 import time
 from random import randint
 from micropython import const
-from adafruit_wiznet5k import debug_msg  # pylint: disable=ungrouped-imports
+from adafruit_wiznet5k.adafruit_wiznet5k_debug import (  # pylint: disable=ungrouped-imports
+    debug_msg,
+)
 
 # DHCP State Machine
 _STATE_INIT = const(0x01)

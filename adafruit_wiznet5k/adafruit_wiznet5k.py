@@ -48,7 +48,7 @@ import time
 from micropython import const
 
 from adafruit_bus_device.spi_device import SPIDevice
-from adafruit_wiznet5k import debug_msg
+from adafruit_wiznet5k.adafruit_wiznet5k_debug import debug_msg
 import adafruit_wiznet5k.adafruit_wiznet5k_dhcp as dhcp
 import adafruit_wiznet5k.adafruit_wiznet5k_dns as dns
 
