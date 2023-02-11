@@ -729,7 +729,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
         :return int: The first available socket.
 
-        :raises RuntimeError if no sockets are available.
+        :raises RuntimeError: If no sockets are available.
         """
         if self._debug:
             print("*** Get socket")
