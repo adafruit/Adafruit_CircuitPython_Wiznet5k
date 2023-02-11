@@ -727,21 +727,20 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
         Cycle through the sockets to find the first available one, if any.
 
-        :return int: The first available socket. Returns 0xFF if no sockets are free.
+        :return int: The first available socket.
+
+        :raises RuntimeError if no sockets are available.
         """
         if self._debug:
             print("*** Get socket")
 
-        sock = _SOCKET_INVALID
-        for _sock in range(self.max_sockets):
-            status = self.socket_status(_sock)[0]
+        for sock in range(self.max_sockets):
+            status = self.socket_status(sock)[0]
             if status == SNSR_SOCK_CLOSED:
-                sock = _sock
-                break
-
-        if self._debug:
-            print("Allocated socket #{}".format(sock))
-        return sock
+                if self._debug:
+                    print("Allocated socket #{}".format(sock))
+                return sock
+        raise RuntimeError("Out of sockets.")
 
     def socket_listen(
         self, socket_num: int, port: int, conn_mode: int = _SNMR_TCP
