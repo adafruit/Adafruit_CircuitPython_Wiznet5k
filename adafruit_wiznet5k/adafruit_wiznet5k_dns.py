@@ -252,7 +252,7 @@ class DNS:
 
         # Send DNS request packet
         self._sock.bind((None, _DNS_PORT))
-        self._sock.connect((self._dns_server, _DNS_PORT))
+        self._sock.connect((self._iface.pretty_ip(self._dns_server), _DNS_PORT))
         _debug_print(debug=self._debug, message="* DNS: Sending request packet...")
         self._sock.send(buffer)
 
