@@ -243,12 +243,12 @@ class socket:
             self._disconnect()
             stamp = time.monotonic()
             while self._status == wiznet5k.adafruit_wiznet5k.SNSR_SOCK_FIN_WAIT:
-                if time.monotonic() - stamp > 1000:
+                if time.monotonic() - stamp > 19:  # Hardware default timeout.
                     raise RuntimeError("Failed to disconnect socket")
         self.close()
         stamp = time.monotonic()
         while self._status != wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSED:
-            if time.monotonic() - stamp > 1000:
+            if time.monotonic() - stamp > 19:  # Hardware default timeout.
                 raise RuntimeError("Failed to close socket")
 
     @property
