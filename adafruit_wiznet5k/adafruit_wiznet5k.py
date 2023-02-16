@@ -193,6 +193,13 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         self._ch_base_msb = 0
         if self._w5xxx_init() != 1:
             raise RuntimeError("Failed to initialize WIZnet module.")
+        if self._chip_type == "w5100s":
+            WIZNET5K._sockets_reserved = [False] * (_W5100_MAX_SOCK_NUM - 1)
+        elif self._chip_type == "w5500":
+            WIZNET5K._sockets_reserved = [False] * (_W5200_W5500_MAX_SOCK_NUM - 1)
+        else:
+            raise RuntimeError("Unrecognized chip type.")
+
         # Set MAC address
         self.mac_address = mac
         self.src_port = 0
@@ -780,7 +787,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
         :param int socket_number: The socket to release.
         """
-        WIZNET5K._sockets_reserved[socket_number] = False
+        WIZNET5K._sockets_reserved[socket_number - 1] = False
 
     def socket_listen(
         self, socket_num: int, port: int, conn_mode: int = _SNMR_TCP
