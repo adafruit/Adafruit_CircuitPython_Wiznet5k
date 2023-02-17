@@ -252,7 +252,7 @@ class socket:
             if time.monotonic() - stamp > 1000:
                 raise RuntimeError("Failed to close socket")
 
-    # This works around problems with using a method as a decorator.
+    # This works around problems with using a class method as a decorator.
     def _check_socket_closed(func):  # pylint: disable=no-self-argument
         """Decorator to check whether the socket object has been closed."""
 
@@ -697,20 +697,20 @@ class socket:
         """
         return self.gettimeout() == 0
 
-    @_check_socket_closed
     @property
+    @_check_socket_closed
     def family(self) -> int:
         """Socket family (always 0x03 in this implementation)."""
         return 3
 
-    @_check_socket_closed
     @property
+    @_check_socket_closed
     def type(self):
         """Socket type."""
         return self._sock_type
 
-    @_check_socket_closed
     @property
+    @_check_socket_closed
     def proto(self):
         """Socket protocol (always 0x00 in this implementation)."""
         return 0
