@@ -259,8 +259,6 @@ class socket:
         def wrapper(self, *args, **kwargs):
             if self._socket_closed:  # pylint: disable=protected-access
                 raise RuntimeError("The socket has been closed.")
-            print(*args)
-            print(**kwargs)
             return func(self, *args, **kwargs)  # pylint: disable=not-callable
 
         return wrapper
