@@ -130,13 +130,13 @@ class TestDnsGetHostByName:
         )
         # Set up mock server calls.
         dns_server = wiz_dns.DNS(wiznet, "8.8.8.8", debug=DEFAULT_DEBUG_ON)
-        dns_server._sock.available.return_value = len(dns_bytes_recv)
+        dns_server._sock._available.return_value = len(dns_bytes_recv)
         dns_server._sock.recv.return_value = dns_bytes_recv
 
         # Check that the correct IPv4 address was received.
         assert dns_server.gethostbyname(bytes(domain, "utf-8")) == ipv4
         # Check that correct socket calls were made.
-        dns_server._sock.bind.assert_called_once_with((None, 0x35))
+        dns_server._sock.bind.assert_called_once_with(("", 0x35))
         dns_server._sock.connect.assert_called_once()
         dns_server._sock.send.assert_called_once_with(dns_bytes_sent)
 
@@ -169,15 +169,15 @@ class TestDnsGetHostByName:
         )
         # Set up mock server calls.
         dns_server = wiz_dns.DNS(wiznet, "8.8.8.8", debug=DEFAULT_DEBUG_ON)
-        dns_server._sock.available.return_value = len(dns_bytes_recv)
+        dns_server._sock._available.return_value = len(dns_bytes_recv)
         dns_server._sock.recv.return_value = dns_bytes_recv
 
         # Check that the correct response was received.
         assert dns_server.gethostbyname(bytes("apple.com", "utf-8")) == response
 
         # Check that the correct number of calls to _sock.available were made.
-        dns_server._sock.available.assert_called()
-        assert len(dns_server._sock.available.call_args_list) == 5
+        dns_server._sock._available.assert_called()
+        assert len(dns_server._sock._available.call_args_list) == 5
 
     @freezegun.freeze_time("2022-3-4", auto_tick_seconds=0.1)
     def test_retries_with_no_data_on_socket(self, wiznet, wrench):
@@ -186,13 +186,13 @@ class TestDnsGetHostByName:
         # pylint: disable=unused-argument
 
         dns_server = wiz_dns.DNS(wiznet, "8.8.8.8", debug=DEFAULT_DEBUG_ON)
-        dns_server._sock.available.return_value = 0
+        dns_server._sock._available.return_value = 0
         dns_server._sock.recv.return_value = b""
         dns_server.gethostbyname(bytes("domain.name", "utf-8"))
 
         # Check how many times the socket was polled for data before giving up.
-        dns_server._sock.available.assert_called()
-        assert len(dns_server._sock.available.call_args_list) == 12
+        dns_server._sock._available.assert_called()
+        assert len(dns_server._sock._available.call_args_list) == 12
         # Check that no attempt made to read data from the socket.
         dns_server._sock.recv.assert_not_called()
 
@@ -202,13 +202,13 @@ class TestDnsGetHostByName:
         # pylint: disable=unused-argument
 
         dns_server = wiz_dns.DNS(wiznet, "8.8.8.8", debug=DEFAULT_DEBUG_ON)
-        dns_server._sock.available.return_value = 7
+        dns_server._sock._available.return_value = 7
         dns_server._sock.recv.return_value = b"\x99\x12\x81\x80\x00\x01\x00"
         dns_server.gethostbyname(bytes("domain.name", "utf-8"))
 
         # Check how many times the socket was polled for data before giving up.
-        dns_server._sock.available.assert_called()
-        assert len(dns_server._sock.available.call_args_list) == 5
+        dns_server._sock._available.assert_called()
+        assert len(dns_server._sock._available.call_args_list) == 5
         # Check how many attempts were made to read data from the socket.
         dns_server._sock.recv.assert_called()
         assert len(dns_server._sock.recv.call_args_list) == 5
