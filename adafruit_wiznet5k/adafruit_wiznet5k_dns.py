@@ -251,8 +251,8 @@ class DNS:
         self._query_id, self._query_length, buffer = _build_dns_query(hostname)
 
         # Send DNS request packet
-        self._sock.bind((None, _DNS_PORT))
-        self._sock.connect((self._iface.pretty_ip(self._dns_server), _DNS_PORT))
+        self._sock.bind(("", _DNS_PORT))
+        self._sock.connect((self._dns_server, _DNS_PORT))
         _debug_print(debug=self._debug, message="* DNS: Sending request packet...")
         self._sock.send(buffer)
 
@@ -261,9 +261,11 @@ class DNS:
         for _ in range(5):
             #  wait for a response
             socket_timeout = time.monotonic() + 1.0
-            packet_size = self._sock.available()
+            packet_size = self._sock._available()  # pylint: disable=protected-access
             while packet_size == 0:
-                packet_size = self._sock.available()
+                packet_size = (
+                    self._sock._available()  # pylint: disable=protected-access
+                )
                 if time.monotonic() > socket_timeout:
                     _debug_print(
                         debug=self._debug,
@@ -273,7 +275,7 @@ class DNS:
                     return -1
                 time.sleep(0.05)
             # recv packet into buf
-            buffer = self._sock.recv(512)
+            buffer = self._sock.recv(512)  # > UDP payload length
             _debug_print(
                 debug=self._debug,
                 message="DNS Packet Received: {}".format(buffer),

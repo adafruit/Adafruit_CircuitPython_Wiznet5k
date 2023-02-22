@@ -89,8 +89,8 @@ SNSR_SOCK_SYNRECV = const(0x16)
 SNSR_SOCK_ESTABLISHED = const(0x17)
 SNSR_SOCK_FIN_WAIT = const(0x18)
 _SNSR_SOCK_CLOSING = const(0x1A)
-_SNSR_SOCK_TIME_WAIT = const(0x1B)
-_SNSR_SOCK_CLOSE_WAIT = const(0x1C)
+SNSR_SOCK_TIME_WAIT = const(0x1B)
+SNSR_SOCK_CLOSE_WAIT = const(0x1C)
 _SNSR_SOCK_LAST_ACK = const(0x1D)
 _SNSR_SOCK_UDP = const(0x22)
 _SNSR_SOCK_IPRAW = const(0x32)
@@ -260,7 +260,9 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         if isinstance(hostname, str):
             hostname = bytes(hostname, "utf-8")
         # Return IP assigned by DHCP
-        _dns_client = dns.DNS(self, self._dns, debug=self._debug)
+        _dns_client = dns.DNS(
+            self, self.pretty_ip(bytearray(self._dns)), debug=self._debug
+        )
         ret = _dns_client.gethostbyname(hostname)
         debug_msg("* Resolved IP: {}".format(ret), self._debug)
         if ret == -1:
@@ -817,9 +819,9 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         status = self.read_snsr(socket_num)[0]
         if status in (
             SNSR_SOCK_CLOSED,
-            _SNSR_SOCK_TIME_WAIT,
+            SNSR_SOCK_TIME_WAIT,
             SNSR_SOCK_FIN_WAIT,
-            _SNSR_SOCK_CLOSE_WAIT,
+            SNSR_SOCK_CLOSE_WAIT,
             _SNSR_SOCK_CLOSING,
             _SNSR_SOCK_UDP,
         ):
@@ -897,7 +899,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         if ret == 0:
             # no data on socket?
             status = self._read_snmr(socket_num)
-            if status in (SNSR_SOCK_LISTEN, SNSR_SOCK_CLOSED, _SNSR_SOCK_CLOSE_WAIT):
+            if status in (SNSR_SOCK_LISTEN, SNSR_SOCK_CLOSED, SNSR_SOCK_CLOSE_WAIT):
                 # remote end closed its side of the connection, EOF state
                 raise RuntimeError("Lost connection to peer.")
                 # connection is alive, no data waiting to be read
@@ -993,7 +995,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         while free_size < ret:
             free_size = self._get_tx_free_size(socket_num)
             status = self.socket_status(socket_num)[0]
-            if status not in (SNSR_SOCK_ESTABLISHED, _SNSR_SOCK_CLOSE_WAIT) or (
+            if status not in (SNSR_SOCK_ESTABLISHED, SNSR_SOCK_CLOSE_WAIT) or (
                 timeout and time.monotonic() - stamp > timeout
             ):
                 ret = 0
@@ -1032,18 +1034,18 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             time.sleep(0.001)
 
         # check data was  transferred correctly
-        while not self._read_snir(socket_num)[0] & _SNIR_SEND_OK:
+        while not self.read_snir(socket_num)[0] & _SNIR_SEND_OK:
             if self.socket_status(socket_num)[0] in (
                 SNSR_SOCK_CLOSED,
-                _SNSR_SOCK_TIME_WAIT,
+                SNSR_SOCK_TIME_WAIT,
                 SNSR_SOCK_FIN_WAIT,
-                _SNSR_SOCK_CLOSE_WAIT,
+                SNSR_SOCK_CLOSE_WAIT,
                 _SNSR_SOCK_CLOSING,
             ):
                 raise RuntimeError("Socket closed before data was sent.")
             if timeout and time.monotonic() - stamp > timeout:
                 raise RuntimeError("Operation timed out. No data sent.")
-            if self._read_snir(socket_num)[0] & _SNIR_TIMEOUT:
+            if self.read_snir(socket_num)[0] & _SNIR_TIMEOUT:
                 raise TimeoutError(
                     "Hardware timeout while sending on socket {}.".format(socket_num)
                 )
@@ -1127,7 +1129,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         """Read Socket n Status Register."""
         return self._read_socket(sock, _REG_SNSR)
 
-    def _read_snir(self, sock: int) -> Optional[bytearray]:
+    def read_snir(self, sock: int) -> Optional[bytearray]:
         """Read Socket n Interrupt Register."""
         return self._read_socket(sock, _REG_SNIR)
 
