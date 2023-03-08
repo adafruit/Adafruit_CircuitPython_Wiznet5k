@@ -240,16 +240,25 @@ class socket:
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         if self._sock_type == SOCK_STREAM:
-            self._disconnect()
-            stamp = time.monotonic()
-            while self._status == wiznet5k.adafruit_wiznet5k.SNSR_SOCK_FIN_WAIT:
-                if time.monotonic() - stamp > 19:  # Hardware default timeout.
-                    raise RuntimeError("Failed to disconnect socket")
-        self.close()
-        stamp = time.monotonic()
-        while self._status != wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSED:
-            if time.monotonic() - stamp > 19:  # Hardware default timeout.
-                raise RuntimeError("Failed to close socket")
+            _the_interface.write_snir(
+                self._socknum, 0xFF
+            )  # Reset socket interrupt register.
+            _the_interface.socket_disconnect(self._socknum)
+            mask = (
+                wiznet5k.adafruit_wiznet5k.SNIR_TIMEOUT
+                | wiznet5k.adafruit_wiznet5k.SNIR_DISCON
+            )
+            while not _the_interface.read_snir(self._socknum)[0] & mask:
+                pass
+        _the_interface.write_snir(
+            self._socknum, 0xFF
+        )  # Reset socket interrupt register.
+        _the_interface.socket_close(self._socknum)
+        while (
+            not _the_interface.socket_status(self._socknum)[0]
+            & wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSED
+        ):
+            pass
 
     @property
     def _status(self) -> int:
