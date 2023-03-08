@@ -255,8 +255,8 @@ class socket:
         )  # Reset socket interrupt register.
         _the_interface.socket_close(self._socknum)
         while (
-            not _the_interface.socket_status(self._socknum)[0]
-            & wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSED
+            _the_interface.socket_status(self._socknum)[0]
+            != wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSED
         ):
             pass
 
