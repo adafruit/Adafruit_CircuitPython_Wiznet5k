@@ -1094,7 +1094,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
                 raise RuntimeError("Socket closed before data was sent.")
             if timeout and time.monotonic() - stamp > timeout:
                 raise RuntimeError("Operation timed out. No data sent.")
-            if self.read_snir(socket_num)[0] & _SNIR_TIMEOUT:
+            if self.read_snir(socket_num)[0] & SNIR_TIMEOUT:
                 raise TimeoutError(
                     "Hardware timeout while sending on socket {}.".format(socket_num)
                 )
