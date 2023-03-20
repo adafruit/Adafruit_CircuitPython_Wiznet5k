@@ -107,9 +107,9 @@ _CMD_SOCK_RECV = const(0x40)
 
 # Socket n Interrupt Register
 _SNIR_SEND_OK = const(0x10)
-_SNIR_TIMEOUT = const(0x08)
+SNIR_TIMEOUT = const(0x08)
 _SNIR_RECV = const(0x04)
-_SNIR_DISCON = const(0x02)
+SNIR_DISCON = const(0x02)
 _SNIR_CON = const(0x01)
 
 _CH_SIZE = const(0x100)
@@ -883,7 +883,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             time.sleep(0.00025)
 
             self._write_snmr(socket_num, conn_mode)
-            self._write_snir(socket_num, 0xFF)
+            self.write_snir(socket_num, 0xFF)
 
             if self.src_port > 0:
                 # write to socket source port
@@ -1104,7 +1104,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
                 return 0
             time.sleep(0.01)
 
-        self._write_snir(socket_num, _SNIR_SEND_OK)
+        self.write_snir(socket_num, _SNIR_SEND_OK)
         return ret
 
     # Socket-Register Methods
@@ -1170,11 +1170,15 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         """Read Socket n Status Register."""
         return self._read_socket(sock, _REG_SNSR)
 
+    def read_snir(self, sock: int) -> Optional[bytearray]:
+        """Read Socket n Status Register."""
+        return self._read_socket(sock, _REG_SNIR)
+
     def _write_snmr(self, sock: int, protocol: int) -> None:
         """Write to Socket n Mode Register."""
         self._write_socket(sock, _REG_SNMR, protocol)
 
-    def _write_snir(self, sock: int, data: int) -> None:
+    def write_snir(self, sock: int, data: int) -> None:
         """Write to Socket n Interrupt Register."""
         self._write_socket(sock, _REG_SNIR, data)
 
