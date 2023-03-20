@@ -227,30 +227,55 @@ class socket:
         """
         if family != AF_INET:
             raise RuntimeError("Only AF_INET family supported by W5K modules.")
+        self._socket_closed = False
         self._sock_type = type
         self._buffer = b""
         self._timeout = _default_socket_timeout
         self._listen_port = None
 
-        self._socknum = _the_interface.get_socket()
+        self._socknum = _the_interface.get_socket(reserve_socket=True)
         if self._socknum == _SOCKET_INVALID:
             raise RuntimeError("Failed to allocate socket.")
+
+    def __del__(self):
+        _the_interface.release_socket(self._socknum)
 
     def __enter__(self):
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        _the_interface.release_socket(self._socknum)
         if self._sock_type == SOCK_STREAM:
-            self._disconnect()
-            stamp = time.monotonic()
-            while self._status == wiznet5k.adafruit_wiznet5k.SNSR_SOCK_FIN_WAIT:
-                if time.monotonic() - stamp > 1000:
-                    raise RuntimeError("Failed to disconnect socket")
-        self.close()
-        stamp = time.monotonic()
-        while self._status != wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSED:
-            if time.monotonic() - stamp > 1000:
-                raise RuntimeError("Failed to close socket")
+            _the_interface.write_snir(
+                self._socknum, 0xFF
+            )  # Reset socket interrupt register.
+            _the_interface.socket_disconnect(self._socknum)
+            mask = (
+                wiznet5k.adafruit_wiznet5k.SNIR_TIMEOUT
+                | wiznet5k.adafruit_wiznet5k.SNIR_DISCON
+            )
+            while not _the_interface.read_snir(self._socknum)[0] & mask:
+                pass
+        _the_interface.write_snir(
+            self._socknum, 0xFF
+        )  # Reset socket interrupt register.
+        _the_interface.socket_close(self._socknum)
+        while (
+            _the_interface.socket_status(self._socknum)[0]
+            != wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSED
+        ):
+            pass
+
+    # This works around problems with using a class method as a decorator.
+    def _check_socket_closed(func):  # pylint: disable=no-self-argument
+        """Decorator to check whether the socket object has been closed."""
+
+        def wrapper(self, *args, **kwargs):
+            if self._socket_closed:  # pylint: disable=protected-access
+                raise RuntimeError("The socket has been closed.")
+            return func(self, *args, **kwargs)  # pylint: disable=not-callable
+
+        return wrapper
 
     @property
     def _status(self) -> int:
@@ -289,6 +314,7 @@ class socket:
             self.close()
         return result
 
+    @_check_socket_closed
     def getpeername(self) -> Tuple[str, int]:
         """
         Return the remote address to which the socket is connected.
@@ -299,6 +325,7 @@ class socket:
             self._socknum
         )
 
+    @_check_socket_closed
     def bind(self, address: Tuple[Optional[str], int]) -> None:
         """
         Bind the socket to address. The socket must not already be bound.
@@ -344,6 +371,7 @@ class socket:
             )
             self._buffer = b""
 
+    @_check_socket_closed
     def listen(self, backlog: int = 0) -> None:
         """
         Enable a server to accept connections.
@@ -355,6 +383,7 @@ class socket:
         _the_interface.socket_listen(self._socknum, self._listen_port)
         self._buffer = b""
 
+    @_check_socket_closed
     def accept(
         self,
     ) -> Tuple[socket, Tuple[str, int]]:
@@ -389,6 +418,7 @@ class socket:
             raise RuntimeError("Failed to open new listening socket")
         return client_sock, addr
 
+    @_check_socket_closed
     def connect(self, address: Tuple[str, int]) -> None:
         """
         Connect to a remote socket at address.
@@ -408,6 +438,7 @@ class socket:
             raise RuntimeError("Failed to connect to host ", address[0])
         self._buffer = b""
 
+    @_check_socket_closed
     def send(self, data: Union[bytes, bytearray]) -> int:
         """
         Send data to the socket. The socket must be connected to a remote socket.
@@ -423,6 +454,7 @@ class socket:
         gc.collect()
         return bytes_sent
 
+    @_check_socket_closed
     def sendto(self, data: bytearray, *flags_and_or_address: any) -> int:
         """
         Send data to the socket. The socket should not be connected to a remote socket, since the
@@ -446,6 +478,7 @@ class socket:
         self.connect(address)
         return self.send(data)
 
+    @_check_socket_closed
     def recv(
         # pylint: disable=too-many-branches
         self,
@@ -501,6 +534,7 @@ class socket:
         gc.collect()
         return ret
 
+    @_check_socket_closed
     def recvfrom(self, bufsize: int, flags: int = 0) -> Tuple[bytes, Tuple[str, int]]:
         """
         Receive data from the socket. The return value is a pair (bytes, address) where bytes is
@@ -521,6 +555,7 @@ class socket:
             ),
         )
 
+    @_check_socket_closed
     def recv_into(self, buffer: bytearray, nbytes: int = 0, flags: int = 0) -> int:
         """
         Receive up to nbytes bytes from the socket, storing the data into a buffer
@@ -539,6 +574,7 @@ class socket:
         buffer[:nbytes] = bytes_received
         return nbytes
 
+    @_check_socket_closed
     def recvfrom_into(
         self, buffer: bytearray, nbytes: int = 0, flags: int = 0
     ) -> Tuple[int, Tuple[str, int]]:
@@ -597,12 +633,15 @@ class socket:
             raise RuntimeError("Socket must be a TCP socket.")
         _the_interface.socket_disconnect(self._socknum)
 
+    @_check_socket_closed
     def close(self) -> None:
         """
         Mark the socket closed. Once that happens, all future operations on the socket object
         will fail. The remote end will receive no more data.
         """
+        _the_interface.release_socket(self._socknum)
         _the_interface.socket_close(self._socknum)
+        self._socket_closed = True
 
     def _available(self) -> int:
         """
@@ -612,6 +651,7 @@ class socket:
         """
         return _the_interface.socket_available(self._socknum, self._sock_type)
 
+    @_check_socket_closed
     def settimeout(self, value: Optional[float]) -> None:
         """
         Set a timeout on blocking socket operations. The value argument can be a
@@ -628,6 +668,7 @@ class socket:
         else:
             raise ValueError("Timeout must be None, 0.0 or a positive numeric value.")
 
+    @_check_socket_closed
     def gettimeout(self) -> Optional[float]:
         """
         Return the timeout in seconds (float) associated with socket operations, or None if no
@@ -637,6 +678,7 @@ class socket:
         """
         return self._timeout
 
+    @_check_socket_closed
     def setblocking(self, flag: bool) -> None:
         """
         Set blocking or non-blocking mode of the socket: if flag is false, the socket is set
@@ -659,6 +701,7 @@ class socket:
         else:
             raise TypeError("Flag must be a boolean.")
 
+    @_check_socket_closed
     def getblocking(self) -> bool:
         """
         Return True if socket is in blocking mode, False if in non-blocking.
@@ -670,16 +713,19 @@ class socket:
         return self.gettimeout() == 0
 
     @property
+    @_check_socket_closed
     def family(self) -> int:
         """Socket family (always 0x03 in this implementation)."""
         return 3
 
     @property
+    @_check_socket_closed
     def type(self):
         """Socket type."""
         return self._sock_type
 
     @property
+    @_check_socket_closed
     def proto(self):
         """Socket protocol (always 0x00 in this implementation)."""
         return 0
