@@ -45,11 +45,13 @@ __repo__ = "https://github.com/adafruit/Adafruit_CircuitPython_Wiznet5k.git"
 
 from random import randint
 import time
+import gc
 from micropython import const
 
 from adafruit_bus_device.spi_device import SPIDevice
 import adafruit_wiznet5k.adafruit_wiznet5k_dhcp as dhcp
 import adafruit_wiznet5k.adafruit_wiznet5k_dns as dns
+from adafruit_wiznet5k.adafruit_wiznet5k_debug import debug_msg
 
 # Wiznet5k Registers
 _REG_MR = const(0x0000)  # Mode
@@ -144,6 +146,8 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
     _UDP_MODE = const(0x02)
     _TLS_MODE = const(0x03)  # This is NOT currently implemented
 
+    _sockets_reserved = []
+
     # pylint: disable=too-many-arguments
     def __init__(
         self,
@@ -189,6 +193,13 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         self._ch_base_msb = 0
         if self._w5xxx_init() != 1:
             raise RuntimeError("Failed to initialize WIZnet module.")
+        if self._chip_type == "w5100s":
+            WIZNET5K._sockets_reserved = [False] * (_W5100_MAX_SOCK_NUM - 1)
+        elif self._chip_type == "w5500":
+            WIZNET5K._sockets_reserved = [False] * (_W5200_W5500_MAX_SOCK_NUM - 1)
+        else:
+            raise RuntimeError("Unrecognized chip type.")
+
         # Set MAC address
         self.mac_address = mac
         self.src_port = 0
@@ -722,26 +733,61 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             if self._debug:
                 print("waiting for sncr to clear...")
 
-    def get_socket(self) -> int:
-        """Request, allocate and return a socket from the W5k chip.
-
-        Cycle through the sockets to find the first available one, if any.
-
-        :return int: The first available socket. Returns 0xFF if no sockets are free.
+    def get_socket(self, *, reserve_socket=False) -> int:
         """
-        if self._debug:
-            print("*** Get socket")
+        Request, allocate and return a socket from the W5k chip.
 
-        sock = _SOCKET_INVALID
-        for _sock in range(self.max_sockets):
-            status = self.socket_status(_sock)[0]
-            if status == SNSR_SOCK_CLOSED:
-                sock = _sock
-                break
+        Cycle through the sockets to find the first available one. If the called with
+        reserve_socket=True, update the list of reserved sockets (intended to be used with
+        socket.socket()). Note that reserved sockets must be released by calling
+        cancel_reservation() once they are no longer needed.
 
-        if self._debug:
-            print("Allocated socket #{}".format(sock))
-        return sock
+        If all sockets are reserved, no sockets are available for DNS calls, etc. Therefore,
+        one socket cannot be reserved. Since socket 0 is the only socket that is capable of
+        operating in MacRAW mode, it is the non-reservable socket.
+
+        :param bool reserve_socket: Whether to reserve the socket.
+
+        :returns int: The first available socket.
+
+        :raises RuntimeError: If no socket is available.
+        """
+        debug_msg("*** Get socket.", self._debug)
+        # Prefer socket zero for none reserved calls as it cannot be reserved.
+        if not reserve_socket and self.socket_status(0)[0] == SNSR_SOCK_CLOSED:
+            debug_msg("Allocated socket # 0", self._debug)
+            return 0
+        # Then check the other sockets.
+
+        #  Call garbage collection to encourage socket.__del__() be called to on any
+        #  destroyed instances. Not at all guaranteed to work!
+        gc.collect()
+        debug_msg(
+            "Reserved sockets: {}".format(WIZNET5K._sockets_reserved), self._debug
+        )
+
+        for socket_number, reserved in enumerate(WIZNET5K._sockets_reserved, start=1):
+            if (
+                not reserved
+                and self.socket_status(socket_number)[0] == SNSR_SOCK_CLOSED
+            ):
+                if reserve_socket:
+                    WIZNET5K._sockets_reserved[socket_number - 1] = True
+                    debug_msg(
+                        "Allocated socket # {}.".format(socket_number),
+                        self._debug,
+                    )
+                return socket_number
+        raise RuntimeError("Out of sockets.")
+
+    @staticmethod
+    def release_socket(socket_number):
+        """
+        Update the socket reservation list when a socket is no longer reserved.
+
+        :param int socket_number: The socket to release.
+        """
+        WIZNET5K._sockets_reserved[socket_number - 1] = False
 
     def socket_listen(
         self, socket_num: int, port: int, conn_mode: int = _SNMR_TCP

@@ -232,14 +232,18 @@ class socket:
         self._timeout = _default_socket_timeout
         self._listen_port = None
 
-        self._socknum = _the_interface.get_socket()
+        self._socknum = _the_interface.get_socket(reserve_socket=True)
         if self._socknum == _SOCKET_INVALID:
             raise RuntimeError("Failed to allocate socket.")
+
+    def __del__(self):
+        _the_interface.release_socket(self._socknum)
 
     def __enter__(self):
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        _the_interface.release_socket(self._socknum)
         if self._sock_type == SOCK_STREAM:
             self._disconnect()
             stamp = time.monotonic()
@@ -625,8 +629,9 @@ class socket:
         Mark the socket closed. Once that happens, all future operations on the socket object
         will fail. The remote end will receive no more data.
         """
-        self._socket_closed = True
+        _the_interface.release_socket(self._socknum)
         _the_interface.socket_close(self._socknum)
+        self._socket_closed = True
 
     def _available(self) -> int:
         """
