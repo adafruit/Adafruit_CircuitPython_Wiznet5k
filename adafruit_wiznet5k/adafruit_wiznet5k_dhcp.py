@@ -84,7 +84,7 @@ _LEASE_TIME = const(51)
 _OPT_END = const(255)
 
 # Packet buffer
-_BUFF_LENGTH = 318
+_BUFF_LENGTH = 512
 _BUFF = bytearray(_BUFF_LENGTH)
 
 
@@ -303,7 +303,8 @@ class DHCP:
         buffer = bytearray(b"")
         bytes_read = 0
         debug_msg("+ Beginning to receive…", self._debug)
-        while bytes_read <= minimum_packet_length and time.monotonic() < timeout:
+        timeout += time.monotonic()
+        while bytes_read < minimum_packet_length and time.monotonic() < timeout:
             if self._eth.socket_available(self._wiz_sock, _SNMR_UDP):
                 x = self._eth.read_udp(self._wiz_sock, _BUFF_LENGTH - bytes_read)[1]
                 buffer.extend(x)
@@ -612,12 +613,18 @@ class DHCP:
             :returns Tuple[int, int, bytes]: Pointer to next option,
                 option type, and option data.
             """
+            # debug_msg("initial pointer = {}".format(pointer), self._debug)
             option_type = _BUFF[pointer]
+            # debug_msg("option type = {}".format(option_type), self._debug)
             pointer += 1
             data_length = _BUFF[pointer]
+            # debug_msg("data length = {}".format(data_length), self._debug)
             pointer += 1
             data_end = pointer + data_length
+            # debug_msg("data end = {}".format(data_end), self._debug)
             option_data = bytes(_BUFF[pointer:data_end])
+            # debug_msg(option_data, self._debug)
+            # debug_msg("Final pointer = {}".format(pointer), self._debug)
             return data_end, option_type, option_data
 
         debug_msg("Parsing DHCP message.", self._debug)
