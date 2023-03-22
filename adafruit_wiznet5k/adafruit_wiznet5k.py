@@ -45,12 +45,13 @@ __repo__ = "https://github.com/adafruit/Adafruit_CircuitPython_Wiznet5k.git"
 
 from random import randint
 import time
+import gc
 from micropython import const
 
 from adafruit_bus_device.spi_device import SPIDevice
-from adafruit_wiznet5k.adafruit_wiznet5k_debug import debug_msg
 import adafruit_wiznet5k.adafruit_wiznet5k_dhcp as dhcp
 import adafruit_wiznet5k.adafruit_wiznet5k_dns as dns
+from adafruit_wiznet5k.adafruit_wiznet5k_debug import debug_msg
 
 # Wiznet5k Registers
 _REG_MR = const(0x0000)  # Mode
@@ -110,9 +111,9 @@ _CMD_SOCK_RECV = const(0x40)
 
 # Socket n Interrupt Register
 _SNIR_SEND_OK = const(0x10)
-_SNIR_TIMEOUT = const(0x08)
+SNIR_TIMEOUT = const(0x08)
 _SNIR_RECV = const(0x04)
-_SNIR_DISCON = const(0x02)
+SNIR_DISCON = const(0x02)
 _SNIR_CON = const(0x01)
 
 _CH_SIZE = const(0x100)
@@ -148,6 +149,8 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
     _TCP_MODE = const(0x21)
     _UDP_MODE = const(0x02)
     _TLS_MODE = const(0x03)  # This is NOT currently implemented
+
+    _sockets_reserved = []
 
     # pylint: disable=too-many-arguments
     def __init__(
@@ -192,6 +195,13 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         self._ch_base_msb = 0
         if self._w5xxx_init() != 1:
             raise RuntimeError("Failed to initialize WIZnet module.")
+        if self._chip_type == "w5100s":
+            WIZNET5K._sockets_reserved = [False] * (_W5100_MAX_SOCK_NUM - 1)
+        elif self._chip_type == "w5500":
+            WIZNET5K._sockets_reserved = [False] * (_W5200_W5500_MAX_SOCK_NUM - 1)
+        else:
+            raise RuntimeError("Unrecognized chip type.")
+
         # Set MAC address
         self.mac_address = mac
         self.src_port = 0
@@ -719,23 +729,61 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         while self.read_sncr(socket) != b"\x00":
             debug_msg("waiting for SNCR to clear...", self._debug)
 
-    def get_socket(self) -> int:
-        """Request, allocate and return a socket from the W5k chip.
-
-        Cycle through the sockets to find the first available one, if any.
-
-        :return int: The first available socket. Returns 0xFF if no sockets are free.
+    def get_socket(self, *, reserve_socket=False) -> int:
         """
-        debug_msg("get_socket", self._debug)
+        Request, allocate and return a socket from the W5k chip.
 
-        sock = _SOCKET_INVALID
-        for _sock in range(self.max_sockets):
-            status = self.socket_status(_sock)[0]
-            if status == SNSR_SOCK_CLOSED:
-                sock = _sock
-                break
-        debug_msg("Allocated socket #{}".format(sock), self._debug)
-        return sock
+        Cycle through the sockets to find the first available one. If the called with
+        reserve_socket=True, update the list of reserved sockets (intended to be used with
+        socket.socket()). Note that reserved sockets must be released by calling
+        cancel_reservation() once they are no longer needed.
+
+        If all sockets are reserved, no sockets are available for DNS calls, etc. Therefore,
+        one socket cannot be reserved. Since socket 0 is the only socket that is capable of
+        operating in MacRAW mode, it is the non-reservable socket.
+
+        :param bool reserve_socket: Whether to reserve the socket.
+
+        :returns int: The first available socket.
+
+        :raises RuntimeError: If no socket is available.
+        """
+        debug_msg("*** Get socket.", self._debug)
+        # Prefer socket zero for none reserved calls as it cannot be reserved.
+        if not reserve_socket and self.socket_status(0)[0] == SNSR_SOCK_CLOSED:
+            debug_msg("Allocated socket # 0", self._debug)
+            return 0
+        # Then check the other sockets.
+
+        #  Call garbage collection to encourage socket.__del__() be called to on any
+        #  destroyed instances. Not at all guaranteed to work!
+        gc.collect()
+        debug_msg(
+            "Reserved sockets: {}".format(WIZNET5K._sockets_reserved), self._debug
+        )
+
+        for socket_number, reserved in enumerate(WIZNET5K._sockets_reserved, start=1):
+            if (
+                not reserved
+                and self.socket_status(socket_number)[0] == SNSR_SOCK_CLOSED
+            ):
+                if reserve_socket:
+                    WIZNET5K._sockets_reserved[socket_number - 1] = True
+                    debug_msg(
+                        "Allocated socket # {}.".format(socket_number),
+                        self._debug,
+                    )
+                return socket_number
+        raise RuntimeError("Out of sockets.")
+
+    @staticmethod
+    def release_socket(socket_number):
+        """
+        Update the socket reservation list when a socket is no longer reserved.
+
+        :param int socket_number: The socket to release.
+        """
+        WIZNET5K._sockets_reserved[socket_number - 1] = False
 
     def socket_listen(
         self, socket_num: int, port: int, conn_mode: int = _SNMR_TCP
@@ -831,7 +879,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             time.sleep(0.00025)
 
             self.write_snmr(socket_num, conn_mode)
-            self._write_snir(socket_num, 0xFF)
+            self.write_snir(socket_num, 0xFF)
 
             if self.src_port > 0:
                 # write to socket source port
@@ -893,7 +941,6 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             raise ValueError("Provided socket exceeds max_sockets.")
 
         # Check if there is data available on the socket
-        resp = b""
         ret = self._get_rx_rcv_size(socket_num)
         debug_msg("Bytes avail. on sock: {}".format(ret), self._debug)
         if ret == 0:
@@ -980,10 +1027,8 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         # pylint: disable=too-many-branches
         if not self.link_status:
             raise ConnectionError("Ethernet cable disconnected!")
-        assert socket_num <= self.max_sockets, "Provided socket exceeds max_sockets."
-        status = 0
-        ret = 0
-        free_size = 0
+        if socket_num > self.max_sockets:
+            raise ValueError("Provided socket exceeds max_sockets.")
         if len(buffer) > _SOCK_SIZE:
             ret = _SOCK_SIZE
         else:
@@ -1045,12 +1090,12 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
                 raise RuntimeError("Socket closed before data was sent.")
             if timeout and time.monotonic() - stamp > timeout:
                 raise RuntimeError("Operation timed out. No data sent.")
-            if self.read_snir(socket_num)[0] & _SNIR_TIMEOUT:
+            if self.read_snir(socket_num)[0] & SNIR_TIMEOUT:
                 raise TimeoutError(
                     "Hardware timeout while sending on socket {}.".format(socket_num)
                 )
             time.sleep(0.001)
-        self._write_snir(socket_num, _SNIR_SEND_OK)
+        self.write_snir(socket_num, _SNIR_SEND_OK)
         return ret
 
     # Socket-Register Methods
@@ -1137,7 +1182,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         """Write to Socket n Mode Register."""
         self._write_socket(sock, _REG_SNMR, protocol)
 
-    def _write_snir(self, sock: int, data: int) -> None:
+    def write_snir(self, sock: int, data: int) -> None:
         """Write to Socket n Interrupt Register."""
         self._write_socket(sock, _REG_SNIR, data)
 
