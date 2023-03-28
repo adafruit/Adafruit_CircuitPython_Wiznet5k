@@ -293,7 +293,7 @@ class DHCP:
         If the packet is too short, it is discarded and zero is returned. The
         maximum packet size is limited by the size of the global buffer.
 
-        :param float timeout: Seconds to wait for a process to complete.
+        :param float timeout: time.monotonic at which attempt should timeout.
 
         :returns int: The number of bytes stored in the global buffer.
         """
@@ -303,7 +303,6 @@ class DHCP:
         buffer = bytearray(b"")
         bytes_read = 0
         debug_msg("+ Beginning to receive…", self._debug)
-        timeout += time.monotonic()
         while bytes_read < minimum_packet_length and time.monotonic() < timeout:
             if self._eth.socket_available(self._wiz_sock, _SNMR_UDP):
                 x = self._eth.read_udp(self._wiz_sock, _BUFF_LENGTH - bytes_read)[1]
