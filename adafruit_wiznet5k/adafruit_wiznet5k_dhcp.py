@@ -219,6 +219,7 @@ class DHCP:
         if self._wiz_sock:
             self._eth.socket_close(self._wiz_sock)
             self._wiz_sock = None
+        debug_msg("  Socket released.", self._debug)
 
     def _dhcp_connection_setup(self, timeout: float = 5.0) -> None:
         """Initialise a UDP socket.
