@@ -906,11 +906,28 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         :param int socket_num: The socket to close.
         """
         debug_msg("*** Closing socket {}".format(socket_num), self._debug)
+        timeout = time.monotonic() + 5.0
         self.write_sncr(socket_num, _CMD_SOCK_CLOSE)
+        debug_msg("  Waiting for close command to process…", self._debug)
         while self.read_sncr(socket_num):
+            if time.monotonic() < timeout:
+                raise RuntimeError(
+                    "Wiznet5k failed to complete command, status = {}.".format(
+                        self.read_sncr(socket_num)
+                    )
+                )
             time.sleep(0.0001)
+        debug_msg("  Waiting for socket to close…", self._debug)
+        timeout = time.monotonic() + 5.0
         while self.read_snsr(socket_num) != SNSR_SOCK_CLOSED:
+            if time.monotonic() > timeout:
+                raise RuntimeError(
+                    "Wiznet5k failed to close socket, status = {}.".format(
+                        self.read_snsr(socket_num)
+                    )
+                )
             time.sleep(0.0001)
+        debug_msg("  Socket has closed.", self._debug)
 
     def socket_disconnect(self, socket_num: int) -> None:
         """
