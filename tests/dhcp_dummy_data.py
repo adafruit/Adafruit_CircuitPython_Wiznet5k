@@ -10,10 +10,10 @@ def _pad_message(message_section: bytearray, target_length: int) -> bytearray:
 
 
 def _build_message(message_body: bytearray, message_options: bytearray) -> bytearray:
-    """Assemble the padded message and body to make a 318 byte packet. The 'header'
-    section must be 236 bytes and the entire message must be 318 bytes."""
-    dhcp_message = _pad_message(message_body, 236) + _pad_message(message_options, 82)
-    assert len(dhcp_message) == 318
+    """Assemble the padded message and body to make a 512 byte packet. The 'header'
+    section must be 236 bytes and the entire message must be 512 bytes."""
+    dhcp_message = _pad_message(message_body, 236) + _pad_message(message_options, 276)
+    assert len(dhcp_message) == 512
     return dhcp_message
 
 
