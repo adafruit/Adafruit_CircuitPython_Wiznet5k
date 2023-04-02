@@ -247,7 +247,7 @@ class DHCP:
             self._eth.write_sncr(self._wiz_sock, 0x01)  # Open the socket.
             while self._eth.read_sncr(self._wiz_sock):  # Wait for command to complete.
                 time.sleep(0.001)
-            if self._eth.read_snsr(self._wiz_sock) == b"\x22":
+            if self._eth.read_snsr(self._wiz_sock) == 0x22:
                 self._eth.write_sndport(2, _DHCP_SERVER_PORT)
                 debug_msg("+ Connection OK, port set.", self._debug)
                 return

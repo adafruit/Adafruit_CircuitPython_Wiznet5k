@@ -806,8 +806,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             SNSR_SOCK_ESTABLISHED,
             _SNSR_SOCK_UDP,
         ):
-            status = self.read_snsr(socket_num)
-            if status[0] == SNSR_SOCK_CLOSED:
+            if self.read_snsr(socket_num) == SNSR_SOCK_CLOSED:
                 raise RuntimeError("Listening socket closed.")
 
     def socket_accept(
@@ -851,8 +850,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         if not self.link_status:
             raise ConnectionError("Ethernet cable disconnected!")
         debug_msg("*** Opening socket {}".format(socket_num), self._debug)
-        status = self.read_snsr(socket_num)[0]
-        if status in (
+        if self.read_snsr(socket_num) in (
             SNSR_SOCK_CLOSED,
             SNSR_SOCK_TIME_WAIT,
             SNSR_SOCK_FIN_WAIT,
@@ -881,7 +879,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             # open socket
             self.write_sncr(socket_num, _CMD_SOCK_OPEN)
             self.read_sncr(socket_num)
-            if self.read_snsr((socket_num))[0] not in [0x13, 0x22]:
+            if self.read_snsr(socket_num) not in [_SNSR_SOCK_INIT, _SNSR_SOCK_UDP]:
                 raise RuntimeError("Could not open socket in TCP or UDP mode.")
             return 0
         return 1
@@ -906,11 +904,11 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             time.sleep(0.0001)
         debug_msg("  Waiting for socket to close…", self._debug)
         timeout = time.monotonic() + 5.0
-        while self.read_snsr(socket_num)[0] != SNSR_SOCK_CLOSED:
+        while self.read_snsr(socket_num) != SNSR_SOCK_CLOSED:
             if time.monotonic() > timeout:
                 raise RuntimeError(
                     "Wiznet5k failed to close socket, status = {}.".format(
-                        self.read_snsr(socket_num)[0]
+                        self.read_snsr(socket_num)
                     )
                 )
             time.sleep(0.0001)
@@ -1174,9 +1172,9 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         self._write_socket(sock, _REG_SNDPORT, port >> 8)
         self._write_socket(sock, _REG_SNDPORT + 1, port & 0xFF)
 
-    def read_snsr(self, sock: int) -> Optional[bytearray]:
+    def read_snsr(self, sock: int) -> int:
         """Read Socket n Status Register."""
-        return self._read_socket(sock, _REG_SNSR)
+        return int.from_bytes(self._read_socket(sock, _REG_SNSR), "big")
 
     def read_snir(self, sock: int) -> Optional[bytearray]:
         """Read Socket n Interrupt Register."""
