@@ -302,7 +302,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         return self._chip_type
 
     @property
-    def ip_address(self) -> bytearray:
+    def ip_address(self) -> bytes:
         """
         Configured IP address.
 
@@ -430,11 +430,11 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
     @property
     def ifconfig(
         self,
-    ) -> Tuple[bytearray, bytearray, bytearray, Tuple[int, int, int, int]]:
+    ) -> Tuple[bytes, bytes, bytes, Tuple[int, int, int, int]]:
         """
         Network configuration information.
 
-        :return Tuple[bytearray, bytearray, bytearray, Tuple[int, int, int, int]]: \
+        :return Tuple[bytes, bytes, bytes, Tuple[int, int, int, int]]: \
             The IP address, subnet mask, gateway address and DNS server address."""
         return (
             self.ip_address,
@@ -476,26 +476,20 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             :return bool: True if a W5500 chip is detected, False if not.
             """
             self._chip_type = "w5500"
-            # assert self.sw_reset() == 0, "Chip not reset properly!"
             self._write_mr(0x08)
-            # assert self._read_mr()[0] == 0x08, "Expected 0x08."
-            if self._read_mr()[0] != 0x08:
+            if self._read_mr() != 0x08:
                 return False
 
             self._write_mr(0x10)
-            # assert self._read_mr()[0] == 0x10, "Expected 0x10."
-            if self._read_mr()[0] != 0x10:
+            if self._read_mr() != 0x10:
                 return False
 
             self._write_mr(0x00)
-            # assert self._read_mr()[0] == 0x00, "Expected 0x00."
-            if self._read_mr()[0] != 0x00:
+            if self._read_mr() != 0x00:
                 return False
 
             if self._read(_REG_VERSIONR_W5500, 0x00)[0] != 0x04:
                 return False
-            # self._chip_type = "w5500"
-            # self._ch_base_msb = 0x10
             return True
 
         def _detect_and_reset_w5100s() -> bool:
@@ -540,19 +534,17 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
         :return int: 0 if the reset succeeds, -1 if not.
         """
-        mode_reg = self._read_mr()
         self._write_mr(0x80)
-        mode_reg = self._read_mr()
 
         # W5100S case => 0x03
-        if (mode_reg[0] != 0x00) and (mode_reg[0] != 0x03):
+        if self._read_mr() not in (0x00, 0x03):
             return -1
         return 0
 
-    def _read_mr(self) -> bytearray:
+    def _read_mr(self) -> int:
         """Read from the Mode Register (MR)."""
-        res = self._read(_REG_MR, 0x00)
-        return res
+        register = self._read(_REG_MR, 0x00)
+        return int.from_bytes(register, "big")
 
     def _write_mr(self, data: int) -> None:
         """Write to the mode register (MR)."""
@@ -571,7 +563,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         :param int callback: Callback reference.
         :param int length: Number of bytes to read from the register, defaults to 1.
 
-        :return Union[WriteableBuffer, bytearray]: Data read from the chip.
+        :return bytes: Data read from the chip.
         """
         with self._device as bus_device:
             if self._chip_type == "w5500":
@@ -977,7 +969,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
                 resp = self._read(ptr, ctrl_byte, ret)
             else:
-                # if self._chip_type == "w5100s":
+                # Chip assumed to be 5100s.
                 offset = ptr & _SOCK_MASK
                 src_addr = offset + (socket_num * _SOCK_SIZE + 0x6000)
                 if offset + ret > _SOCK_SIZE:
@@ -1226,7 +1218,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             )
         return None
 
-    def _read_socket(self, sock: int, address: int) -> bytearray:
+    def _read_socket(self, sock: int, address: int) -> bytes:
         """Read a W5k socket register."""
         if self._chip_type == "w5500":
             cntl_byte = (sock << 5) + 0x08
