@@ -1081,8 +1081,8 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             time.sleep(0.001)
 
         # check data was  transferred correctly
-        while not self.read_snir(socket_num)[0] & _SNIR_SEND_OK:
-            if self.socket_status(socket_num)[0] in (
+        while not self.read_snir(socket_num) & _SNIR_SEND_OK:
+            if self.socket_status(socket_num) in (
                 SNSR_SOCK_CLOSED,
                 SNSR_SOCK_TIME_WAIT,
                 SNSR_SOCK_FIN_WAIT,
@@ -1092,7 +1092,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
                 raise RuntimeError("Socket closed before data was sent.")
             if timeout and time.monotonic() - stamp > timeout:
                 raise RuntimeError("Operation timed out. No data sent.")
-            if self.read_snir(socket_num)[0] & SNIR_TIMEOUT:
+            if self.read_snir(socket_num) & SNIR_TIMEOUT:
                 raise TimeoutError(
                     "Hardware timeout while sending on socket {}.".format(socket_num)
                 )
@@ -1176,9 +1176,9 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         """Read Socket n Status Register."""
         return int.from_bytes(self._read_socket(sock, _REG_SNSR), "big")
 
-    def read_snir(self, sock: int) -> Optional[bytearray]:
+    def read_snir(self, sock: int) -> int:
         """Read Socket n Interrupt Register."""
-        return self._read_socket(sock, _REG_SNIR)
+        return int.from_bytes(self._read_socket(sock, _REG_SNIR), "big")
 
     def write_snmr(self, sock: int, protocol: int) -> None:
         """Write to Socket n Mode Register."""

@@ -254,7 +254,7 @@ class socket:
                 wiznet5k.adafruit_wiznet5k.SNIR_TIMEOUT
                 | wiznet5k.adafruit_wiznet5k.SNIR_DISCON
             )
-            while not _the_interface.read_snir(self._socknum)[0] & mask:
+            while not _the_interface.read_snir(self._socknum) & mask:
                 pass
         _the_interface.write_snir(
             self._socknum, 0xFF
