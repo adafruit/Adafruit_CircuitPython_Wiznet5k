@@ -301,7 +301,7 @@ class TestParseDhcpMessage:
         # Test for bad OP code, ID mismatch, no server ID, bad Magic Cookie
         bad_data = dhcp_data.BAD_DATA
         dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, bytes((1, 2, 3, 4, 5, 6)))
-        dhcp_client._eth._read_socket.return_value = (len(bad_data), bad_data)
+        dhcp_client._eth._read_socket_register.return_value = (len(bad_data), bad_data)
         # Transaction ID mismatch.
         dhcp_client._transaction_id = 0x42424242
         with pytest.raises(ValueError):
@@ -411,8 +411,8 @@ class TestSmallHelperFunctions:
     @freeze_time("2022-7-6")
     def test_setup_socket_with_no_error(self, mocker, mock_wiznet5k):
         mocker.patch.object(mock_wiznet5k, "get_socket", return_value=2)
-        mocker.patch.object(mock_wiznet5k, "read_sncr", return_value=b"\x00")
-        mocker.patch.object(mock_wiznet5k, "read_snsr", return_value=b"\x22")
+        mocker.patch.object(mock_wiznet5k, "read_sncr", return_value=0x00)
+        mocker.patch.object(mock_wiznet5k, "read_snsr", return_value=0x22)
         dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, bytes((1, 2, 3, 4, 5, 6)))
         dhcp_client._dhcp_connection_setup()
         mock_wiznet5k.get_socket.assert_called_once()
@@ -438,8 +438,8 @@ class TestSmallHelperFunctions:
     @freeze_time("2022-7-6", auto_tick_seconds=2)
     def test_setup_socket_with_timeout_on_socket_is_udp(self, mocker, mock_wiznet5k):
         mocker.patch.object(mock_wiznet5k, "get_socket", return_value=2)
-        mocker.patch.object(mock_wiznet5k, "read_sncr", return_value=b"\x00")
-        mocker.patch.object(mock_wiznet5k, "read_snsr", return_value=b"\x21")
+        mocker.patch.object(mock_wiznet5k, "read_sncr", return_value=0x00)
+        mocker.patch.object(mock_wiznet5k, "read_snsr", return_value=0x21)
         dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, bytes((1, 2, 3, 4, 5, 6)))
         with pytest.raises(RuntimeError):
             dhcp_client._dhcp_connection_setup()

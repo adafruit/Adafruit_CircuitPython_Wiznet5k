@@ -398,8 +398,10 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         """
         if socket_num >= self.max_sockets:
             return self._pbuff
-        for octet in range(0, 4):
-            self._pbuff[octet] = self._read_socket(socket_num, _REG_SNDIPR + octet)[0]
+        for octet in range(4):
+            self._pbuff[octet] = self._read_socket_register(
+                socket_num, _REG_SNDIPR + octet
+            )
         return self.pretty_ip(self._pbuff)
 
     @property
@@ -427,7 +429,9 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         if socket_num >= self.max_sockets:
             return self._pbuff
         for octet in range(2):
-            self._pbuff[octet] = self._read_socket(socket_num, _REG_SNDPORT + octet)[0]
+            self._pbuff[octet] = self._read_socket_register(
+                socket_num, _REG_SNDPORT + octet
+            )
         return int((self._pbuff[0] << 8) | self._pbuff[0])
 
     @property
@@ -1112,7 +1116,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             val_1 = self._read_snrx_rsr(sock)
             if val_1 != 0:
                 val = self._read_snrx_rsr(sock)
-        return int.from_bytes(val, "big")
+        return val
 
     def _get_tx_free_size(self, sock: int) -> int:
         """Free size of socket's tx buffer block."""
@@ -1122,12 +1126,12 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             val_1 = self._read_sntx_fsr(sock)
             if val_1 != 0:
                 val = self._read_sntx_fsr(sock)
-        return int.from_bytes(val, "big")
+        return val
 
     def _read_snrx_rd(self, sock: int) -> int:
         """Read socket n RX Read Data Pointer Register."""
-        self._pbuff[0] = self._read_socket(sock, _REG_SNRX_RD)[0]
-        self._pbuff[1] = self._read_socket(sock, _REG_SNRX_RD + 1)[0]
+        self._pbuff[0] = self._read_socket_register(sock, _REG_SNRX_RD)
+        self._pbuff[1] = self._read_socket_register(sock, _REG_SNRX_RD + 1)
         return self._pbuff[0] << 8 | self._pbuff[1]
 
     def _write_snrx_rd(self, sock: int, data: int) -> None:
@@ -1142,20 +1146,20 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
     def _read_sntx_wr(self, sock: int) -> int:
         """Read the socket write buffer pointer for socket `sock`."""
-        self._pbuff[0] = self._read_socket(sock, 0x0024)[0]
-        self._pbuff[1] = self._read_socket(sock, 0x0024 + 1)[0]
+        self._pbuff[0] = self._read_socket_register(sock, 0x0024)
+        self._pbuff[1] = self._read_socket_register(sock, 0x0025)
         return self._pbuff[0] << 8 | self._pbuff[1]
 
     def _read_sntx_fsr(self, sock: int) -> Optional[bytearray]:
         """Read socket n TX Free Size Register"""
-        data = self._read_socket(sock, _REG_SNTX_FSR)
-        data += self._read_socket(sock, _REG_SNTX_FSR + 1)
+        data = self._read_socket_register(sock, _REG_SNTX_FSR) << 8
+        data += self._read_socket_register(sock, _REG_SNTX_FSR + 1)
         return data
 
-    def _read_snrx_rsr(self, sock: int) -> Optional[bytearray]:
+    def _read_snrx_rsr(self, sock: int) -> int:
         """Read socket n Received Size Register"""
-        data = self._read_socket(sock, _REG_SNRX_RSR)
-        data += self._read_socket(sock, _REG_SNRX_RSR + 1)
+        data = self._read_socket_register(sock, _REG_SNRX_RSR) << 8
+        data += self._read_socket_register(sock, _REG_SNRX_RSR + 1)
         return data
 
     def write_sndipr(self, sock: int, ip_addr: bytearray) -> None:
@@ -1163,12 +1167,12 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         for offset in range(4):
             self._write_socket(sock, _REG_SNDIPR + offset, ip_addr[offset])
 
-    def _read_sndipr(self, sock) -> bytearray:
+    def _read_sndipr(self, sock) -> bytes:
         """Read socket destination IP address."""
-        data = b""
+        data = []
         for offset in range(4):
-            data += self._read_socket(sock, _REG_SIPR + offset)
-        return bytearray(data)
+            data.append(self._read_socket_register(sock, _REG_SIPR + offset))
+        return bytes(data)
 
     def write_sndport(self, sock: int, port: int) -> None:
         """Write to socket destination port."""
@@ -1177,11 +1181,11 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
     def read_snsr(self, sock: int) -> int:
         """Read Socket n Status Register."""
-        return int.from_bytes(self._read_socket(sock, _REG_SNSR), "big")
+        return self._read_socket_register(sock, _REG_SNSR)
 
     def read_snir(self, sock: int) -> int:
         """Read Socket n Interrupt Register."""
-        return int.from_bytes(self._read_socket(sock, _REG_SNIR), "big")
+        return self._read_socket_register(sock, _REG_SNIR)
 
     def write_snmr(self, sock: int, protocol: int) -> None:
         """Write to Socket n Mode Register."""
@@ -1202,10 +1206,10 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
     def read_sncr(self, sock: int) -> int:
         """Read socket command register."""
-        return int.from_bytes(self._read_socket(sock, _REG_SNCR), "big")
+        return self._read_socket_register(sock, _REG_SNCR)
 
-    def _read_snmr(self, sock: int) -> Optional[bytearray]:
-        return self._read_socket(sock, _REG_SNMR)
+    def _read_snmr(self, sock: int) -> int:
+        return self._read_socket_register(sock, _REG_SNMR)
 
     def _write_socket(self, sock: int, address: int, data: int) -> None:
         """Write to a W5k socket register."""
@@ -1219,15 +1223,17 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             )
         return None
 
-    def _read_socket(self, sock: int, address: int) -> bytes:
+    def _read_socket_register(self, sock: int, address: int) -> int:
         """Read a W5k socket register."""
         if self._chip_type == "w5500":
             cntl_byte = (sock << 5) + 0x08
-            return self._read(address, cntl_byte)
+            register = self._read(address, cntl_byte)
         if self._chip_type == "w5100s":
             cntl_byte = 0
-            return self._read(self._ch_base_msb + sock * _CH_SIZE + address, cntl_byte)
-        raise RuntimeError("Invalid Wiznet chip type.")
+            register = self._read(
+                self._ch_base_msb + sock * _CH_SIZE + address, cntl_byte
+            )
+        return int.from_bytes(register, "big")
 
     @property
     def rcr(self) -> int:
