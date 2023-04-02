@@ -308,7 +308,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
         :return bytearray: IP address as four bytes.
         """
-        return self.read(_REG_SIPR, 0x00, 4)
+        return self._read(_REG_SIPR, 0x00, 4)
 
     def pretty_ip(
         self,
@@ -345,7 +345,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         Ethernet hardware's MAC address.
 
         :return bytearray: Six byte MAC address."""
-        return bytes(self.read(_REG_SHAR, 0x00, 6))
+        return bytes(self._read(_REG_SHAR, 0x00, 6))
 
     @mac_address.setter
     def mac_address(self, address: Tuple[int]) -> None:
@@ -406,10 +406,10 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         :return int: 1 if the link is up, 0 if the link is down.
         """
         if self._chip_type == "w5500":
-            data = self.read(_REG_PHYCFGR, 0x00)
+            data = self._read(_REG_PHYCFGR, 0x00)
             return data[0] & 0x01
         if self._chip_type == "w5100s":
-            data = self.read(_REG_PHYCFGR_W5100S, 0x00)
+            data = self._read(_REG_PHYCFGR_W5100S, 0x00)
             return data[0] & 0x01
         return 0
 
@@ -438,8 +438,8 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             The IP address, subnet mask, gateway address and DNS server address."""
         return (
             self.ip_address,
-            self.read(_REG_SUBR, 0x00, 4),
-            self.read(_REG_GAR, 0x00, 4),
+            self._read(_REG_SUBR, 0x00, 4),
+            self._read(_REG_GAR, 0x00, 4),
             self._dns,
         )
 
@@ -492,7 +492,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             if self._read_mr()[0] != 0x00:
                 return False
 
-            if self.read(_REG_VERSIONR_W5500, 0x00)[0] != 0x04:
+            if self._read(_REG_VERSIONR_W5500, 0x00)[0] != 0x04:
                 return False
             # self._chip_type = "w5500"
             # self._ch_base_msb = 0x10
@@ -508,7 +508,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             self._chip_type = "w5100s"
             # sw reset
             assert self.sw_reset() == 0, "Chip not reset properly!"
-            if self.read(_REG_VERSIONR_W5100S, 0x00)[0] != 0x51:
+            if self._read(_REG_VERSIONR_W5100S, 0x00)[0] != 0x51:
                 return False
 
             self._ch_base_msb = 0x0400
@@ -551,27 +551,25 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
     def _read_mr(self) -> bytearray:
         """Read from the Mode Register (MR)."""
-        res = self.read(_REG_MR, 0x00)
+        res = self._read(_REG_MR, 0x00)
         return res
 
     def _write_mr(self, data: int) -> None:
         """Write to the mode register (MR)."""
         self.write(_REG_MR, 0x04, data)
 
-    def read(
+    def _read(
         self,
         addr: int,
         callback: int,
         length: int = 1,
-        buffer: Optional[WriteableBuffer] = None,
-    ) -> Union[WriteableBuffer, bytearray]:
+    ) -> bytes:
         """
         Read data from a register address.
 
         :param int addr: Register address to read.
         :param int callback: Callback reference.
         :param int length: Number of bytes to read from the register, defaults to 1.
-        :param Optional[WriteableBuffer] buffer: Buffer to read data into, defaults to None.
 
         :return Union[WriteableBuffer, bytearray]: Data read from the chip.
         """
@@ -586,12 +584,9 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
                 bus_device.write(bytes([addr >> 8]))  # pylint: disable=no-member
                 bus_device.write(bytes([addr & 0xFF]))  # pylint: disable=no-member
 
-            if buffer is None:
-                self._rxbuf = bytearray(length)
-                bus_device.readinto(self._rxbuf)  # pylint: disable=no-member
-                return self._rxbuf
-            bus_device.readinto(buffer, end=length)  # pylint: disable=no-member
-            return buffer
+            self._rxbuf = bytearray(length)
+            bus_device.readinto(self._rxbuf)  # pylint: disable=no-member
+            return bytes(self._rxbuf)
 
     def write(
         self, addr: int, callback: int, data: Union[int, Sequence[Union[int, bytes]]]
@@ -980,20 +975,20 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
                 # Read data from the starting address of snrx_rd
                 ctrl_byte = 0x18 + (socket_num << 5)
 
-                resp = self.read(ptr, ctrl_byte, ret)
+                resp = self._read(ptr, ctrl_byte, ret)
             else:
                 # if self._chip_type == "w5100s":
                 offset = ptr & _SOCK_MASK
                 src_addr = offset + (socket_num * _SOCK_SIZE + 0x6000)
                 if offset + ret > _SOCK_SIZE:
                     size = _SOCK_SIZE - offset
-                    resp1 = self.read(src_addr, 0x00, size)
+                    resp1 = self._read(src_addr, 0x00, size)
                     size = ret - size
                     src_addr = socket_num * _SOCK_SIZE + 0x6000
-                    resp2 = self.read(src_addr, 0x00, size)
+                    resp2 = self._read(src_addr, 0x00, size)
                     resp = resp1 + resp2
                 else:
-                    resp = self.read(src_addr, 0x00, ret)
+                    resp = self._read(src_addr, 0x00, ret)
 
             #  After reading the received data, update Sn_RX_RD to the increased
             # value as many as the reading size.
@@ -1235,10 +1230,10 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         """Read a W5k socket register."""
         if self._chip_type == "w5500":
             cntl_byte = (sock << 5) + 0x08
-            return self.read(address, cntl_byte)
+            return self._read(address, cntl_byte)
         if self._chip_type == "w5100s":
             cntl_byte = 0
-            return self.read(self._ch_base_msb + sock * _CH_SIZE + address, cntl_byte)
+            return self._read(self._ch_base_msb + sock * _CH_SIZE + address, cntl_byte)
         raise RuntimeError("Invalid Wiznet chip type.")
 
     @property
@@ -1249,7 +1244,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         else:
             # Assume a W5100s
             rcr_reg = _REG_RCR_5100s
-        return self.read(rcr_reg, 0x00)
+        return self._read(rcr_reg, 0x00)
 
     @rcr.setter
     def rcr(self, retry_count: int) -> None:
@@ -1270,7 +1265,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         else:
             # Assume a W5100s
             reg = _REG_RTR_5100s
-        return self.read(reg, 0x00, 2)
+        return self._read(reg, 0x00, 2)
 
     @rtr.setter
     def rtr(self, retry_count: int) -> None:
