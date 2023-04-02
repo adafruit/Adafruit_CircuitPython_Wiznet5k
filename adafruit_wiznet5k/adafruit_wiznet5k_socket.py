@@ -261,7 +261,7 @@ class socket:
         )  # Reset socket interrupt register.
         _the_interface.socket_close(self._socknum)
         while (
-            _the_interface.socket_status(self._socknum)[0]
+            _the_interface.socket_status(self._socknum)
             != wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSED
         ):
             pass
@@ -284,7 +284,7 @@ class socket:
 
         :return int: Status of the socket.
         """
-        return _the_interface.socket_status(self._socknum)[0]
+        return _the_interface.socket_status(self._socknum)
 
     @property
     def _connected(self) -> bool:
@@ -297,7 +297,7 @@ class socket:
 
         if self._socknum >= _the_interface.max_sockets:
             return False
-        status = _the_interface.socket_status(self._socknum)[0]
+        status = _the_interface.socket_status(self._socknum)
         if (
             status == wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSE_WAIT
             and self._available() == 0
