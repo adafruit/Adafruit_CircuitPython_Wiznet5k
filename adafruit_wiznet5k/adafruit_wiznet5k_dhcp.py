@@ -245,9 +245,7 @@ class DHCP:
             self._eth.write_snmr(self._wiz_sock, 0x02)  # Set UDP connection
             self._eth.write_sock_port(self._wiz_sock, 68)  # Set DHCP client port.
             self._eth.write_sncr(self._wiz_sock, 0x01)  # Open the socket.
-            while (
-                self._eth.read_sncr(self._wiz_sock) != b"\x00"
-            ):  # Wait for command to complete.
+            while self._eth.read_sncr(self._wiz_sock):  # Wait for command to complete.
                 time.sleep(0.001)
             if self._eth.read_snsr(self._wiz_sock) == b"\x22":
                 self._eth.write_sndport(2, _DHCP_SERVER_PORT)

@@ -713,7 +713,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
     def _send_socket_cmd(self, socket: int, cmd: int) -> None:
         """Send a socket command to a socket."""
         self.write_sncr(socket, cmd)
-        while self.read_sncr(socket) != b"\x00":
+        while self.read_sncr(socket):
             debug_msg("waiting for SNCR to clear...", self._debug)
 
     def get_socket(self, *, reserve_socket=False) -> int:
@@ -896,11 +896,11 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         timeout = time.monotonic() + 5.0
         self.write_sncr(socket_num, _CMD_SOCK_CLOSE)
         debug_msg("  Waiting for close command to process…", self._debug)
-        while self.read_sncr(socket_num)[0]:
+        while self.read_sncr(socket_num):
             if time.monotonic() < timeout:
                 raise RuntimeError(
                     "Wiznet5k failed to complete command, status = {}.".format(
-                        self.read_sncr(socket_num)[0]
+                        self.read_sncr(socket_num)
                     )
                 )
             time.sleep(0.0001)
@@ -989,7 +989,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
             # Notify the W5k of the updated Sn_Rx_RD
             self.write_sncr(socket_num, _CMD_SOCK_RECV)
-            while self.read_sncr(socket_num)[0] & _CMD_SOCK_RECV:
+            while self.read_sncr(socket_num) & _CMD_SOCK_RECV:
                 time.sleep(0.0001)
         return ret, resp
 
@@ -1079,7 +1079,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         ptr = (ptr + ret) & 0xFFFF
         self._write_sntx_wr(socket_num, ptr)
         self.write_sncr(socket_num, _CMD_SOCK_SEND)
-        while self.read_sncr(socket_num) != b"\x00":
+        while self.read_sncr(socket_num):
             time.sleep(0.001)
 
         # check data was  transferred correctly
@@ -1199,9 +1199,9 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         """Write to socket command register."""
         self._write_socket(sock, _REG_SNCR, data)
 
-    def read_sncr(self, sock: int) -> Optional[bytearray]:
+    def read_sncr(self, sock: int) -> int:
         """Read socket command register."""
-        return self._read_socket(sock, _REG_SNCR)
+        return int.from_bytes(self._read_socket(sock, _REG_SNCR), "big")
 
     def _read_snmr(self, sock: int) -> Optional[bytearray]:
         return self._read_socket(sock, _REG_SNMR)
