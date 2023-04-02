@@ -350,30 +350,30 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         """
         Ethernet hardware's MAC address.
 
-        :return bytearray: Six byte MAC address."""
-        return bytes(self._read(_REG_SHAR, 0x00, 6))
+        :return bytes: Six byte MAC address.
+        """
+        return self._read(_REG_SHAR, 0x00, 6)
 
     @mac_address.setter
     def mac_address(self, address: Tuple[int]) -> None:
         """
         Set the hardware MAC address.
 
-        :param Tuple address: A 6 byte hardware MAC address.
+        :param Tuple[int] address: A 6 byte hardware MAC address.
 
         :raises ValueError: If the MAC address in invalid
         """
-        # Check that the MAC is a valid 6 byte address.
-        if len(address) == 6 and False not in [
-            (isinstance(x, int) and 0 <= x <= 255) for x in address
-        ]:
-            self.write(_REG_SHAR, 0x04, address)
-        else:
+        try:
+            if len(address) != 6:
+                raise ValueError()
+            self.write(_REG_SHAR, 0x04, bytes(address))
+        except ValueError:
+            # pylint: disable=raise-missing-from
             raise ValueError("Invalid MAC address.")
 
+    @staticmethod
     def pretty_mac(
-        self,
-        # pylint: disable=no-self-use, invalid-name
-        mac: bytearray,
+        mac: bytes,
     ) -> str:
         """
         Convert a bytearray MAC address to a ':' seperated string for display.
@@ -381,15 +381,12 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         :param bytearray mac: The MAC address.
 
         :return str: Mac Address in the form 00:00:00:00:00:00
+
+        :raises ValueError: If MAC address is not 6 bytes.
         """
-        return "%s:%s:%s:%s:%s:%s" % (
-            hex(mac[0]),
-            hex(mac[1]),
-            hex(mac[2]),
-            hex(mac[3]),
-            hex(mac[4]),
-            hex(mac[5]),
-        )
+        if len(mac) != 6:
+            raise ValueError("MAC address must be 6 bytes long")
+        return ":".join(str(byte) for byte in mac)
 
     def remote_ip(self, socket_num: int) -> Union[str, bytearray]:
         """
