@@ -1234,7 +1234,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         else:
             # Assume a W5100s
             rcr_reg = _REG_RCR_5100s
-        return self._read(rcr_reg, 0x00)
+        return int.from_bytes(self._read(rcr_reg, 0x00), "big")
 
     @rcr.setter
     def rcr(self, retry_count: int) -> None:
@@ -1255,12 +1255,12 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         else:
             # Assume a W5100s
             reg = _REG_RTR_5100s
-        return self._read(reg, 0x00, 2)
+        return int.from_bytes(self._read(reg, 0x00, 2), "big")
 
     @rtr.setter
     def rtr(self, retry_count: int) -> None:
         if 0 > retry_count > 2**16:
-            raise ValueError("Retry time must be from 0 to {}".format(2**16))
+            raise ValueError("Retry time must be from 0 to 65536")
         if self._chip_type == "w5500":
             reg = _REG_RTR_5500
         else:
