@@ -306,38 +306,44 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         """
         Configured IP address.
 
-        :return bytearray: IP address as four bytes.
+        :return bytes: IP address as four bytes.
         """
         return self._read(_REG_SIPR, 0x00, 4)
 
+    @staticmethod
     def pretty_ip(
-        self,
-        # pylint: disable=no-self-use, invalid-name
-        ip: bytearray,
+        ipv4: bytes,
     ) -> str:
         """
         Convert a 4 byte IP address to a dotted-quad string for printing.
 
-        :param bytearray ip: A four byte IP address.
+        :param bytearray ipv4: A four byte IP address.
 
         :return str: The IP address (a string of the form '255.255.255.255').
-        """
-        return "%d.%d.%d.%d" % (ip[0], ip[1], ip[2], ip[3])
 
+        :raises ValueError: If IP address is not 4 bytes.
+        """
+        if len(ipv4) != 4:
+            raise ValueError("Input bytes object must be 4 bytes long")
+        return ".".join(str(byte) for byte in ipv4)
+
+    @staticmethod
     def unpretty_ip(
-        self,
-        # pylint: disable=no-self-use, invalid-name
-        ip: str,
+        ipv4: str,
     ) -> bytes:
         """
         Convert a dotted-quad string to a four byte IP address.
 
-        :param str ip: IP address (a string of the form '255.255.255.255') to be converted.
+        :param str ipv4: IP address (a string of the form '255.255.255.255') to be converted.
 
         :return bytes: IP address in four bytes.
+
+        :raises ValueError: If IPv4 address is not 4 bytes.
         """
-        octets = [int(x) for x in ip.split(".")]
-        return bytes(octets)
+        octets = bytes([int(x) for x in ipv4.split(".")])
+        if len(octets) == 4:
+            return bytes(octets)
+        raise ValueError("IPv4 address must be 4 bytes.")
 
     @property
     def mac_address(self) -> bytes:
