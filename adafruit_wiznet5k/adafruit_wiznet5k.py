@@ -1130,8 +1130,8 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
     def _write_two_byte_sock_reg(self, sock: int, reg_address: int, data: int) -> None:
         """Write to a two byte socket register."""
-        self._write_socket(sock, reg_address, data >> 8 & 0xFF)
-        self._write_socket(sock, reg_address + 1, data & 0xFF)
+        self._write_socket_register(sock, reg_address, data >> 8 & 0xFF)
+        self._write_socket_register(sock, reg_address + 1, data & 0xFF)
 
     def _read_snrx_rd(self, sock: int) -> int:
         """Read socket n RX Read Data Pointer Register."""
@@ -1160,7 +1160,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
     def write_sndipr(self, sock: int, ip_addr: bytes) -> None:
         """Write to socket destination IP Address."""
         for offset in range(4):
-            self._write_socket(sock, _REG_SNDIPR + offset, ip_addr[offset])
+            self._write_socket_register(sock, _REG_SNDIPR + offset, ip_addr[offset])
 
     def _read_sndipr(self, sock) -> bytes:
         """Read socket destination IP address."""
@@ -1183,11 +1183,11 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
     def write_snmr(self, sock: int, protocol: int) -> None:
         """Write to Socket n Mode Register."""
-        self._write_socket(sock, _REG_SNMR, protocol)
+        self._write_socket_register(sock, _REG_SNMR, protocol)
 
     def write_snir(self, sock: int, data: int) -> None:
         """Write to Socket n Interrupt Register."""
-        self._write_socket(sock, _REG_SNIR, data)
+        self._write_socket_register(sock, _REG_SNIR, data)
 
     def write_sock_port(self, sock: int, port: int) -> None:
         """Write to the socket port number."""
@@ -1195,7 +1195,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
     def write_sncr(self, sock: int, data: int) -> None:
         """Write to socket command register."""
-        self._write_socket(sock, _REG_SNCR, data)
+        self._write_socket_register(sock, _REG_SNCR, data)
 
     def read_sncr(self, sock: int) -> int:
         """Read socket command register."""
@@ -1204,7 +1204,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
     def _read_snmr(self, sock: int) -> int:
         return self._read_socket_register(sock, _REG_SNMR)
 
-    def _write_socket(self, sock: int, address: int, data: int) -> None:
+    def _write_socket_register(self, sock: int, address: int, data: int) -> None:
         """Write to a W5k socket register."""
         if self._chip_type == "w5500":
             cntl_byte = (sock << 5) + 0x0C
