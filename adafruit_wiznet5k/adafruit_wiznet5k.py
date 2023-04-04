@@ -690,10 +690,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             self._debug,
         )
         # initialize a socket and set the mode
-        res = self.socket_open(socket_num, conn_mode=conn_mode)
-        if res == 1:
-            raise ConnectionError("Failed to initialize a connection with the socket.")
-
+        self.socket_open(socket_num, conn_mode=conn_mode)
         # set socket destination IP and port
         self.write_sndipr(socket_num, dest)
         self.write_sndport(socket_num, port)
@@ -794,10 +791,8 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         )
         # Initialize a socket and set the mode
         self.src_port = port
-        res = self.socket_open(socket_num, conn_mode=conn_mode)
+        self.socket_open(socket_num, conn_mode=conn_mode)
         self.src_port = 0
-        if res == 1:
-            raise RuntimeError("Failed to initialize the socket.")
         # Send listen command
         self._send_socket_cmd(socket_num, _CMD_SOCK_LISTEN)
         # Wait until ready
@@ -838,7 +833,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         )
         return next_socknum, (dest_ip, dest_port)
 
-    def socket_open(self, socket_num: int, conn_mode: int = _SNMR_TCP) -> int:
+    def socket_open(self, socket_num: int, conn_mode: int = _SNMR_TCP) -> None:
         """
         Open an IP socket.
 
@@ -847,13 +842,13 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         :param int socket_num: The socket number to open.
         :param int conn_mode: The protocol to use. Use SNMR_TCP for TCP or SNMR_UDP for \
             UDP, defaults to SNMR_TCP.
-        :return int: 1 if the socket was opened, 0 if not.
 
-        :raises ConnectionError: If the Ethernet link is down.
+        :raises ConnectionError: If the Ethernet link is down or no connection to socket.
+        :raises RuntimeError: If unable to open a socket in UDP or TCP mode.
         """
         self._check_link_status()
         debug_msg("*** Opening socket {}".format(socket_num), self._debug)
-        if self.read_snsr(socket_num) in (
+        if self.read_snsr(socket_num) not in (
             SNSR_SOCK_CLOSED,
             SNSR_SOCK_TIME_WAIT,
             SNSR_SOCK_FIN_WAIT,
@@ -861,31 +856,28 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             _SNSR_SOCK_CLOSING,
             _SNSR_SOCK_UDP,
         ):
-            debug_msg(
-                "* Opening W5k Socket, protocol={}".format(conn_mode), self._debug
-            )
-            time.sleep(0.00025)
+            raise ConnectionError("Failed to initialize a connection with the socket.")
+        debug_msg("* Opening W5k Socket, protocol={}".format(conn_mode), self._debug)
+        time.sleep(0.00025)
 
-            self.write_snmr(socket_num, conn_mode)
-            self.write_snir(socket_num, 0xFF)
+        self.write_snmr(socket_num, conn_mode)
+        self.write_snir(socket_num, 0xFF)
 
-            if self.src_port > 0:
-                # write to socket source port
-                self.write_sock_port(socket_num, self.src_port)
-            else:
+        if self.src_port > 0:
+            # write to socket source port
+            self.write_sock_port(socket_num, self.src_port)
+        else:
+            s_port = randint(49152, 65535)
+            while s_port in _SRC_PORTS:
                 s_port = randint(49152, 65535)
-                while s_port in _SRC_PORTS:
-                    s_port = randint(49152, 65535)
-                self.write_sock_port(socket_num, s_port)
-                _SRC_PORTS[socket_num] = s_port
+            self.write_sock_port(socket_num, s_port)
+            _SRC_PORTS[socket_num] = s_port
 
-            # open socket
-            self.write_sncr(socket_num, _CMD_SOCK_OPEN)
-            self.read_sncr(socket_num)
-            if self.read_snsr(socket_num) not in [_SNSR_SOCK_INIT, _SNSR_SOCK_UDP]:
-                raise RuntimeError("Could not open socket in TCP or UDP mode.")
-            return 0
-        return 1
+        # open socket
+        self.write_sncr(socket_num, _CMD_SOCK_OPEN)
+        self.read_sncr(socket_num)
+        if self.read_snsr(socket_num) not in [_SNSR_SOCK_INIT, _SNSR_SOCK_UDP]:
+            raise RuntimeError("Could not open socket in TCP or UDP mode.")
 
     def socket_close(self, socket_num: int) -> None:
         """
