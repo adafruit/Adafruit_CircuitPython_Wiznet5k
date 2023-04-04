@@ -384,21 +384,22 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             raise ValueError("MAC address must be 6 bytes long")
         return ":".join(str(byte) for byte in mac)
 
-    def remote_ip(self, socket_num: int) -> Union[str, bytearray]:
+    def remote_ip(self, socket_num: int) -> str:
         """
         IP address of the host which sent the current incoming packet.
 
         :param int socket_num: ID number of the socket to check.
 
         :return Union[str, bytearray]: A four byte IP address.
+
+        :raises ValueError: If the socket number is greater than the maximum.
         """
-        if socket_num >= self.max_sockets:
-            return self._pbuff
+        self._sock_num_in_range(socket_num)
         for octet in range(4):
             self._pbuff[octet] = self._read_socket_register(
                 socket_num, _REG_SNDIPR + octet
             )
-        return self.pretty_ip(self._pbuff)
+        return self.pretty_ip(self._pbuff[:4])
 
     @property
     def link_status(self) -> int:
@@ -422,8 +423,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
         :return Union[int, bytearray]: The port number of the socket connection.
         """
-        if socket_num >= self.max_sockets:
-            return self._pbuff
+        self._sock_num_in_range(socket_num)
         for octet in range(2):
             self._pbuff[octet] = self._read_socket_register(
                 socket_num, _REG_SNDPORT + octet
@@ -544,6 +544,11 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             return -1
         return 0
 
+    def _sock_num_in_range(self, sock: int) -> None:
+        """Check that the socket number is in the range 0 - maximum sockets."""
+        if not 0 <= sock < self.max_sockets:
+            raise ValueError("Socket number out of range.")
+
     def _read_mr(self) -> int:
         """Read from the Mode Register (MR)."""
         register = self._read(_REG_MR, 0x00)
@@ -628,8 +633,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             ),
             self._debug,
         )
-        if socket_num > self.max_sockets:
-            raise ValueError("Provided socket exceeds max_sockets.")
+        self._sock_num_in_range(socket_num)
 
         res = self._get_rx_rcv_size(socket_num)
 
@@ -940,8 +944,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         # pylint: disable=too-many-branches
         if not self.link_status:
             raise ConnectionError("Ethernet cable disconnected!")
-        if socket_num > self.max_sockets:
-            raise ValueError("Provided socket exceeds max_sockets.")
+        self._sock_num_in_range(socket_num)
 
         # Check if there is data available on the socket
         ret = self._get_rx_rcv_size(socket_num)
@@ -1030,8 +1033,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         # pylint: disable=too-many-branches
         if not self.link_status:
             raise ConnectionError("Ethernet cable disconnected!")
-        if socket_num > self.max_sockets:
-            raise ValueError("Provided socket exceeds max_sockets.")
+        self._sock_num_in_range(socket_num)
         if len(buffer) > _SOCK_SIZE:
             ret = _SOCK_SIZE
         else:
