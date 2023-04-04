@@ -375,7 +375,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         """
         if len(mac) != 6:
             raise ValueError("MAC address must be 6 bytes long")
-        return ":".join(str(byte) for byte in mac)
+        return ":".join(f"{byte:02x}" for byte in mac)
 
     def remote_ip(self, socket_num: int) -> str:
         """
