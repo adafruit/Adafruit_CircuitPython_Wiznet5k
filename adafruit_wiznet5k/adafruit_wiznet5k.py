@@ -14,7 +14,7 @@
 Pure-Python interface for WIZNET 5k ethernet modules.
 
 * Author(s): WIZnet, Arduino LLC, Bjoern Hartmann, Paul Stoffregen, Brent Rubell,
-  Patrick Van Oosterwijck
+  Patrick Van Oosterwijck, Martin Stephens
 
 Implementation Notes
 --------------------
@@ -1122,11 +1122,15 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
                 val = self._read_sntx_fsr(sock)
         return val
 
+    def _read_two_byte_sock_reg(self, sock: int, reg_address: int) -> int:
+        """Read a two byte socket register."""
+        register = self._read_socket_register(sock, reg_address) << 8
+        register += self._read_socket_register(sock, reg_address + 1)
+        return register
+
     def _read_snrx_rd(self, sock: int) -> int:
         """Read socket n RX Read Data Pointer Register."""
-        register = self._read_socket_register(sock, _REG_SNRX_RD) << 8
-        register += self._read_socket_register(sock, _REG_SNRX_RD + 1)
-        return register
+        return self._read_two_byte_sock_reg(sock, _REG_SNRX_RD)
 
     def _write_snrx_rd(self, sock: int, data: int) -> None:
         """Write socket n RX Read Data Pointer Register."""
@@ -1140,21 +1144,15 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
     def _read_sntx_wr(self, sock: int) -> int:
         """Read the socket write buffer pointer for socket `sock`."""
-        register = self._read_socket_register(sock, 0x0024) << 8
-        register += self._read_socket_register(sock, 0x0025)
-        return register
+        return self._read_two_byte_sock_reg(sock, _REG_SNTX_WR)
 
     def _read_sntx_fsr(self, sock: int) -> int:
         """Read socket n TX Free Size Register"""
-        register = self._read_socket_register(sock, _REG_SNTX_FSR) << 8
-        register += self._read_socket_register(sock, _REG_SNTX_FSR + 1)
-        return register
+        return self._read_two_byte_sock_reg(sock, _REG_SNTX_FSR)
 
     def _read_snrx_rsr(self, sock: int) -> int:
         """Read socket n Received Size Register"""
-        register = self._read_socket_register(sock, _REG_SNRX_RSR) << 8
-        register += self._read_socket_register(sock, _REG_SNRX_RSR + 1)
-        return register
+        return self._read_two_byte_sock_reg(sock, _REG_SNRX_RSR)
 
     def write_sndipr(self, sock: int, ip_addr: bytes) -> None:
         """Write to socket destination IP Address."""
