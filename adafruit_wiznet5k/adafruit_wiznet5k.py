@@ -406,20 +406,18 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             address = _REG_PHYCFGR_W5100S
         return bool(int.from_bytes(self._read(address, 0x00), "big") & 0x01)
 
-    def remote_port(self, socket_num: int) -> Union[int, bytearray]:
+    def remote_port(self, socket_num: int) -> int:
         """
         Port of the host which sent the current incoming packet.
 
         :param int socket_num: ID number of the socket to check.
 
-        :return Union[int, bytearray]: The port number of the socket connection.
+        :return int: The port number of the socket connection.
+
+        :raises ValueError: If the socket number is out of range.
         """
         self._sock_num_in_range(socket_num)
-        for octet in range(2):
-            self._pbuff[octet] = self._read_socket_register(
-                socket_num, _REG_SNDPORT + octet
-            )
-        return int((self._pbuff[0] << 8) | self._pbuff[0])
+        return self._read_two_byte_sock_reg(socket_num, _REG_SNDPORT)
 
     @property
     def ifconfig(
