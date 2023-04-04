@@ -211,26 +211,20 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         self.udp_from_ip = [b"\x00\x00\x00\x00"] * self.max_sockets
         self.udp_from_port = [0] * self.max_sockets
 
-        # First, wait link status is on
-        # to avoid the code during DHCP, socket listen, connect ...
-        # assert self.link_status, "Ethernet cable disconnected!"
-        start_time = time.monotonic()
-        while True:
-            if self.link_status or ((time.monotonic() - start_time) > 5):
+        # Wait to give the Ethernet link to initialise.
+        stop_time = time.monotonic() + 5
+        while time.monotonic() < stop_time:
+            if self.link_status:
                 break
-            time.sleep(1)
-            debug_msg("My Link is: {}".format(self.link_status), self._debug)
+            debug_msg("Ethernet link is down…", self._debug)
+            time.sleep(0.5)
         self._dhcp_client = None
 
         # Set DHCP
         if is_dhcp:
-            ret = self.set_dhcp(hostname)
-            if ret != 0:
-                self._dhcp_client = None
-            if ret != 0:
-                raise RuntimeError("Failed to configure DHCP Server!")
+            self.set_dhcp(hostname)
 
-    def set_dhcp(self, hostname: Optional[str] = None) -> int:
+    def set_dhcp(self, hostname: Optional[str] = None) -> None:
         """
         Initialize the DHCP client and attempt to retrieve and set network
         configuration from the DHCP server.
@@ -238,20 +232,19 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         :param Optional[str] hostname: The desired hostname for the DHCP server with
             optional {} to fill in the MAC address, defaults to None.
 
-        :return int: 0 if DHCP configured, -1 otherwise.
+        :raises RuntimeError: If DHCP lease cannot be established.
         """
         debug_msg("* Initializing DHCP", self._debug)
-        # Return IP assigned by DHCP
         self._dhcp_client = dhcp.DHCP(self, self.mac_address, hostname, self._debug)
-        ret = self._dhcp_client.request_dhcp_lease()
-        if ret == 1:
+        if self._dhcp_client.request_dhcp_lease():
             debug_msg(
                 "Found DHCP Server:\nIP: {}\n  Subnet Mask: {}\n  GW Addr: {}"
                 "\n  DNS Server: {}".format(*self.ifconfig),
                 self._debug,
             )
-            return 0
-        return -1
+        else:
+            self._dhcp_client = None
+            raise RuntimeError("Failed to configure DHCP Server!")
 
     def maintain_dhcp_lease(self) -> None:
         """Maintain the DHCP lease."""
