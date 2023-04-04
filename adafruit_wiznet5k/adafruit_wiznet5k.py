@@ -1128,19 +1128,22 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         register += self._read_socket_register(sock, reg_address + 1)
         return register
 
+    def _write_two_byte_sock_reg(self, sock: int, reg_address: int, data: int) -> None:
+        """Write to a two byte socket register."""
+        self._write_socket(sock, reg_address, data >> 8 & 0xFF)
+        self._write_socket(sock, reg_address + 1, data & 0xFF)
+
     def _read_snrx_rd(self, sock: int) -> int:
         """Read socket n RX Read Data Pointer Register."""
         return self._read_two_byte_sock_reg(sock, _REG_SNRX_RD)
 
     def _write_snrx_rd(self, sock: int, data: int) -> None:
         """Write socket n RX Read Data Pointer Register."""
-        self._write_socket(sock, _REG_SNRX_RD, data >> 8 & 0xFF)
-        self._write_socket(sock, _REG_SNRX_RD + 1, data & 0xFF)
+        self._write_two_byte_sock_reg(sock, _REG_SNRX_RD, data)
 
     def _write_sntx_wr(self, sock: int, data: int) -> None:
         """Write the socket write buffer pointer for socket `sock`."""
-        self._write_socket(sock, _REG_SNTX_WR, data >> 8 & 0xFF)
-        self._write_socket(sock, _REG_SNTX_WR + 1, data & 0xFF)
+        self._write_two_byte_sock_reg(sock, _REG_SNTX_WR, data)
 
     def _read_sntx_wr(self, sock: int) -> int:
         """Read the socket write buffer pointer for socket `sock`."""
@@ -1168,8 +1171,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
     def write_sndport(self, sock: int, port: int) -> None:
         """Write to socket destination port."""
-        self._write_socket(sock, _REG_SNDPORT, port >> 8)
-        self._write_socket(sock, _REG_SNDPORT + 1, port & 0xFF)
+        self._write_two_byte_sock_reg(sock, _REG_SNDPORT, port)
 
     def read_snsr(self, sock: int) -> int:
         """Read Socket n Status Register."""
@@ -1189,8 +1191,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
     def write_sock_port(self, sock: int, port: int) -> None:
         """Write to the socket port number."""
-        self._write_socket(sock, _REG_SNPORT, port >> 8)
-        self._write_socket(sock, _REG_SNPORT + 1, port & 0xFF)
+        self._write_two_byte_sock_reg(sock, _REG_SNPORT, port)
 
     def write_sncr(self, sock: int, data: int) -> None:
         """Write to socket command register."""
