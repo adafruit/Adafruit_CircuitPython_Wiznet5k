@@ -640,7 +640,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
                 return self.udp_datasize[socket_num]
             # parse the udp rx packet
             # read the first 8 header bytes
-            ret, self._pbuff = self.socket_read(socket_num, 8)
+            ret, self._pbuff[:8] = self.socket_read(socket_num, 8)
             if ret > 0:
                 self.udp_from_ip[socket_num] = self._pbuff[:4]
                 self.udp_from_port[socket_num] = (self._pbuff[4] << 8) + self._pbuff[5]
