@@ -545,8 +545,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
     def _read_mr(self) -> int:
         """Read from the Mode Register (MR)."""
-        register = self._read(_REG_MR, 0x00)
-        return int.from_bytes(register, "big")
+        return int.from_bytes(self._read(_REG_MR, 0x00), "big")
 
     def _write_mr(self, data: int) -> None:
         """Write to the mode register (MR)."""
