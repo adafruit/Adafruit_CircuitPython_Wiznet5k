@@ -395,18 +395,16 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         return self.pretty_ip(self._pbuff[:4])
 
     @property
-    def link_status(self) -> int:
+    def link_status(self) -> bool:
         """Physical hardware (PHY) connection status.
 
-        :return int: 1 if the link is up, 0 if the link is down.
+        :return bool: True if the link is up, False if the link is down.
         """
         if self._chip_type == "w5500":
-            data = self._read(_REG_PHYCFGR, 0x00)
-            return data[0] & 0x01
+            address = _REG_PHYCFGR
         if self._chip_type == "w5100s":
-            data = self._read(_REG_PHYCFGR_W5100S, 0x00)
-            return data[0] & 0x01
-        return 0
+            address = _REG_PHYCFGR_W5100S
+        return bool(int.from_bytes(self._read(address, 0x00), "big") & 0x01)
 
     def remote_port(self, socket_num: int) -> Union[int, bytearray]:
         """
@@ -541,6 +539,11 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         """Check that the socket number is in the range 0 - maximum sockets."""
         if not 0 <= sock < self.max_sockets:
             raise ValueError("Socket number out of range.")
+
+    def _check_link_status(self):
+        """Raise an exception if the link is down."""
+        if not self.link_status:
+            raise ConnectionError("The Ethernet connection is down.")
 
     def _read_mr(self) -> int:
         """Read from the Mode Register (MR)."""
@@ -678,9 +681,11 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         :param int port: Port to connect to (0 - 65,536).
         :param int conn_mode: The connection mode. Use SNMR_TCP for TCP or SNMR_UDP for UDP,
             defaults to SNMR_TCP.
+
+        :raises ConnectionError: If the Ethernet link is down or unable to connect to a
+            hardware socket.
         """
-        if not self.link_status:
-            raise ConnectionError("Ethernet cable disconnected!")
+        self._check_link_status()
         debug_msg(
             "W5K socket connect, protocol={}, port={}, ip={}".format(
                 conn_mode, port, self.pretty_ip(dest)
@@ -779,9 +784,11 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         :param int port: Port to listen on (0 - 65,535).
         :param int conn_mode: Connection mode SNMR_TCP for TCP or SNMR_UDP for
             UDP, defaults to SNMR_TCP.
+
+        :raises ConnectionError: If the Ethernet link is down.
+        :raises RuntimeError: If unable to connect to a hardware socket.
         """
-        if not self.link_status:
-            raise ConnectionError("Ethernet cable disconnected!")
+        self._check_link_status()
         debug_msg(
             "* Listening on port={}, ip={}".format(
                 port, self.pretty_ip(self.ip_address)
@@ -844,9 +851,10 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         :param int conn_mode: The protocol to use. Use SNMR_TCP for TCP or SNMR_UDP for \
             UDP, defaults to SNMR_TCP.
         :return int: 1 if the socket was opened, 0 if not.
+
+        :raises ConnectionError: If the Ethernet link is down.
         """
-        if not self.link_status:
-            raise ConnectionError("Ethernet cable disconnected!")
+        self._check_link_status()
         debug_msg("*** Opening socket {}".format(socket_num), self._debug)
         if self.read_snsr(socket_num) in (
             SNSR_SOCK_CLOSED,
@@ -933,10 +941,11 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             item of the tuple is the length of the data and the second is the data. If the read
             was unsuccessful then both items equal an error code, 0 for no data waiting and -1
             for no connection to the socket.
+
+        :raises ConnectionError: If the Ethernet link is down.
         """
         # pylint: disable=too-many-branches
-        if not self.link_status:
-            raise ConnectionError("Ethernet cable disconnected!")
+        self._check_link_status()
         self._sock_num_in_range(socket_num)
 
         # Check if there is data available on the socket
@@ -1022,10 +1031,12 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             indefinitely.
 
         :return int: The number of bytes written to the buffer.
+
+        :raises ConnectionError: If the Ethernet link is down.
+        :raises ValueError: If the socket number is out of range
         """
         # pylint: disable=too-many-branches
-        if not self.link_status:
-            raise ConnectionError("Ethernet cable disconnected!")
+        self._check_link_status()
         self._sock_num_in_range(socket_num)
         if len(buffer) > _SOCK_SIZE:
             ret = _SOCK_SIZE
