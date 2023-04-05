@@ -1009,6 +1009,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         :raises ValueError: If the socket number is out of range.
         :raises RuntimeError: If the data cannot be sent.
         """
+        # pylint: disable=too-many-branches
         self._check_link_status()
         self._sock_num_in_range(socket_num)
         if len(buffer) > _SOCK_SIZE:
@@ -1061,11 +1062,16 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
                 SNSR_SOCK_CLOSE_WAIT,
                 _SNSR_SOCK_CLOSING,
             ):
-                raise RuntimeError("Socket closed before data was sent.")
+                raise RuntimeError("No data was sent, socket was closed.")
             if timeout and time.monotonic() > stop_time:
                 raise RuntimeError("Operation timed out. No data sent.")
             if self.read_snir(socket_num) & SNIR_TIMEOUT:
-                raise RuntimeError("Hardware timeout. No data sent.")
+                self.write_snir(socket_num, SNIR_TIMEOUT)
+                # TCP sockets are closed by the hardware timeout
+                # so that will be caught at the while statement.
+                # UDP sockets are 1:many so not closed thus return 0.
+                if self._read_snmr(socket_num) == SNMR_UDP:
+                    return 0
             time.sleep(0.001)
         self.write_snir(socket_num, _SNIR_SEND_OK)
         return bytes_to_write
