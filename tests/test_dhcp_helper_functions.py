@@ -419,7 +419,6 @@ class TestSmallHelperFunctions:
         mock_wiznet5k.write_snmr.assert_called_once_with(2, 0x02)
         mock_wiznet5k.write_sock_port(2, 68)
         mock_wiznet5k.write_sncr(2, 0x01)
-        mock_wiznet5k.read_sncr.assert_called_with(2)
         mock_wiznet5k.write_sndport.assert_called_once_with(
             2, wiz_dhcp._DHCP_SERVER_PORT
         )

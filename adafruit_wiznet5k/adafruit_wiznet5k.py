@@ -712,8 +712,6 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
     def _send_socket_cmd(self, socket: int, cmd: int) -> None:
         """Send a socket command to a socket."""
         self.write_sncr(socket, cmd)
-        while self.read_sncr(socket):
-            debug_msg("waiting for SNCR to clear...", self._debug)
 
     def get_socket(self, *, reserve_socket=False) -> int:
         """
@@ -875,7 +873,6 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
         # open socket
         self.write_sncr(socket_num, _CMD_SOCK_OPEN)
-        self.read_sncr(socket_num)
         if self.read_snsr(socket_num) not in [_SNSR_SOCK_INIT, _SNSR_SOCK_UDP]:
             raise RuntimeError("Could not open socket in TCP or UDP mode.")
 
@@ -886,17 +883,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         :param int socket_num: The socket to close.
         """
         debug_msg("*** Closing socket {}".format(socket_num), self._debug)
-        timeout = time.monotonic() + 5.0
         self.write_sncr(socket_num, _CMD_SOCK_CLOSE)
-        debug_msg("  Waiting for close command to process…", self._debug)
-        while self.read_sncr(socket_num):
-            if time.monotonic() < timeout:
-                raise RuntimeError(
-                    "Wiznet5k failed to complete command, status = {}.".format(
-                        self.read_sncr(socket_num)
-                    )
-                )
-            time.sleep(0.0001)
         debug_msg("  Waiting for socket to close…", self._debug)
         timeout = time.monotonic() + 5.0
         while self.read_snsr(socket_num) != SNSR_SOCK_CLOSED:
@@ -917,7 +904,6 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         """
         debug_msg("*** Disconnecting socket {}".format(socket_num), self._debug)
         self.write_sncr(socket_num, _CMD_SOCK_DISCON)
-        self.read_sncr(socket_num)
 
     def socket_read(self, socket_num: int, length: int) -> Tuple[int, bytes]:
         """
@@ -982,8 +968,6 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
             # Notify the W5k of the updated Sn_Rx_RD
             self.write_sncr(socket_num, _CMD_SOCK_RECV)
-            while self.read_sncr(socket_num) & _CMD_SOCK_RECV:
-                time.sleep(0.0001)
         return ret, resp
 
     def read_udp(self, socket_num: int, length: int) -> Tuple[int, bytes]:
@@ -1073,8 +1057,6 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         ptr = (ptr + ret) & 0xFFFF
         self._write_sntx_wr(socket_num, ptr)
         self.write_sncr(socket_num, _CMD_SOCK_SEND)
-        while self.read_sncr(socket_num):
-            time.sleep(0.001)
 
         # check data was  transferred correctly
         while not self.read_snir(socket_num) & _SNIR_SEND_OK:
@@ -1191,10 +1173,9 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
     def write_sncr(self, sock: int, data: int) -> None:
         """Write to socket command register."""
         self._write_socket_register(sock, _REG_SNCR, data)
-
-    def read_sncr(self, sock: int) -> int:
-        """Read socket command register."""
-        return self._read_socket_register(sock, _REG_SNCR)
+        # Wait for command to complete before continuing.
+        while self._read_socket_register(sock, _REG_SNCR):
+            pass
 
     def _read_snmr(self, sock: int) -> int:
         return self._read_socket_register(sock, _REG_SNMR)
