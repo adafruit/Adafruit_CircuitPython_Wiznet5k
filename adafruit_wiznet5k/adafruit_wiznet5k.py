@@ -281,9 +281,8 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         """
         if self._chip_type == "w5500":
             return _W5200_W5500_MAX_SOCK_NUM
-        if self._chip_type == "w5100s":
-            return _W5100_MAX_SOCK_NUM
-        return -1
+        # Assume a W5100s
+        return _W5100_MAX_SOCK_NUM
 
     @property
     def chip(self) -> str:
@@ -402,7 +401,8 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         """
         if self._chip_type == "w5500":
             address = _REG_PHYCFGR
-        if self._chip_type == "w5100s":
+        else:
+            # Assume a W5100s
             address = _REG_PHYCFGR_W5100S
         return bool(int.from_bytes(self._read(address, 0x00), "big") & 0x01)
 
@@ -572,7 +572,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
                 bus_device.write(bytes([addr & 0xFF]))  # pylint: disable=no-member
                 bus_device.write(bytes([callback]))  # pylint: disable=no-member
             else:
-                # if self._chip_type == "w5100s":
+                # Assume a W5100s
                 bus_device.write(bytes([0x0F]))  # pylint: disable=no-member
                 bus_device.write(bytes([addr >> 8]))  # pylint: disable=no-member
                 bus_device.write(bytes([addr & 0xFF]))  # pylint: disable=no-member
@@ -597,7 +597,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
                 bus_device.write(bytes([addr & 0xFF]))  # pylint: disable=no-member
                 bus_device.write(bytes([callback]))  # pylint: disable=no-member
             else:
-                # if self._chip_type == "w5100s":
+                # Assume a W5100s
                 bus_device.write(bytes([0xF0]))  # pylint: disable=no-member
                 bus_device.write(bytes([addr >> 8]))  # pylint: disable=no-member
                 bus_device.write(bytes([addr & 0xFF]))  # pylint: disable=no-member
@@ -948,7 +948,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
                 resp = self._read(ptr, ctrl_byte, ret)
             else:
-                # Chip assumed to be 5100s.
+                # Assume a W5100s
                 offset = ptr & _SOCK_MASK
                 src_addr = offset + (socket_num * _SOCK_SIZE + 0x6000)
                 if offset + ret > _SOCK_SIZE:
@@ -1037,7 +1037,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             self.write(dst_addr, cntl_byte, buffer[:bytes_to_write])
 
         else:
-            # if self._chip_type == "w5100s":
+            # Assume a W5100s
             dst_addr = offset + (socket_num * _SOCK_SIZE + 0x4000)
 
             if offset + bytes_to_write > _SOCK_SIZE:
@@ -1183,7 +1183,8 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         if self._chip_type == "w5500":
             cntl_byte = (sock << 5) + 0x0C
             self.write(address, cntl_byte, data)
-        if self._chip_type == "w5100s":
+        else:
+            # Assume a W5100s
             cntl_byte = 0
             self.write(self._ch_base_msb + sock * _CH_SIZE + address, cntl_byte, data)
 
@@ -1192,7 +1193,8 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         if self._chip_type == "w5500":
             cntl_byte = (sock << 5) + 0x08
             register = self._read(address, cntl_byte)
-        if self._chip_type == "w5100s":
+        else:
+            # Assume a W5100s
             cntl_byte = 0
             register = self._read(
                 self._ch_base_msb + sock * _CH_SIZE + address, cntl_byte
