@@ -449,7 +449,8 @@ class socket:
 
         :return int: Number of bytes sent.
         """
-        bytes_sent = _the_interface.socket_write(self._socknum, data, self._timeout)
+        timeout = 0 if self._timeout is None else self._timeout
+        bytes_sent = _the_interface.socket_write(self._socknum, data, timeout)
         gc.collect()
         return bytes_sent
 
