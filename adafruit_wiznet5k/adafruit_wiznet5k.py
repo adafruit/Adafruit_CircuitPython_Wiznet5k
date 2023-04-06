@@ -976,16 +976,18 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             item of the tuple is the length of the data and the second is the data.
             If the read was unsuccessful then (0, b"") is returned.
         """
+        bytes_on_socket, bytes_read = 0, b""
         if self.udp_datasize[socket_num] > 0:
             if self.udp_datasize[socket_num] <= length:
-                ret, resp = self.socket_read(socket_num, self.udp_datasize[socket_num])
+                bytes_on_socket, bytes_read = self.socket_read(
+                    socket_num, self.udp_datasize[socket_num]
+                )
             else:
-                ret, resp = self.socket_read(socket_num, length)
+                bytes_on_socket, bytes_read = self.socket_read(socket_num, length)
                 # just consume the rest, it is lost to the higher layers
                 self.socket_read(socket_num, self.udp_datasize[socket_num] - length)
             self.udp_datasize[socket_num] = 0
-            return ret, resp
-        return 0, b""
+        return bytes_on_socket, bytes_read
 
     def socket_write(
         self, socket_num: int, buffer: bytearray, timeout: float = 0.0
