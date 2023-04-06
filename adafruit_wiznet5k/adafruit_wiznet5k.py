@@ -903,68 +903,67 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
     def socket_read(self, socket_num: int, length: int) -> Tuple[int, bytes]:
         """
-        Read data from a TCP socket.
+        Read data from a hardware socket. Called directly by TCP socket objects and via
+        read_udp() for UDP socket objects.
 
         :param int socket_num: The socket to read data from.
         :param int length: The number of bytes to read from the socket.
 
-        :return Tuple[int, Union[int, bytearray]]: If the read was successful then the first
-            item of the tuple is the length of the data and the second is the data. If the read
-            was unsuccessful then both items equal an error code, 0 for no data waiting and -1
-            for no connection to the socket.
+        :return Tuple[int, bytes]: If the read was successful then the first
+            item of the tuple is the length of the data and the second is the data.
+            If the read was unsuccessful then 0, b"" is returned.
 
         :raises ConnectionError: If the Ethernet link is down.
+        :raises RuntimeError: If the socket connection has been lost.
         """
-        # pylint: disable=too-many-branches
         self._check_link_status()
         self._sock_num_in_range(socket_num)
 
         # Check if there is data available on the socket
-        ret = self._get_rx_rcv_size(socket_num)
-        debug_msg("Bytes avail. on sock: {}".format(ret), self._debug)
-        if ret == 0:
-            # no data on socket?
-            status = self._read_snmr(socket_num)
-            if status in (SNSR_SOCK_LISTEN, SNSR_SOCK_CLOSED, SNSR_SOCK_CLOSE_WAIT):
-                # remote end closed its side of the connection, EOF state
-                raise RuntimeError("Lost connection to peer.")
-                # connection is alive, no data waiting to be read
-            ret = -1
-        elif ret > length:
-            # set ret to the length of buffer
-            ret = length
-        if ret > 0:
-            debug_msg("* Processing {} bytes of data".format(ret), self._debug)
+        bytes_on_socket = self._get_rx_rcv_size(socket_num)
+        debug_msg("Bytes avail. on sock: {}".format(bytes_on_socket), self._debug)
+        if bytes_on_socket:
+            bytes_on_socket = length if bytes_on_socket > length else bytes_on_socket
+            debug_msg(
+                "* Processing {} bytes of data".format(bytes_on_socket), self._debug
+            )
             # Read the starting save address of the received data
-            ptr = self._read_snrx_rd(socket_num)
+            pointer = self._read_snrx_rd(socket_num)
 
             if self._chip_type == "w5500":
                 # Read data from the starting address of snrx_rd
                 ctrl_byte = 0x18 + (socket_num << 5)
-
-                resp = self._read(ptr, ctrl_byte, ret)
+                bytes_read = self._read(pointer, ctrl_byte, bytes_on_socket)
             else:
                 # Assume a W5100s
-                offset = ptr & _SOCK_MASK
+                offset = pointer & _SOCK_MASK
                 src_addr = offset + (socket_num * _SOCK_SIZE + 0x6000)
-                if offset + ret > _SOCK_SIZE:
-                    size = _SOCK_SIZE - offset
-                    resp1 = self._read(src_addr, 0x00, size)
-                    size = ret - size
+                if offset + bytes_on_socket > _SOCK_SIZE:
+                    split_point = _SOCK_SIZE - offset
+                    bytes_read = self._read(src_addr, 0x00, split_point)
+                    split_point = bytes_on_socket - split_point
                     src_addr = socket_num * _SOCK_SIZE + 0x6000
-                    resp2 = self._read(src_addr, 0x00, size)
-                    resp = resp1 + resp2
+                    bytes_read += self._read(src_addr, 0x00, split_point)
                 else:
-                    resp = self._read(src_addr, 0x00, ret)
+                    bytes_read = self._read(src_addr, 0x00, bytes_on_socket)
 
-            #  After reading the received data, update Sn_RX_RD to the increased
+            # After reading the received data, update Sn_RX_RD to the increased
             # value as many as the reading size.
-            ptr = (ptr + ret) & 0xFFFF
-            self._write_snrx_rd(socket_num, ptr)
+            pointer = (pointer + bytes_on_socket) & 0xFFFF
+            self._write_snrx_rd(socket_num, pointer)
 
             # Notify the W5k of the updated Sn_Rx_RD
             self.write_sncr(socket_num, _CMD_SOCK_RECV)
-        return ret, resp
+        else:
+            # no data on socket
+            if self._read_snmr(socket_num) in (
+                SNSR_SOCK_LISTEN,
+                SNSR_SOCK_CLOSED,
+                SNSR_SOCK_CLOSE_WAIT,
+            ):
+                raise RuntimeError("Lost connection to peer.")
+            bytes_read = b""
+        return bytes_on_socket, bytes_read
 
     def read_udp(self, socket_num: int, length: int) -> Tuple[int, bytes]:
         """
