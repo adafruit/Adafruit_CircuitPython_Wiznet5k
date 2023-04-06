@@ -137,10 +137,7 @@ _DEFAULT_MAC = (0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED)
 # Maximum number of sockets to support, differs between chip versions.
 _W5200_W5500_MAX_SOCK_NUM = const(0x08)
 _W5100_MAX_SOCK_NUM = const(0x04)
-_SOCKET_INVALID = const(255)
-
-# Source ports in use
-_SRC_PORTS = [0] * _W5200_W5500_MAX_SOCK_NUM
+_SOCKET_INVALID = const(0xFF)
 
 
 class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-attributes
@@ -197,10 +194,13 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             raise RuntimeError("Failed to initialize WIZnet module.")
         if self._chip_type == "w5100s":
             WIZNET5K._sockets_reserved = [False] * (_W5100_MAX_SOCK_NUM - 1)
+            max_ports = _W5100_MAX_SOCK_NUM
         elif self._chip_type == "w5500":
             WIZNET5K._sockets_reserved = [False] * (_W5200_W5500_MAX_SOCK_NUM - 1)
+            max_ports = _W5200_W5500_MAX_SOCK_NUM
         else:
             raise RuntimeError("Unrecognized chip type.")
+        self._src_ports_in_use = [0] * max_ports
 
         # Set MAC address
         self.mac_address = mac
@@ -866,10 +866,10 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             self.write_sock_port(socket_num, self.src_port)
         else:
             s_port = randint(49152, 65535)
-            while s_port in _SRC_PORTS:
+            while s_port in self._src_ports_in_use:
                 s_port = randint(49152, 65535)
             self.write_sock_port(socket_num, s_port)
-            _SRC_PORTS[socket_num] = s_port
+            self._src_ports_in_use[socket_num] = s_port
 
         # open socket
         self.write_sncr(socket_num, _CMD_SOCK_OPEN)
