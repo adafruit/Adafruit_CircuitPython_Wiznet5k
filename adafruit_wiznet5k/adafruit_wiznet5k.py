@@ -694,7 +694,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         # set socket destination IP and port
         self.write_sndipr(socket_num, dest)
         self.write_sndport(socket_num, port)
-        self._send_socket_cmd(socket_num, _CMD_SOCK_CONNECT)
+        self.write_sncr(socket_num, _CMD_SOCK_CONNECT)
 
         if conn_mode == _SNMR_TCP:
             # wait for tcp connection establishment
@@ -708,10 +708,6 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         elif conn_mode == SNMR_UDP:
             self.udp_datasize[socket_num] = 0
         return 1
-
-    def _send_socket_cmd(self, socket: int, cmd: int) -> None:
-        """Send a socket command to a socket."""
-        self.write_sncr(socket, cmd)
 
     def get_socket(self, *, reserve_socket=False) -> int:
         """
@@ -792,7 +788,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         self.socket_open(socket_num, conn_mode=conn_mode)
         self.src_port = 0
         # Send listen command
-        self._send_socket_cmd(socket_num, _CMD_SOCK_LISTEN)
+        self.write_sncr(socket_num, _CMD_SOCK_LISTEN)
         # Wait until ready
         status = SNSR_SOCK_CLOSED
         while status not in (
