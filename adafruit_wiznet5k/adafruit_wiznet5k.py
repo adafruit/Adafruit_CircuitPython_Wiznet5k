@@ -201,7 +201,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         # Set MAC address
         self.mac_address = mac
         self.src_port = 0
-        self._dns = (0, 0, 0, 0)
+        self._dns = b"\x00\x00\x00\x00"
         # udp related
         self.udp_datasize = [0] * self.max_sockets
         self.udp_from_ip = [b"\x00\x00\x00\x00"] * self.max_sockets
@@ -418,7 +418,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
     @property
     def ifconfig(
         self,
-    ) -> Tuple[bytes, bytes, bytes, Tuple[int, int, int, int]]:
+    ) -> Tuple[bytes, bytes, bytes, bytes]:
         """
         Network configuration information.
 
@@ -433,21 +433,21 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
     @ifconfig.setter
     def ifconfig(
-        self, params: Tuple[bytearray, bytearray, bytearray, Tuple[int, int, int, int]]
+        self, params: Tuple[Union[bytes, bytearray, Tuple[int, ...]], ...]
     ) -> None:
         """
         Set network configuration.
 
-        :param Tuple[bytearray, bytearray, bytearray, Tuple[int, int, int, int]]:
-            Configuration settings - (ip_address, subnet_mask, gateway_address, dns_server).
+        :param Tuple[Union[bytes, bytearray, Tuple[int, ...]], ...]: Configuration settings
+           - (ip_address, subnet_mask, gateway_address, dns_server).
         """
         ip_address, subnet_mask, gateway_address, dns_server = params
 
-        self._write(_REG_SIPR, 0x04, ip_address)
-        self._write(_REG_SUBR, 0x04, subnet_mask)
-        self._write(_REG_GAR, 0x04, gateway_address)
+        self._write(_REG_SIPR, 0x04, bytes(ip_address))
+        self._write(_REG_SUBR, 0x04, bytes(subnet_mask))
+        self._write(_REG_GAR, 0x04, bytes(gateway_address))
 
-        self._dns = dns_server
+        self._dns = bytes(dns_server)
 
     def _w5xxx_init(self) -> None:
         """
