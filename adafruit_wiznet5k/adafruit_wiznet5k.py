@@ -31,7 +31,7 @@ Implementation Notes
 from __future__ import annotations
 
 try:
-    from typing import TYPE_CHECKING, Optional, Union, List, Tuple, Sequence
+    from typing import TYPE_CHECKING, Optional, Union, List, Tuple
 
     if TYPE_CHECKING:
         from circuitpython_typing import WriteableBuffer
@@ -572,32 +572,33 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             bus_device.readinto(self._rxbuf)
             return bytes(self._rxbuf)
 
-    def _write(
-        self, addr: int, callback: int, data: Union[int, Sequence[Union[int, bytes]]]
-    ) -> None:
+    def _write(self, addr: int, callback: int, data: Union[int, bytes]) -> None:
         """
         Write data to a register address.
 
         :param int addr: Destination address.
         :param int callback: Callback reference.
-        :param Union[int, Sequence[Union[int, bytes]]] data: Data to write to the register address.
+        :param Union[int, bytes] data: Data to write to the register address, if data
+            is an integer, it must be 1 or 2 bytes.
         """
         with self._device as bus_device:
             if self._chip_type == "w5500":
-                bus_device.write(bytes([addr >> 8]))
-                bus_device.write(bytes([addr & 0xFF]))
-                bus_device.write(bytes([callback]))
+                bus_device.write((addr >> 8).to_bytes(1, "big"))
+                bus_device.write((addr & 0xFF).to_bytes(1, "big"))
+                bus_device.write(callback.to_bytes(1, "big"))
             else:
                 # Assume a W5100s
-                bus_device.write(bytes([0xF0]))
-                bus_device.write(bytes([addr >> 8]))
-                bus_device.write(bytes([addr & 0xFF]))
+                bus_device.write((0xF0).to_bytes(1, "big"))
+                bus_device.write((addr >> 8).to_bytes(1, "big"))
+                bus_device.write((addr & 0xFF).to_bytes(1, "big"))
 
-            if hasattr(data, "from_bytes"):
-                bus_device.write(bytes([data]))
-            else:
-                for data_comp in data:
-                    bus_device.write(bytes([data_comp]))
+            try:
+                data = data.to_bytes(1, "big")
+            except OverflowError:
+                data = data.to_bytes(2, "big")
+            except AttributeError:
+                pass
+            bus_device.write(data)
 
     # Socket-Register API
 
