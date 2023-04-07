@@ -463,7 +463,6 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
             :return bool: True if a W5500 chip is detected, False if not.
             """
-            print("init 5500")
             self._write_mr(0x08)
             if self._read_mr() != 0x08:
                 return False
@@ -497,26 +496,19 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             :return bool: True if a W5100 chip is detected, False if not.
             """
             # Reset w5100s
-            print("init 5100s")
             self._write_mr(0x80)
             if self._read_mr() != 0x03:
-                print("bad reset")
                 return False
-            print("good reset")
             if self._read(_REG_VERSIONR_W5100S, 0x00)[0] != 0x51:
-                print("bad ID")
                 return False
-            print("good ID")
             self._ch_base_msb = 0x0400
             WIZNET5K._sockets_reserved = [False] * (_W5100_MAX_SOCK_NUM - 1)
             self._src_ports_in_use = [0] * _W5100_MAX_SOCK_NUM
             self._chip_type = "w5100s"
-            print("returning True")
             return True
 
         # Detect if chip is Wiznet W5500
-        print("calling detectors")
-        if not (_detect_and_reset_w5500() or _detect_and_reset_w5100s()):
+        if not any([_detect_and_reset_w5500(), _detect_and_reset_w5100s()]):
             raise RuntimeError("Failed to initialize WIZnet module.")
 
     def sw_reset(self) -> None:
