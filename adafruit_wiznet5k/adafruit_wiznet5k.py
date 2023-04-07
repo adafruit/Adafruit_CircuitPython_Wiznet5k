@@ -519,19 +519,18 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
                 return 0
         return 1
 
-    def sw_reset(self) -> int:
-        """Perform a soft-reset on the Wiznet chip.
+    def sw_reset(self) -> None:
+        """
+        Perform a soft reset on the WIZnet chip.
 
-        Perform a soft reset by writing to the chip's MR register reset bit.
-
-        :return int: 0 if the reset succeeds, -1 if not.
+        :raises RuntimeError: If reset fails.
         """
         self._write_mr(0x80)
-
-        # W5100S case => 0x03
-        if self._read_mr() not in (0x00, 0x03):
-            return -1
-        return 0
+        result = self._read_mr()
+        if self._chip_type == "w5500" and result != 0x00:
+            raise RuntimeError("WIZnet chip reset failed.")
+        if result != 0x03:
+            raise RuntimeError("WIZnet chip reset failed.")
 
     def _sock_num_in_range(self, sock: int) -> None:
         """Check that the socket number is in the range 0 - maximum sockets."""
