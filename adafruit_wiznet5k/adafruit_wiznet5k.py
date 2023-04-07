@@ -559,17 +559,17 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         """
         with self._device as bus_device:
             if self._chip_type == "w5500":
-                bus_device.write(bytes([addr >> 8]))  # pylint: disable=no-member
-                bus_device.write(bytes([addr & 0xFF]))  # pylint: disable=no-member
-                bus_device.write(bytes([callback]))  # pylint: disable=no-member
+                bus_device.write(bytes([addr >> 8]))
+                bus_device.write(bytes([addr & 0xFF]))
+                bus_device.write(bytes([callback]))
             else:
                 # Assume a W5100s
-                bus_device.write(bytes([0x0F]))  # pylint: disable=no-member
-                bus_device.write(bytes([addr >> 8]))  # pylint: disable=no-member
-                bus_device.write(bytes([addr & 0xFF]))  # pylint: disable=no-member
+                bus_device.write(bytes([0x0F]))
+                bus_device.write(bytes([addr >> 8]))
+                bus_device.write(bytes([addr & 0xFF]))
 
             self._rxbuf = bytearray(length)
-            bus_device.readinto(self._rxbuf)  # pylint: disable=no-member
+            bus_device.readinto(self._rxbuf)
             return bytes(self._rxbuf)
 
     def write(
@@ -584,20 +584,20 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         """
         with self._device as bus_device:
             if self._chip_type == "w5500":
-                bus_device.write(bytes([addr >> 8]))  # pylint: disable=no-member
-                bus_device.write(bytes([addr & 0xFF]))  # pylint: disable=no-member
-                bus_device.write(bytes([callback]))  # pylint: disable=no-member
+                bus_device.write(bytes([addr >> 8]))
+                bus_device.write(bytes([addr & 0xFF]))
+                bus_device.write(bytes([callback]))
             else:
                 # Assume a W5100s
-                bus_device.write(bytes([0xF0]))  # pylint: disable=no-member
-                bus_device.write(bytes([addr >> 8]))  # pylint: disable=no-member
-                bus_device.write(bytes([addr & 0xFF]))  # pylint: disable=no-member
+                bus_device.write(bytes([0xF0]))
+                bus_device.write(bytes([addr >> 8]))
+                bus_device.write(bytes([addr & 0xFF]))
 
             if hasattr(data, "from_bytes"):
-                bus_device.write(bytes([data]))  # pylint: disable=no-member
+                bus_device.write(bytes([data]))
             else:
                 for data_comp in data:
-                    bus_device.write(bytes([data_comp]))  # pylint: disable=no-member
+                    bus_device.write(bytes([data_comp]))
 
     # Socket-Register API
 
