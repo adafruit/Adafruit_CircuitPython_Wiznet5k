@@ -37,6 +37,8 @@ try:
         from circuitpython_typing import WriteableBuffer
         import busio
         import digitalio
+
+        Address4Bytes = Union[bytes, bytearray, Tuple[int, int, int, int]]
 except ImportError:
     pass
 
@@ -244,7 +246,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
     def maintain_dhcp_lease(self) -> None:
         """Maintain the DHCP lease."""
-        if self._dhcp_client is not None:
+        if self._dhcp_client:
             self._dhcp_client.maintain_dhcp_lease()
 
     def get_host_by_name(self, hostname: str) -> bytes:
@@ -253,7 +255,9 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
         :param str hostname: The host name to be converted.
 
-        :return Union[int, bytes]: a 4 bytearray.
+        :return bytes: The IPv4 address as a 4 byte array.
+
+        :raises RuntimeError: If the DNS lookup fails.
         """
         debug_msg("Get host by name", self._debug)
         if isinstance(hostname, str):
@@ -262,11 +266,11 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         _dns_client = dns.DNS(
             self, self.pretty_ip(bytearray(self._dns)), debug=self._debug
         )
-        ret = _dns_client.gethostbyname(hostname)
-        debug_msg("* Resolved IP: {}".format(ret), self._debug)
-        if ret == -1:
+        ipv4 = _dns_client.gethostbyname(hostname)
+        debug_msg("* Resolved IP: {}".format(ipv4), self._debug)
+        if ipv4 == -1:
             raise RuntimeError("Failed to resolve hostname!")
-        return ret
+        return ipv4
 
     @property
     def max_sockets(self) -> int:
@@ -292,7 +296,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
     @property
     def ip_address(self) -> bytes:
         """
-        Configured IP address.
+        Configured IP address for the WIZnet Ethernet hardware.
 
         :return bytes: IP address as four bytes.
         """
@@ -332,7 +336,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
     @property
     def mac_address(self) -> bytes:
         """
-        Ethernet hardware's MAC address.
+        The WIZnet Ethernet hardware MAC address.
 
         :return bytes: Six byte MAC address.
         """
@@ -341,28 +345,27 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
     @mac_address.setter
     def mac_address(self, address: Tuple[int]) -> None:
         """
-        Set the hardware MAC address.
+        Set the WIZnet hardware MAC address.
 
         :param Tuple[int] address: A 6 byte hardware MAC address.
 
-        :raises ValueError: If the MAC address in invalid
+        :raises ValueError: If the MAC address is invalid
         """
         try:
             if len(address) != 6:
                 raise ValueError()
+            # Bytes conversion will raise ValueError if values are not 0-255
             self._write(_REG_SHAR, 0x04, bytes(address))
         except ValueError:
             # pylint: disable=raise-missing-from
             raise ValueError("Invalid MAC address.")
 
     @staticmethod
-    def pretty_mac(
-        mac: bytes,
-    ) -> str:
+    def pretty_mac(mac: bytes) -> str:
         """
-        Convert a bytearray MAC address to a ':' seperated string for display.
+        Convert a byte MAC address to a ':' seperated string for display.
 
-        :param bytearray mac: The MAC address.
+        :param bytes mac: The MAC address.
 
         :return str: Mac Address in the form 00:00:00:00:00:00
 
@@ -378,9 +381,9 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
         :param int socket_num: ID number of the socket to check.
 
-        :return Union[str, bytearray]: A four byte IP address.
+        :return str: The IPv4 address.
 
-        :raises ValueError: If the socket number is greater than the maximum.
+        :raises ValueError: If the socket number is out of range.
         """
         self._sock_num_in_range(socket_num)
         for octet in range(4):
@@ -391,7 +394,10 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
     @property
     def link_status(self) -> bool:
-        """Physical hardware (PHY) connection status.
+        """
+        Physical hardware (PHY) connection status.
+
+        Whether the WIZnet hardware is physically connected to an Ethernet network.
 
         :return bool: True if the link is up, False if the link is down.
         """
@@ -404,11 +410,11 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
     def remote_port(self, socket_num: int) -> int:
         """
-        Port of the host which sent the current incoming packet.
+        Port number of the host which sent the current incoming packet.
 
         :param int socket_num: ID number of the socket to check.
 
-        :return int: The port number of the socket connection.
+        :return int: The incoming port number of the socket connection.
 
         :raises ValueError: If the socket number is out of range.
         """
@@ -416,14 +422,13 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         return self._read_two_byte_sock_reg(socket_num, _REG_SNDPORT)
 
     @property
-    def ifconfig(
-        self,
-    ) -> Tuple[bytes, bytes, bytes, bytes]:
+    def ifconfig(self) -> Tuple[bytes, bytes, bytes, bytes]:
         """
         Network configuration information.
 
-        :return Tuple[bytes, bytes, bytes, Tuple[int, int, int, int]]: \
-            The IP address, subnet mask, gateway address and DNS server address."""
+        :return Tuple[bytes, bytes, bytes, bytes]: The IP address, subnet mask, gateway
+            address and DNS server address.
+        """
         return (
             self.ip_address,
             self._read(_REG_SUBR, 0x00, 4),
@@ -433,14 +438,17 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
     @ifconfig.setter
     def ifconfig(
-        self, params: Tuple[Union[bytes, bytearray, Tuple[int, ...]], ...]
+        self, params: Tuple[Address4Bytes, Address4Bytes, Address4Bytes, Address4Bytes]
     ) -> None:
         """
         Set network configuration.
 
-        :param Tuple[Union[bytes, bytearray, Tuple[int, ...]], ...]: Configuration settings
-           - (ip_address, subnet_mask, gateway_address, dns_server).
+        :param Tuple[Address4Bytes, Address4Bytes, Address4Bytes, Address4Bytes]: Configuration
+            settings - (ip_address, subnet_mask, gateway_address, dns_server).
         """
+        for param in params:
+            if len(param) != 4:
+                raise ValueError("IPv4 address must be 4 bytes.")
         ip_address, subnet_mask, gateway_address, dns_server = params
 
         self._write(_REG_SIPR, 0x04, bytes(ip_address))
@@ -451,7 +459,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
     def _w5xxx_init(self) -> None:
         """
-        Detect and initialize a WIZnet5k Ethernet module.
+        Detect and initialize a WIZnet 5k Ethernet module.
 
         :raises RuntimeError: If no WIZnet chip is detected.
         """
@@ -611,6 +619,8 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             defaults to SNMR_TCP.
 
         :return int: Number of bytes available to read.
+
+        :raises ValueError: If the socket number is out of range.
         """
         debug_msg(
             "socket_available called on socket {}, protocol {}".format(
@@ -649,31 +659,32 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
         :param int socket_num: ID of socket to check.
 
-        :return: Optional[bytearray]
+        :return int: The connection status.
         """
         return self.read_snsr(socket_num)
 
     def socket_connect(
         self,
         socket_num: int,
-        dest: Union[bytes, bytearray],
+        dest: Union[bytes, Address4Bytes],
         port: int,
         conn_mode: int = _SNMR_TCP,
     ) -> int:
         """
-        Open and verify a connection from a socket to a destination IP address
+        Open and verify a connection from a socket to a destination IPv4 address
         or hostname. A TCP connection is made by default. A UDP connection can also
         be made.
 
         :param int socket_num: ID of the socket to be connected.
-        :param Union[bytes, bytearray] dest: The destination as a host name or IP address.
-        :param int port: Port to connect to (0 - 65,536).
+        :param Union[bytes, Address4Bytes] dest: The destination as a host name or IP address.
+        :param int port: Port to connect to (0 - 65,535).
         :param int conn_mode: The connection mode. Use SNMR_TCP for TCP or SNMR_UDP for UDP,
             defaults to SNMR_TCP.
 
-        :raises ConnectionError: If the Ethernet link is down or unable to connect to a
-            hardware socket.
+        :raises ValueError if the socket number is out of range.
+        :raises ConnectionError: If the connection to the socket cannot be established.
         """
+        self._sock_num_in_range(socket_num)
         self._check_link_status()
         debug_msg(
             "W5K socket connect, protocol={}, port={}, ip={}".format(
@@ -703,12 +714,12 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
     def get_socket(self, *, reserve_socket=False) -> int:
         """
-        Request, allocate and return a socket from the W5k chip.
+        Request, allocate and return a socket from the WIZnet 5k chip.
 
         Cycle through the sockets to find the first available one. If the called with
         reserve_socket=True, update the list of reserved sockets (intended to be used with
         socket.socket()). Note that reserved sockets must be released by calling
-        cancel_reservation() once they are no longer needed.
+        release_socket() once they are no longer needed.
 
         If all sockets are reserved, no sockets are available for DNS calls, etc. Therefore,
         one socket cannot be reserved. Since socket 0 is the only socket that is capable of
@@ -743,15 +754,17 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
                         self._debug,
                     )
                 return socket_number
-        raise RuntimeError("Out of sockets.")
+        raise RuntimeError("All sockets in use.")
 
-    @staticmethod
-    def release_socket(socket_number):
+    def release_socket(self, socket_number):
         """
         Update the socket reservation list when a socket is no longer reserved.
 
         :param int socket_number: The socket to release.
+
+        :raises ValueError: If the socket number is out of range.
         """
+        self._sock_num_in_range(socket_number)
         WIZNET5K._sockets_reserved[socket_number - 1] = False
 
     def socket_listen(
@@ -765,9 +778,11 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         :param int conn_mode: Connection mode SNMR_TCP for TCP or SNMR_UDP for
             UDP, defaults to SNMR_TCP.
 
+        :raises ValueError: If the socket number is out of range.
         :raises ConnectionError: If the Ethernet link is down.
         :raises RuntimeError: If unable to connect to a hardware socket.
         """
+        self._sock_num_in_range(socket_num)
         self._check_link_status()
         debug_msg(
             "* Listening on port={}, ip={}".format(
@@ -792,22 +807,21 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             if status == SNSR_SOCK_CLOSED:
                 raise RuntimeError("Listening socket closed.")
 
-    def socket_accept(
-        self, socket_num: int
-    ) -> Tuple[int, Tuple[Union[str, bytearray], Union[int, bytearray]]]:
+    def socket_accept(self, socket_num: int) -> Tuple[int, Tuple[str, int]]:
         """
-        Destination IP address and port from an incoming connection.
+        Destination IPv4 address and port from an incoming connection.
 
         Return the next socket number so listening can continue, along with
         the IP address and port of the incoming connection.
 
         :param int socket_num: Socket number with connection to check.
+
         :return Tuple[int, Tuple[Union[str, bytearray], Union[int, bytearray]]]:
             If successful, the next (socket number, (destination IP address, destination port)).
 
-        If errors occur, the destination IP address and / or the destination port may be
-        returned as bytearrays.
+        :raises ValueError: If the socket number is out of range.
         """
+        self._sock_num_in_range(socket_num)
         dest_ip = self.remote_ip(socket_num)
         dest_port = self.remote_port(socket_num)
         next_socknum = self.get_socket()
@@ -829,9 +843,11 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         :param int conn_mode: The protocol to use. Use SNMR_TCP for TCP or SNMR_UDP for \
             UDP, defaults to SNMR_TCP.
 
+        :raises ValueError: If the socket number is out of range.
         :raises ConnectionError: If the Ethernet link is down or no connection to socket.
         :raises RuntimeError: If unable to open a socket in UDP or TCP mode.
         """
+        self._sock_num_in_range(socket_num)
         self._check_link_status()
         debug_msg("*** Opening socket {}".format(socket_num), self._debug)
         if self.read_snsr(socket_num) not in (
@@ -869,8 +885,11 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         Close a socket.
 
         :param int socket_num: The socket to close.
+
+        :raises ValueError: If the socket number is out of range.
         """
         debug_msg("*** Closing socket {}".format(socket_num), self._debug)
+        self._sock_num_in_range(socket_num)
         self.write_sncr(socket_num, _CMD_SOCK_CLOSE)
         debug_msg("  Waiting for socket to close…", self._debug)
         timeout = time.monotonic() + 5.0
@@ -889,8 +908,11 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         Disconnect a TCP or UDP connection.
 
         :param int socket_num: The socket to close.
+
+        :raises ValueError: If the socket number is out of range.
         """
         debug_msg("*** Disconnecting socket {}".format(socket_num), self._debug)
+        self._sock_num_in_range(socket_num)
         self.write_sncr(socket_num, _CMD_SOCK_DISCON)
 
     def socket_read(self, socket_num: int, length: int) -> Tuple[int, bytes]:
@@ -905,11 +927,12 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             item of the tuple is the length of the data and the second is the data.
             If the read was unsuccessful then 0, b"" is returned.
 
+        :raises ValueError: If the socket number is out of range.
         :raises ConnectionError: If the Ethernet link is down.
         :raises RuntimeError: If the socket connection has been lost.
         """
-        self._check_link_status()
         self._sock_num_in_range(socket_num)
+        self._check_link_status()
 
         # Check if there is data available on the socket
         bytes_on_socket = self._get_rx_rcv_size(socket_num)
@@ -967,7 +990,10 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         :return Tuple[int, bytes]: If the read was successful then the first
             item of the tuple is the length of the data and the second is the data.
             If the read was unsuccessful then (0, b"") is returned.
+
+        :raises ValueError: If the socket number is out of range.
         """
+        self._sock_num_in_range(socket_num)
         bytes_on_socket, bytes_read = 0, b""
         if self.udp_datasize[socket_num] > 0:
             if self.udp_datasize[socket_num] <= length:
@@ -999,8 +1025,8 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         :raises RuntimeError: If the data cannot be sent.
         """
         # pylint: disable=too-many-branches
-        self._check_link_status()
         self._sock_num_in_range(socket_num)
+        self._check_link_status()
         if len(buffer) > _SOCK_SIZE:
             bytes_to_write = _SOCK_SIZE
         else:
@@ -1165,10 +1191,11 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             pass
 
     def _read_snmr(self, sock: int) -> int:
+        """Read the socket MR register."""
         return self._read_socket_register(sock, _REG_SNMR)
 
     def _write_socket_register(self, sock: int, address: int, data: int) -> None:
-        """Write to a W5k socket register."""
+        """Write to a WIZnet 5k socket register."""
         if self._chip_type == "w5500":
             cntl_byte = (sock << 5) + 0x0C
             self._write(address, cntl_byte, data)
@@ -1178,7 +1205,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             self._write(self._ch_base_msb + sock * _CH_SIZE + address, cntl_byte, data)
 
     def _read_socket_register(self, sock: int, address: int) -> int:
-        """Read a W5k socket register."""
+        """Read a WIZnet 5k socket register."""
         if self._chip_type == "w5500":
             cntl_byte = (sock << 5) + 0x08
             register = self._read(address, cntl_byte)
@@ -1194,40 +1221,42 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
     def rcr(self) -> int:
         """Retry count register."""
         if self._chip_type == "w5500":
-            rcr_reg = _REG_RCR_5500
+            register = _REG_RCR_5500
         else:
             # Assume a W5100s
-            rcr_reg = _REG_RCR_5100s
-        return int.from_bytes(self._read(rcr_reg, 0x00), "big")
+            register = _REG_RCR_5100s
+        return int.from_bytes(self._read(register, 0x00), "big")
 
     @rcr.setter
     def rcr(self, retry_count: int) -> None:
+        """Retry count register."""
         if 0 > retry_count > 255:
             raise ValueError("Retries must be from 0 to 255.")
         if self._chip_type == "w5500":
-            rcr_reg = _REG_RCR_5500
+            register = _REG_RCR_5500
         else:
             # Assume a W5100s
-            rcr_reg = _REG_RCR_5100s
-        self._write(rcr_reg, 0x04, retry_count)
+            register = _REG_RCR_5100s
+        self._write(register, 0x04, retry_count)
 
     @property
     def rtr(self) -> int:
         """Retry time register."""
         if self._chip_type == "w5500":
-            reg = _REG_RTR_5500
+            register = _REG_RTR_5500
         else:
             # Assume a W5100s
-            reg = _REG_RTR_5100s
-        return int.from_bytes(self._read(reg, 0x00, 2), "big")
+            register = _REG_RTR_5100s
+        return int.from_bytes(self._read(register, 0x00, 2), "big")
 
     @rtr.setter
-    def rtr(self, retry_count: int) -> None:
-        if 0 > retry_count > 2**16:
-            raise ValueError("Retry time must be from 0 to 65536")
+    def rtr(self, retry_time: int) -> None:
+        """Retry time register."""
+        if 0 > retry_time >= 2**16:
+            raise ValueError("Retry time must be from 0 to 65535")
         if self._chip_type == "w5500":
-            reg = _REG_RTR_5500
+            register = _REG_RTR_5500
         else:
             # Assume a W5100s
-            reg = _REG_RTR_5100s
-        self._write(reg, 0x04, retry_count)
+            register = _REG_RTR_5100s
+        self._write(register, 0x04, retry_time)
