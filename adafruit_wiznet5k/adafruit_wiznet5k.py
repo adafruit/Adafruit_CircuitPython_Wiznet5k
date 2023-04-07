@@ -350,7 +350,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         try:
             if len(address) != 6:
                 raise ValueError()
-            self.write(_REG_SHAR, 0x04, bytes(address))
+            self._write(_REG_SHAR, 0x04, bytes(address))
         except ValueError:
             # pylint: disable=raise-missing-from
             raise ValueError("Invalid MAC address.")
@@ -443,9 +443,9 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         """
         ip_address, subnet_mask, gateway_address, dns_server = params
 
-        self.write(_REG_SIPR, 0x04, ip_address)
-        self.write(_REG_SUBR, 0x04, subnet_mask)
-        self.write(_REG_GAR, 0x04, gateway_address)
+        self._write(_REG_SIPR, 0x04, ip_address)
+        self._write(_REG_SUBR, 0x04, subnet_mask)
+        self._write(_REG_GAR, 0x04, gateway_address)
 
         self._dns = dns_server
 
@@ -480,8 +480,8 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             # Initialize w5500
             for i in range(0, _W5200_W5500_MAX_SOCK_NUM):
                 ctrl_byte = 0x0C + (i << 5)
-                self.write(0x1E, ctrl_byte, 2)
-                self.write(0x1F, ctrl_byte, 2)
+                self._write(0x1E, ctrl_byte, 2)
+                self._write(0x1F, ctrl_byte, 2)
             self._ch_base_msb = 0x00
             WIZNET5K._sockets_reserved = [False] * (_W5200_W5500_MAX_SOCK_NUM - 1)
             self._src_ports_in_use = [0] * _W5200_W5500_MAX_SOCK_NUM
@@ -540,7 +540,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
     def _write_mr(self, data: int) -> None:
         """Write to the mode register (MR)."""
-        self.write(_REG_MR, 0x04, data)
+        self._write(_REG_MR, 0x04, data)
 
     def _read(
         self,
@@ -572,7 +572,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             bus_device.readinto(self._rxbuf)
             return bytes(self._rxbuf)
 
-    def write(
+    def _write(
         self, addr: int, callback: int, data: Union[int, Sequence[Union[int, bytes]]]
     ) -> None:
         """
@@ -1022,7 +1022,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         if self._chip_type == "w5500":
             dst_addr = offset + (socket_num * _SOCK_SIZE + 0x8000)
             cntl_byte = 0x14 + (socket_num << 5)
-            self.write(dst_addr, cntl_byte, buffer[:bytes_to_write])
+            self._write(dst_addr, cntl_byte, buffer[:bytes_to_write])
 
         else:
             # Assume a W5100s
@@ -1030,11 +1030,11 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
             if offset + bytes_to_write > _SOCK_SIZE:
                 split_point = _SOCK_SIZE - offset
-                self.write(dst_addr, 0x00, buffer[:split_point])
+                self._write(dst_addr, 0x00, buffer[:split_point])
                 dst_addr = socket_num * _SOCK_SIZE + 0x4000
-                self.write(dst_addr, 0x00, buffer[split_point:bytes_to_write])
+                self._write(dst_addr, 0x00, buffer[split_point:bytes_to_write])
             else:
-                self.write(dst_addr, 0x00, buffer[:bytes_to_write])
+                self._write(dst_addr, 0x00, buffer[:bytes_to_write])
 
         # update sn_tx_wr to the value + data size
         pointer = (pointer + bytes_to_write) & 0xFFFF
@@ -1170,11 +1170,11 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         """Write to a W5k socket register."""
         if self._chip_type == "w5500":
             cntl_byte = (sock << 5) + 0x0C
-            self.write(address, cntl_byte, data)
+            self._write(address, cntl_byte, data)
         else:
             # Assume a W5100s
             cntl_byte = 0
-            self.write(self._ch_base_msb + sock * _CH_SIZE + address, cntl_byte, data)
+            self._write(self._ch_base_msb + sock * _CH_SIZE + address, cntl_byte, data)
 
     def _read_socket_register(self, sock: int, address: int) -> int:
         """Read a W5k socket register."""
@@ -1208,7 +1208,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         else:
             # Assume a W5100s
             rcr_reg = _REG_RCR_5100s
-        self.write(rcr_reg, 0x04, retry_count)
+        self._write(rcr_reg, 0x04, retry_count)
 
     @property
     def rtr(self) -> int:
@@ -1229,4 +1229,4 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         else:
             # Assume a W5100s
             reg = _REG_RTR_5100s
-        self.write(reg, 0x04, retry_count)
+        self._write(reg, 0x04, retry_count)
