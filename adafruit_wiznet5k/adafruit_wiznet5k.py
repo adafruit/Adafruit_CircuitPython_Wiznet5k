@@ -630,22 +630,22 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         )
         self._sock_num_in_range(socket_num)
 
-        res = self._get_rx_rcv_size(socket_num)
+        number_of_bytes = self._get_rx_rcv_size(socket_num)
 
         if sock_type == _SNMR_TCP:
-            return res
-        if res > 0:
+            return number_of_bytes
+        if number_of_bytes > 0:
             if self.udp_datasize[socket_num]:
                 return self.udp_datasize[socket_num]
             # parse the udp rx packet
             # read the first 8 header bytes
-            ret, self._pbuff[:8] = self.socket_read(socket_num, 8)
-            if ret > 0:
+            udp_bytes, self._pbuff[:8] = self.socket_read(socket_num, 8)
+            if udp_bytes > 0:
                 self.udp_from_ip[socket_num] = self._pbuff[:4]
                 self.udp_from_port[socket_num] = (self._pbuff[4] << 8) + self._pbuff[5]
                 self.udp_datasize[socket_num] = (self._pbuff[6] << 8) + self._pbuff[7]
-                ret = self.udp_datasize[socket_num]
-                return ret
+                udp_bytes = self.udp_datasize[socket_num]
+                return udp_bytes
         return 0
 
     def socket_status(self, socket_num: int) -> int:
