@@ -466,164 +466,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
         self._dns = bytes(dns_server)
 
-    def _w5xxx_init(self) -> None:
-        """
-        Detect and initialize a WIZnet 5k Ethernet module.
-
-        :raises RuntimeError: If no WIZnet chip is detected.
-        """
-
-        def _detect_and_reset_w5500() -> bool:
-            """
-            Detect and reset a W5500 chip. Called at startup to initialize the
-            interface hardware.
-
-            :return bool: True if a W5500 chip is detected, False if not.
-            """
-            self._write_mr(0x08)
-            if self._read_mr() != 0x08:
-                return False
-
-            self._write_mr(0x10)
-            if self._read_mr() != 0x10:
-                return False
-
-            self._write_mr(0x00)
-            if self._read_mr() != 0x00:
-                return False
-
-            if self._read(_REG_VERSIONR_W5500, 0x00)[0] != 0x04:
-                return False
-            # Initialize w5500
-            for i in range(_W5200_W5500_MAX_SOCK_NUM):
-                ctrl_byte = 0x0C + (i << 5)
-                self._write(0x1E, ctrl_byte, 2)
-                self._write(0x1F, ctrl_byte, 2)
-            self._ch_base_msb = 0x00
-            WIZNET5K._sockets_reserved = [False] * (_W5200_W5500_MAX_SOCK_NUM - 1)
-            self._src_ports_in_use = [0] * _W5200_W5500_MAX_SOCK_NUM
-            self._chip_type = "w5500"
-            return True
-
-        def _detect_and_reset_w5100s() -> bool:
-            """
-            Detect and reset a W5100S chip. Called at startup to initialize the
-            interface hardware.
-
-            :return bool: True if a W5100 chip is detected, False if not.
-            """
-            # Reset w5100s
-            self._write_mr(0x80)
-            if self._read_mr() != 0x03:
-                return False
-            if self._read(_REG_VERSIONR_W5100S, 0x00)[0] != 0x51:
-                return False
-            self._ch_base_msb = 0x0400
-            WIZNET5K._sockets_reserved = [False] * (_W5100_MAX_SOCK_NUM - 1)
-            self._src_ports_in_use = [0] * _W5100_MAX_SOCK_NUM
-            self._chip_type = "w5100s"
-            return True
-
-        # Detect if chip is Wiznet W5500
-        if not any([_detect_and_reset_w5500(), _detect_and_reset_w5100s()]):
-            raise RuntimeError("Failed to initialize WIZnet module.")
-
-    def sw_reset(self) -> None:
-        """
-        Perform a soft reset on the WIZnet chip.
-
-        :raises RuntimeError: If reset fails.
-        """
-        self._write_mr(0x80)
-        result = self._read_mr()
-        if self._chip_type == "w5500" and result != 0x00:
-            raise RuntimeError("WIZnet chip reset failed.")
-        if result != 0x03:
-            raise RuntimeError("WIZnet chip reset failed.")
-
-    def _sock_num_in_range(self, sock: int) -> None:
-        """Check that the socket number is in the range 0 - maximum sockets."""
-        if not 0 <= sock < self.max_sockets:
-            raise ValueError("Socket number out of range.")
-
-    def _check_link_status(self):
-        """Raise an exception if the link is down."""
-        if not self.link_status:
-            raise ConnectionError("The Ethernet connection is down.")
-
-    def _read_mr(self) -> int:
-        """Read from the Mode Register (MR)."""
-        return int.from_bytes(self._read(_REG_MR, 0x00), "big")
-
-    def _write_mr(self, data: int) -> None:
-        """Write to the mode register (MR)."""
-        self._write(_REG_MR, 0x04, data)
-
-    def _read(
-        self,
-        addr: int,
-        callback: int,
-        length: int = 1,
-    ) -> bytes:
-        """
-        Read data from a register address.
-
-        :param int addr: Register address to read.
-        :param int callback: Callback reference.
-        :param int length: Number of bytes to read from the register, defaults to 1.
-
-        :return bytes: Data read from the chip.
-        """
-        with self._device as bus_device:
-            self._chip_read(bus_device, addr, callback)
-            self._rxbuf = bytearray(length)
-            bus_device.readinto(self._rxbuf)
-            return bytes(self._rxbuf)
-
-    def _chip_read(self, device: "BusDevice", address: int, call_back: int) -> None:
-        """Chip specific calls for _read method."""
-        if self._chip_type == "w5500":
-            device.write((address >> 8).to_bytes(1, "big"))
-            device.write((address & 0xFF).to_bytes(1, "big"))
-            device.write(call_back.to_bytes(1, "big"))
-        else:
-            # Assume a W5100s
-            device.write((0x0F).to_bytes(1, "big"))
-            device.write((address >> 8).to_bytes(1, "big"))
-            device.write((address & 0xFF).to_bytes(1, "big"))
-
-    def _write(self, addr: int, callback: int, data: Union[int, bytes]) -> None:
-        """
-        Write data to a register address.
-
-        :param int addr: Destination address.
-        :param int callback: Callback reference.
-        :param Union[int, bytes] data: Data to write to the register address, if data
-            is an integer, it must be 1 or 2 bytes.
-
-        :raises OverflowError if integer data is more than 2 bytes.
-        """
-        with self._device as bus_device:
-            self._chip_write(bus_device, addr, callback)
-            try:
-                data = data.to_bytes(1, "big")
-            except OverflowError:
-                data = data.to_bytes(2, "big")
-            except AttributeError:
-                pass
-            bus_device.write(data)
-
-    def _chip_write(self, device: "BusDevice", address: int, call_back: int) -> None:
-        """Chip specific calls for _write."""
-        if self._chip_type == "w5500":
-            device.write((address >> 8).to_bytes(1, "big"))
-            device.write((address & 0xFF).to_bytes(1, "big"))
-            device.write(call_back.to_bytes(1, "big"))
-        else:
-            # Assume a W5100s
-            device.write((0xF0).to_bytes(1, "big"))
-            device.write((address >> 8).to_bytes(1, "big"))
-            device.write((address & 0xFF).to_bytes(1, "big"))
+    # *** Public Socket Methods ***
 
     def socket_available(self, socket_num: int, sock_type: int = _SNMR_TCP) -> int:
         """
@@ -976,26 +819,6 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             bytes_read = b""
         return bytes_on_socket, bytes_read
 
-    def _chip_socket_read(self, socket_number, pointer, bytes_to_read):
-        """Chip specific calls for socket_read."""
-        if self._chip_type == "w5500":
-            # Read data from the starting address of snrx_rd
-            ctrl_byte = 0x18 + (socket_number << 5)
-            bytes_read = self._read(pointer, ctrl_byte, bytes_to_read)
-        else:
-            # Assume a W5100s
-            offset = pointer & _SOCK_MASK
-            src_addr = offset + (socket_number * _SOCK_SIZE + 0x6000)
-            if offset + bytes_to_read > _SOCK_SIZE:
-                split_point = _SOCK_SIZE - offset
-                bytes_read = self._read(src_addr, 0x00, split_point)
-                split_point = bytes_to_read - split_point
-                src_addr = socket_number * _SOCK_SIZE + 0x6000
-                bytes_read += self._read(src_addr, 0x00, split_point)
-            else:
-                bytes_read = self._read(src_addr, 0x00, bytes_to_read)
-        return bytes_read
-
     def read_udp(self, socket_num: int, length: int) -> Tuple[int, bytes]:
         """
         Read UDP socket's current message bytes.
@@ -1090,129 +913,142 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         self.write_snir(socket_num, _SNIR_SEND_OK)
         return bytes_to_write
 
-    def _chip_socket_write(
-        self, socket_number: int, offset: int, bytes_to_write: int, buffer: bytes
-    ):
-        """Chip specific calls for socket_write."""
-        if self._chip_type == "w5500":
-            dst_addr = offset + (socket_number * _SOCK_SIZE + 0x8000)
-            cntl_byte = 0x14 + (socket_number << 5)
-            self._write(dst_addr, cntl_byte, buffer[:bytes_to_write])
+    def sw_reset(self) -> None:
+        """
+        Perform a soft reset on the WIZnet chip.
 
-        else:
-            # Assume a W5100s
-            dst_addr = offset + (socket_number * _SOCK_SIZE + 0x4000)
+        :raises RuntimeError: If reset fails.
+        """
+        self._write_mr(0x80)
+        result = self._read_mr()
+        if self._chip_type == "w5500" and result != 0x00:
+            raise RuntimeError("WIZnet chip reset failed.")
+        if result != 0x03:
+            raise RuntimeError("WIZnet chip reset failed.")
 
-            if offset + bytes_to_write > _SOCK_SIZE:
-                split_point = _SOCK_SIZE - offset
-                self._write(dst_addr, 0x00, buffer[:split_point])
-                dst_addr = socket_number * _SOCK_SIZE + 0x4000
-                self._write(dst_addr, 0x00, buffer[split_point:bytes_to_write])
-            else:
-                self._write(dst_addr, 0x00, buffer[:bytes_to_write])
+    def _w5xxx_init(self) -> None:
+        """
+        Detect and initialize a WIZnet 5k Ethernet module.
 
-    # Socket-Register Methods
-    def _get_rx_rcv_size(self, sock: int) -> int:
-        """Size of received and saved in socket buffer."""
-        val = 0
-        val_1 = self._read_snrx_rsr(sock)
-        while val != val_1:
-            val_1 = self._read_snrx_rsr(sock)
-            if val_1 != 0:
-                val = self._read_snrx_rsr(sock)
-        return val
+        :raises RuntimeError: If no WIZnet chip is detected.
+        """
 
-    def _get_tx_free_size(self, sock: int) -> int:
-        """Free size of socket's tx buffer block."""
-        val = 0
-        val_1 = self._read_sntx_fsr(sock)
-        while val != val_1:
-            val_1 = self._read_sntx_fsr(sock)
-            if val_1 != 0:
-                val = self._read_sntx_fsr(sock)
-        return val
+        def _detect_and_reset_w5500() -> bool:
+            """
+            Detect and reset a W5500 chip. Called at startup to initialize the
+            interface hardware.
 
-    def _read_two_byte_sock_reg(self, sock: int, reg_address: int) -> int:
-        """Read a two byte socket register."""
-        register = self._read_socket_register(sock, reg_address) << 8
-        register += self._read_socket_register(sock, reg_address + 1)
-        return register
+            :return bool: True if a W5500 chip is detected, False if not.
+            """
+            self._write_mr(0x08)
+            if self._read_mr() != 0x08:
+                return False
 
-    def _write_two_byte_sock_reg(self, sock: int, reg_address: int, data: int) -> None:
-        """Write to a two byte socket register."""
-        self._write_socket_register(sock, reg_address, data >> 8 & 0xFF)
-        self._write_socket_register(sock, reg_address + 1, data & 0xFF)
+            self._write_mr(0x10)
+            if self._read_mr() != 0x10:
+                return False
 
-    def _read_snrx_rd(self, sock: int) -> int:
-        """Read socket n RX Read Data Pointer Register."""
-        return self._read_two_byte_sock_reg(sock, _REG_SNRX_RD)
+            self._write_mr(0x00)
+            if self._read_mr() != 0x00:
+                return False
 
-    def _write_snrx_rd(self, sock: int, data: int) -> None:
-        """Write socket n RX Read Data Pointer Register."""
-        self._write_two_byte_sock_reg(sock, _REG_SNRX_RD, data)
+            if self._read(_REG_VERSIONR_W5500, 0x00)[0] != 0x04:
+                return False
+            # Initialize w5500
+            for i in range(_W5200_W5500_MAX_SOCK_NUM):
+                ctrl_byte = 0x0C + (i << 5)
+                self._write(0x1E, ctrl_byte, 2)
+                self._write(0x1F, ctrl_byte, 2)
+            self._ch_base_msb = 0x00
+            WIZNET5K._sockets_reserved = [False] * (_W5200_W5500_MAX_SOCK_NUM - 1)
+            self._src_ports_in_use = [0] * _W5200_W5500_MAX_SOCK_NUM
+            self._chip_type = "w5500"
+            return True
 
-    def _write_sntx_wr(self, sock: int, data: int) -> None:
-        """Write the socket write buffer pointer for socket `sock`."""
-        self._write_two_byte_sock_reg(sock, _REG_SNTX_WR, data)
+        def _detect_and_reset_w5100s() -> bool:
+            """
+            Detect and reset a W5100S chip. Called at startup to initialize the
+            interface hardware.
 
-    def _read_sntx_wr(self, sock: int) -> int:
-        """Read the socket write buffer pointer for socket `sock`."""
-        return self._read_two_byte_sock_reg(sock, _REG_SNTX_WR)
+            :return bool: True if a W5100 chip is detected, False if not.
+            """
+            # Reset w5100s
+            self._write_mr(0x80)
+            if self._read_mr() != 0x03:
+                return False
+            if self._read(_REG_VERSIONR_W5100S, 0x00)[0] != 0x51:
+                return False
+            self._ch_base_msb = 0x0400
+            WIZNET5K._sockets_reserved = [False] * (_W5100_MAX_SOCK_NUM - 1)
+            self._src_ports_in_use = [0] * _W5100_MAX_SOCK_NUM
+            self._chip_type = "w5100s"
+            return True
 
-    def _read_sntx_fsr(self, sock: int) -> int:
-        """Read socket n TX Free Size Register"""
-        return self._read_two_byte_sock_reg(sock, _REG_SNTX_FSR)
+        # Detect if chip is Wiznet W5500
+        if not any([_detect_and_reset_w5500(), _detect_and_reset_w5100s()]):
+            raise RuntimeError("Failed to initialize WIZnet module.")
 
-    def _read_snrx_rsr(self, sock: int) -> int:
-        """Read socket n Received Size Register"""
-        return self._read_two_byte_sock_reg(sock, _REG_SNRX_RSR)
+    def _sock_num_in_range(self, sock: int) -> None:
+        """Check that the socket number is in the range 0 - maximum sockets."""
+        if not 0 <= sock < self.max_sockets:
+            raise ValueError("Socket number out of range.")
 
-    def write_sndipr(self, sock: int, ip_addr: bytes) -> None:
-        """Write to socket destination IP Address."""
-        for offset in range(4):
-            self._write_socket_register(sock, _REG_SNDIPR + offset, ip_addr[offset])
+    def _check_link_status(self):
+        """Raise an exception if the link is down."""
+        if not self.link_status:
+            raise ConnectionError("The Ethernet connection is down.")
 
-    def _read_sndipr(self, sock) -> bytes:
-        """Read socket destination IP address."""
-        data = []
-        for offset in range(4):
-            data.append(self._read_socket_register(sock, _REG_SIPR + offset))
-        return bytes(data)
+    def _read_mr(self) -> int:
+        """Read from the Mode Register (MR)."""
+        return int.from_bytes(self._read(_REG_MR, 0x00), "big")
 
-    def write_sndport(self, sock: int, port: int) -> None:
-        """Write to socket destination port."""
-        self._write_two_byte_sock_reg(sock, _REG_SNDPORT, port)
+    def _write_mr(self, data: int) -> None:
+        """Write to the mode register (MR)."""
+        self._write(_REG_MR, 0x04, data)
 
-    def read_snsr(self, sock: int) -> int:
-        """Read Socket n Status Register."""
-        return self._read_socket_register(sock, _REG_SNSR)
+    # *** Low Level Methods ***
 
-    def read_snir(self, sock: int) -> int:
-        """Read Socket n Interrupt Register."""
-        return self._read_socket_register(sock, _REG_SNIR)
+    def _read(
+        self,
+        addr: int,
+        callback: int,
+        length: int = 1,
+    ) -> bytes:
+        """
+        Read data from a register address.
 
-    def write_snmr(self, sock: int, protocol: int) -> None:
-        """Write to Socket n Mode Register."""
-        self._write_socket_register(sock, _REG_SNMR, protocol)
+        :param int addr: Register address to read.
+        :param int callback: Callback reference.
+        :param int length: Number of bytes to read from the register, defaults to 1.
 
-    def write_snir(self, sock: int, data: int) -> None:
-        """Write to Socket n Interrupt Register."""
-        self._write_socket_register(sock, _REG_SNIR, data)
+        :return bytes: Data read from the chip.
+        """
+        with self._device as bus_device:
+            self._chip_read(bus_device, addr, callback)
+            self._rxbuf = bytearray(length)
+            bus_device.readinto(self._rxbuf)
+            return bytes(self._rxbuf)
 
-    def write_sock_port(self, sock: int, port: int) -> None:
-        """Write to the socket port number."""
-        self._write_two_byte_sock_reg(sock, _REG_SNPORT, port)
+    def _write(self, addr: int, callback: int, data: Union[int, bytes]) -> None:
+        """
+        Write data to a register address.
 
-    def write_sncr(self, sock: int, data: int) -> None:
-        """Write to socket command register."""
-        self._write_socket_register(sock, _REG_SNCR, data)
-        # Wait for command to complete before continuing.
-        while self._read_socket_register(sock, _REG_SNCR):
-            pass
+        :param int addr: Destination address.
+        :param int callback: Callback reference.
+        :param Union[int, bytes] data: Data to write to the register address, if data
+            is an integer, it must be 1 or 2 bytes.
 
-    def _read_snmr(self, sock: int) -> int:
-        """Read the socket MR register."""
-        return self._read_socket_register(sock, _REG_SNMR)
+        :raises OverflowError if integer data is more than 2 bytes.
+        """
+        with self._device as bus_device:
+            self._chip_write(bus_device, addr, callback)
+            try:
+                data = data.to_bytes(1, "big")
+            except OverflowError:
+                data = data.to_bytes(2, "big")
+            except AttributeError:
+                pass
+            bus_device.write(data)
 
     def _write_socket_register(self, sock: int, address: int, data: int) -> None:
         """Write to a WIZnet 5k socket register."""
@@ -1236,6 +1072,110 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
                 self._ch_base_msb + sock * _CH_SIZE + address, cntl_byte
             )
         return int.from_bytes(register, "big")
+
+    def _read_two_byte_sock_reg(self, sock: int, reg_address: int) -> int:
+        """Read a two byte socket register."""
+        register = self._read_socket_register(sock, reg_address) << 8
+        register += self._read_socket_register(sock, reg_address + 1)
+        return register
+
+    def _write_two_byte_sock_reg(self, sock: int, reg_address: int, data: int) -> None:
+        """Write to a two byte socket register."""
+        self._write_socket_register(sock, reg_address, data >> 8 & 0xFF)
+        self._write_socket_register(sock, reg_address + 1, data & 0xFF)
+
+    # *** Socket Register Methods ***
+
+    def _get_rx_rcv_size(self, sock: int) -> int:
+        """Size of received and saved in socket buffer."""
+        val = 0
+        val_1 = self._read_snrx_rsr(sock)
+        while val != val_1:
+            val_1 = self._read_snrx_rsr(sock)
+            if val_1 != 0:
+                val = self._read_snrx_rsr(sock)
+        return val
+
+    def _get_tx_free_size(self, sock: int) -> int:
+        """Free size of socket's tx buffer block."""
+        val = 0
+        val_1 = self._read_sntx_fsr(sock)
+        while val != val_1:
+            val_1 = self._read_sntx_fsr(sock)
+            if val_1 != 0:
+                val = self._read_sntx_fsr(sock)
+        return val
+
+    def _read_snrx_rd(self, sock: int) -> int:
+        """Read socket n RX Read Data Pointer Register."""
+        return self._read_two_byte_sock_reg(sock, _REG_SNRX_RD)
+
+    def _write_snrx_rd(self, sock: int, data: int) -> None:
+        """Write socket n RX Read Data Pointer Register."""
+        self._write_two_byte_sock_reg(sock, _REG_SNRX_RD, data)
+
+    def _read_sntx_wr(self, sock: int) -> int:
+        """Read the socket write buffer pointer for socket `sock`."""
+        return self._read_two_byte_sock_reg(sock, _REG_SNTX_WR)
+
+    def _write_sntx_wr(self, sock: int, data: int) -> None:
+        """Write the socket write buffer pointer for socket `sock`."""
+        self._write_two_byte_sock_reg(sock, _REG_SNTX_WR, data)
+
+    def _read_sntx_fsr(self, sock: int) -> int:
+        """Read socket n TX Free Size Register"""
+        return self._read_two_byte_sock_reg(sock, _REG_SNTX_FSR)
+
+    def _read_snrx_rsr(self, sock: int) -> int:
+        """Read socket n Received Size Register"""
+        return self._read_two_byte_sock_reg(sock, _REG_SNRX_RSR)
+
+    def _read_sndipr(self, sock) -> bytes:
+        """Read socket destination IP address."""
+        data = []
+        for offset in range(4):
+            data.append(self._read_socket_register(sock, _REG_SIPR + offset))
+        return bytes(data)
+
+    def write_sndipr(self, sock: int, ip_addr: bytes) -> None:
+        """Write to socket destination IP Address."""
+        for offset in range(4):
+            self._write_socket_register(sock, _REG_SNDIPR + offset, ip_addr[offset])
+
+    def write_sndport(self, sock: int, port: int) -> None:
+        """Write to socket destination port."""
+        self._write_two_byte_sock_reg(sock, _REG_SNDPORT, port)
+
+    def read_snsr(self, sock: int) -> int:
+        """Read Socket n Status Register."""
+        return self._read_socket_register(sock, _REG_SNSR)
+
+    def read_snir(self, sock: int) -> int:
+        """Read Socket n Interrupt Register."""
+        return self._read_socket_register(sock, _REG_SNIR)
+
+    def write_snir(self, sock: int, data: int) -> None:
+        """Write to Socket n Interrupt Register."""
+        self._write_socket_register(sock, _REG_SNIR, data)
+
+    def _read_snmr(self, sock: int) -> int:
+        """Read the socket MR register."""
+        return self._read_socket_register(sock, _REG_SNMR)
+
+    def write_snmr(self, sock: int, protocol: int) -> None:
+        """Write to Socket n Mode Register."""
+        self._write_socket_register(sock, _REG_SNMR, protocol)
+
+    def write_sock_port(self, sock: int, port: int) -> None:
+        """Write to the socket port number."""
+        self._write_two_byte_sock_reg(sock, _REG_SNPORT, port)
+
+    def write_sncr(self, sock: int, data: int) -> None:
+        """Write to socket command register."""
+        self._write_socket_register(sock, _REG_SNCR, data)
+        # Wait for command to complete before continuing.
+        while self._read_socket_register(sock, _REG_SNCR):
+            pass
 
     @property
     def rcr(self) -> int:
@@ -1280,3 +1220,70 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             # Assume a W5100s
             register = _REG_RTR_5100s
         self._write(register, 0x04, retry_time)
+
+    # *** Chip Specific Methods ***
+
+    def _chip_read(self, device: "BusDevice", address: int, call_back: int) -> None:
+        """Chip specific calls for _read method."""
+        if self._chip_type == "w5500":
+            device.write((address >> 8).to_bytes(1, "big"))
+            device.write((address & 0xFF).to_bytes(1, "big"))
+            device.write(call_back.to_bytes(1, "big"))
+        else:
+            # Assume a W5100s
+            device.write((0x0F).to_bytes(1, "big"))
+            device.write((address >> 8).to_bytes(1, "big"))
+            device.write((address & 0xFF).to_bytes(1, "big"))
+
+    def _chip_write(self, device: "BusDevice", address: int, call_back: int) -> None:
+        """Chip specific calls for _write."""
+        if self._chip_type == "w5500":
+            device.write((address >> 8).to_bytes(1, "big"))
+            device.write((address & 0xFF).to_bytes(1, "big"))
+            device.write(call_back.to_bytes(1, "big"))
+        else:
+            # Assume a W5100s
+            device.write((0xF0).to_bytes(1, "big"))
+            device.write((address >> 8).to_bytes(1, "big"))
+            device.write((address & 0xFF).to_bytes(1, "big"))
+
+    def _chip_socket_read(self, socket_number, pointer, bytes_to_read):
+        """Chip specific calls for socket_read."""
+        if self._chip_type == "w5500":
+            # Read data from the starting address of snrx_rd
+            ctrl_byte = 0x18 + (socket_number << 5)
+            bytes_read = self._read(pointer, ctrl_byte, bytes_to_read)
+        else:
+            # Assume a W5100s
+            offset = pointer & _SOCK_MASK
+            src_addr = offset + (socket_number * _SOCK_SIZE + 0x6000)
+            if offset + bytes_to_read > _SOCK_SIZE:
+                split_point = _SOCK_SIZE - offset
+                bytes_read = self._read(src_addr, 0x00, split_point)
+                split_point = bytes_to_read - split_point
+                src_addr = socket_number * _SOCK_SIZE + 0x6000
+                bytes_read += self._read(src_addr, 0x00, split_point)
+            else:
+                bytes_read = self._read(src_addr, 0x00, bytes_to_read)
+        return bytes_read
+
+    def _chip_socket_write(
+        self, socket_number: int, offset: int, bytes_to_write: int, buffer: bytes
+    ):
+        """Chip specific calls for socket_write."""
+        if self._chip_type == "w5500":
+            dst_addr = offset + (socket_number * _SOCK_SIZE + 0x8000)
+            cntl_byte = 0x14 + (socket_number << 5)
+            self._write(dst_addr, cntl_byte, buffer[:bytes_to_write])
+
+        else:
+            # Assume a W5100s
+            dst_addr = offset + (socket_number * _SOCK_SIZE + 0x4000)
+
+            if offset + bytes_to_write > _SOCK_SIZE:
+                split_point = _SOCK_SIZE - offset
+                self._write(dst_addr, 0x00, buffer[:split_point])
+                dst_addr = socket_number * _SOCK_SIZE + 0x4000
+                self._write(dst_addr, 0x00, buffer[split_point:bytes_to_write])
+            else:
+                self._write(dst_addr, 0x00, buffer[:bytes_to_write])
