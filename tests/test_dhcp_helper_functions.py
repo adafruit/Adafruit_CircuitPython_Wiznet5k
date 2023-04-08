@@ -411,7 +411,6 @@ class TestSmallHelperFunctions:
     @freeze_time("2022-7-6")
     def test_setup_socket_with_no_error(self, mocker, mock_wiznet5k):
         mocker.patch.object(mock_wiznet5k, "get_socket", return_value=2)
-        mocker.patch.object(mock_wiznet5k, "read_sncr", return_value=0x00)
         mocker.patch.object(mock_wiznet5k, "read_snsr", return_value=0x22)
         dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, bytes((1, 2, 3, 4, 5, 6)))
         dhcp_client._dhcp_connection_setup()
@@ -427,7 +426,6 @@ class TestSmallHelperFunctions:
     @freeze_time("2022-7-6", auto_tick_seconds=2)
     def test_setup_socket_with_timeout_on_get_socket(self, mocker, mock_wiznet5k):
         mocker.patch.object(mock_wiznet5k, "get_socket", return_value=0xFF)
-        mocker.patch.object(mock_wiznet5k, "read_sncr", return_value=b"\x00")
         mocker.patch.object(mock_wiznet5k, "read_snsr", return_value=b"\x22")
         dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, bytes((1, 2, 3, 4, 5, 6)))
         with pytest.raises(RuntimeError):
@@ -437,7 +435,6 @@ class TestSmallHelperFunctions:
     @freeze_time("2022-7-6", auto_tick_seconds=2)
     def test_setup_socket_with_timeout_on_socket_is_udp(self, mocker, mock_wiznet5k):
         mocker.patch.object(mock_wiznet5k, "get_socket", return_value=2)
-        mocker.patch.object(mock_wiznet5k, "read_sncr", return_value=0x00)
         mocker.patch.object(mock_wiznet5k, "read_snsr", return_value=0x21)
         dhcp_client = wiz_dhcp.DHCP(mock_wiznet5k, bytes((1, 2, 3, 4, 5, 6)))
         with pytest.raises(RuntimeError):
