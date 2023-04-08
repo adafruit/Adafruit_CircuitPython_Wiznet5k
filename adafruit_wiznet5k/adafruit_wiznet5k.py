@@ -142,6 +142,21 @@ _W5100_MAX_SOCK_NUM = const(0x04)
 _SOCKET_INVALID = const(0xFF)
 
 
+def _prettyfy(data: bytes, seperator: str, correct_length) -> str:
+    """Helper for converting byte objects to . or : seperated strings."""
+    if len(data) != correct_length:
+        raise ValueError("Wrong length for IP or MAC address.")
+    return seperator.join(f"{byte:02x}" for byte in data)
+
+
+def _unprettyfy(data: str, seperator: str, correct_length: int) -> bytes:
+    """Helper for converting . or : delimited strings to bytes objects."""
+    data = bytes(int(x) for x in data.split(seperator))
+    if len(data) == correct_length:
+        return data
+    raise ValueError("Invalid IP or MAC address.")
+
+
 class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-attributes
     """Interface for WIZNET5K module."""
 
@@ -313,9 +328,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
         :raises ValueError: If IP address is not 4 bytes.
         """
-        if len(ipv4) != 4:
-            raise ValueError("Input bytes object must be 4 bytes long")
-        return ".".join(str(byte) for byte in ipv4)
+        return _prettyfy(ipv4, ".", 4)
 
     @staticmethod
     def unpretty_ip(ipv4: str) -> bytes:
@@ -328,10 +341,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
         :raises ValueError: If IPv4 address is not 4 bytes.
         """
-        octets = bytes([int(x) for x in ipv4.split(".")])
-        if len(octets) == 4:
-            return bytes(octets)
-        raise ValueError("IPv4 address must be 4 bytes.")
+        return _unprettyfy(ipv4, ".", 4)
 
     @property
     def mac_address(self) -> bytes:
@@ -371,9 +381,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
         :raises ValueError: If MAC address is not 6 bytes.
         """
-        if len(mac) != 6:
-            raise ValueError("MAC address must be 6 bytes long")
-        return ":".join(f"{byte:02x}" for byte in mac)
+        return _prettyfy(mac, ":", 6)
 
     def remote_ip(self, socket_num: int) -> str:
         """
@@ -486,7 +494,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             if self._read(_REG_VERSIONR_W5500, 0x00)[0] != 0x04:
                 return False
             # Initialize w5500
-            for i in range(0, _W5200_W5500_MAX_SOCK_NUM):
+            for i in range(_W5200_W5500_MAX_SOCK_NUM):
                 ctrl_byte = 0x0C + (i << 5)
                 self._write(0x1E, ctrl_byte, 2)
                 self._write(0x1F, ctrl_byte, 2)
