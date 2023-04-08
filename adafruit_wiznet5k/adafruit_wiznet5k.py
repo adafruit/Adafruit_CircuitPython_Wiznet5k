@@ -575,19 +575,22 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         :return bytes: Data read from the chip.
         """
         with self._device as bus_device:
-            if self._chip_type == "w5500":
-                bus_device.write(bytes([addr >> 8]))
-                bus_device.write(bytes([addr & 0xFF]))
-                bus_device.write(bytes([callback]))
-            else:
-                # Assume a W5100s
-                bus_device.write(bytes([0x0F]))
-                bus_device.write(bytes([addr >> 8]))
-                bus_device.write(bytes([addr & 0xFF]))
-
+            self._chip_read(bus_device, addr, callback)
             self._rxbuf = bytearray(length)
             bus_device.readinto(self._rxbuf)
             return bytes(self._rxbuf)
+
+    def _chip_read(self, device: "BusDevice", address: int, call_back: int) -> None:
+        """Chip specific calls for _read method."""
+        if self._chip_type == "w5500":
+            device.write((address >> 8).to_bytes(1, "big"))
+            device.write((address & 0xFF).to_bytes(1, "big"))
+            device.write(call_back.to_bytes(1, "big"))
+        else:
+            # Assume a W5100s
+            device.write((0x0F).to_bytes(1, "big"))
+            device.write((address >> 8).to_bytes(1, "big"))
+            device.write((address & 0xFF).to_bytes(1, "big"))
 
     def _write(self, addr: int, callback: int, data: Union[int, bytes]) -> None:
         """
@@ -597,18 +600,11 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         :param int callback: Callback reference.
         :param Union[int, bytes] data: Data to write to the register address, if data
             is an integer, it must be 1 or 2 bytes.
+
+        :raises OverflowError if integer data is more than 2 bytes.
         """
         with self._device as bus_device:
-            if self._chip_type == "w5500":
-                bus_device.write((addr >> 8).to_bytes(1, "big"))
-                bus_device.write((addr & 0xFF).to_bytes(1, "big"))
-                bus_device.write(callback.to_bytes(1, "big"))
-            else:
-                # Assume a W5100s
-                bus_device.write((0xF0).to_bytes(1, "big"))
-                bus_device.write((addr >> 8).to_bytes(1, "big"))
-                bus_device.write((addr & 0xFF).to_bytes(1, "big"))
-
+            self._chip_write(bus_device, addr, callback)
             try:
                 data = data.to_bytes(1, "big")
             except OverflowError:
@@ -617,7 +613,17 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
                 pass
             bus_device.write(data)
 
-    # Socket-Register API
+    def _chip_write(self, device: "BusDevice", address: int, call_back: int) -> None:
+        """Chip specific calls for _write."""
+        if self._chip_type == "w5500":
+            device.write((address >> 8).to_bytes(1, "big"))
+            device.write((address & 0xFF).to_bytes(1, "big"))
+            device.write(call_back.to_bytes(1, "big"))
+        else:
+            # Assume a W5100s
+            device.write((0xF0).to_bytes(1, "big"))
+            device.write((address >> 8).to_bytes(1, "big"))
+            device.write((address & 0xFF).to_bytes(1, "big"))
 
     def socket_available(self, socket_num: int, sock_type: int = _SNMR_TCP) -> int:
         """
@@ -951,32 +957,13 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             debug_msg(
                 "* Processing {} bytes of data".format(bytes_on_socket), self._debug
             )
-            # Read the starting save address of the received data
+            # Read the starting save address of the received data.
             pointer = self._read_snrx_rd(socket_num)
-
-            if self._chip_type == "w5500":
-                # Read data from the starting address of snrx_rd
-                ctrl_byte = 0x18 + (socket_num << 5)
-                bytes_read = self._read(pointer, ctrl_byte, bytes_on_socket)
-            else:
-                # Assume a W5100s
-                offset = pointer & _SOCK_MASK
-                src_addr = offset + (socket_num * _SOCK_SIZE + 0x6000)
-                if offset + bytes_on_socket > _SOCK_SIZE:
-                    split_point = _SOCK_SIZE - offset
-                    bytes_read = self._read(src_addr, 0x00, split_point)
-                    split_point = bytes_on_socket - split_point
-                    src_addr = socket_num * _SOCK_SIZE + 0x6000
-                    bytes_read += self._read(src_addr, 0x00, split_point)
-                else:
-                    bytes_read = self._read(src_addr, 0x00, bytes_on_socket)
-
-            # After reading the received data, update Sn_RX_RD to the increased
-            # value as many as the reading size.
+            # Read data from the hardware socket.
+            bytes_read = self._chip_socket_read(socket_num, pointer, bytes_on_socket)
+            # After reading the received data, update Sn_RX_RD register.
             pointer = (pointer + bytes_on_socket) & 0xFFFF
             self._write_snrx_rd(socket_num, pointer)
-
-            # Notify the W5k of the updated Sn_Rx_RD
             self.write_sncr(socket_num, _CMD_SOCK_RECV)
         else:
             # no data on socket
@@ -988,6 +975,26 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
                 raise RuntimeError("Lost connection to peer.")
             bytes_read = b""
         return bytes_on_socket, bytes_read
+
+    def _chip_socket_read(self, socket_number, pointer, bytes_to_read):
+        """Chip specific calls for socket_read."""
+        if self._chip_type == "w5500":
+            # Read data from the starting address of snrx_rd
+            ctrl_byte = 0x18 + (socket_number << 5)
+            bytes_read = self._read(pointer, ctrl_byte, bytes_to_read)
+        else:
+            # Assume a W5100s
+            offset = pointer & _SOCK_MASK
+            src_addr = offset + (socket_number * _SOCK_SIZE + 0x6000)
+            if offset + bytes_to_read > _SOCK_SIZE:
+                split_point = _SOCK_SIZE - offset
+                bytes_read = self._read(src_addr, 0x00, split_point)
+                split_point = bytes_to_read - split_point
+                src_addr = socket_number * _SOCK_SIZE + 0x6000
+                bytes_read += self._read(src_addr, 0x00, split_point)
+            else:
+                bytes_read = self._read(src_addr, 0x00, bytes_to_read)
+        return bytes_read
 
     def read_udp(self, socket_num: int, length: int) -> Tuple[int, bytes]:
         """
@@ -1033,7 +1040,6 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         :raises ValueError: If the socket number is out of range.
         :raises RuntimeError: If the data cannot be sent.
         """
-        # pylint: disable=too-many-branches
         self._sock_num_in_range(socket_num)
         self._check_link_status()
         if len(buffer) > _SOCK_SIZE:
@@ -1055,23 +1061,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         # Read the starting address for saving the transmitting data.
         pointer = self._read_sntx_wr(socket_num)
         offset = pointer & _SOCK_MASK
-        if self._chip_type == "w5500":
-            dst_addr = offset + (socket_num * _SOCK_SIZE + 0x8000)
-            cntl_byte = 0x14 + (socket_num << 5)
-            self._write(dst_addr, cntl_byte, buffer[:bytes_to_write])
-
-        else:
-            # Assume a W5100s
-            dst_addr = offset + (socket_num * _SOCK_SIZE + 0x4000)
-
-            if offset + bytes_to_write > _SOCK_SIZE:
-                split_point = _SOCK_SIZE - offset
-                self._write(dst_addr, 0x00, buffer[:split_point])
-                dst_addr = socket_num * _SOCK_SIZE + 0x4000
-                self._write(dst_addr, 0x00, buffer[split_point:bytes_to_write])
-            else:
-                self._write(dst_addr, 0x00, buffer[:bytes_to_write])
-
+        self._chip_socket_write(socket_num, offset, bytes_to_write, buffer)
         # update sn_tx_wr to the value + data size
         pointer = (pointer + bytes_to_write) & 0xFFFF
         self._write_sntx_wr(socket_num, pointer)
@@ -1099,6 +1089,27 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             time.sleep(0.001)
         self.write_snir(socket_num, _SNIR_SEND_OK)
         return bytes_to_write
+
+    def _chip_socket_write(
+        self, socket_number: int, offset: int, bytes_to_write: int, buffer: bytes
+    ):
+        """Chip specific calls for socket_write."""
+        if self._chip_type == "w5500":
+            dst_addr = offset + (socket_number * _SOCK_SIZE + 0x8000)
+            cntl_byte = 0x14 + (socket_number << 5)
+            self._write(dst_addr, cntl_byte, buffer[:bytes_to_write])
+
+        else:
+            # Assume a W5100s
+            dst_addr = offset + (socket_number * _SOCK_SIZE + 0x4000)
+
+            if offset + bytes_to_write > _SOCK_SIZE:
+                split_point = _SOCK_SIZE - offset
+                self._write(dst_addr, 0x00, buffer[:split_point])
+                dst_addr = socket_number * _SOCK_SIZE + 0x4000
+                self._write(dst_addr, 0x00, buffer[split_point:bytes_to_write])
+            else:
+                self._write(dst_addr, 0x00, buffer[:bytes_to_write])
 
     # Socket-Register Methods
     def _get_rx_rcv_size(self, sock: int) -> int:
