@@ -539,7 +539,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         :param int conn_mode: The connection mode. Use SNMR_TCP for TCP or SNMR_UDP for UDP,
             defaults to SNMR_TCP.
 
-        :raises ValueError if the socket number is out of range.
+        :raises ValueError: if the socket number is out of range.
         :raises ConnectionError: If the connection to the socket cannot be established.
         """
         self._sock_num_in_range(socket_num)
@@ -1038,7 +1038,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         :param Union[int, bytes] data: Data to write to the register address, if data
             is an integer, it must be 1 or 2 bytes.
 
-        :raises OverflowError if integer data is more than 2 bytes.
+        :raises OverflowError: if integer data is more than 2 bytes.
         """
         with self._device as bus_device:
             self._chip_write(bus_device, addr, callback)
@@ -1223,7 +1223,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
     # *** Chip Specific Methods ***
 
-    def _chip_read(self, device: "BusDevice", address: int, call_back: int) -> None:
+    def _chip_read(self, device: "busio.SPI", address: int, call_back: int) -> None:
         """Chip specific calls for _read method."""
         if self._chip_type == "w5500":
             device.write((address >> 8).to_bytes(1, "big"))
@@ -1235,7 +1235,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             device.write((address >> 8).to_bytes(1, "big"))
             device.write((address & 0xFF).to_bytes(1, "big"))
 
-    def _chip_write(self, device: "BusDevice", address: int, call_back: int) -> None:
+    def _chip_write(self, device: "busio.SPI", address: int, call_back: int) -> None:
         """Chip specific calls for _write."""
         if self._chip_type == "w5500":
             device.write((address >> 8).to_bytes(1, "big"))
