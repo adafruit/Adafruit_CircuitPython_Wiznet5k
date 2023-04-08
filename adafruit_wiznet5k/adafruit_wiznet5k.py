@@ -401,6 +401,19 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             )
         return self.pretty_ip(self._pbuff[:4])
 
+    def remote_port(self, socket_num: int) -> int:
+        """
+        Port number of the host which sent the current incoming packet.
+
+        :param int socket_num: ID number of the socket to check.
+
+        :return int: The incoming port number of the socket connection.
+
+        :raises ValueError: If the socket number is out of range.
+        """
+        self._sock_num_in_range(socket_num)
+        return self._read_two_byte_sock_reg(socket_num, _REG_SNDPORT)
+
     @property
     def link_status(self) -> bool:
         """
@@ -416,19 +429,6 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             # Assume a W5100s
             address = _REG_PHYCFGR_W5100S
         return bool(int.from_bytes(self._read(address, 0x00), "big") & 0x01)
-
-    def remote_port(self, socket_num: int) -> int:
-        """
-        Port number of the host which sent the current incoming packet.
-
-        :param int socket_num: ID number of the socket to check.
-
-        :return int: The incoming port number of the socket connection.
-
-        :raises ValueError: If the socket number is out of range.
-        """
-        self._sock_num_in_range(socket_num)
-        return self._read_two_byte_sock_reg(socket_num, _REG_SNDPORT)
 
     @property
     def ifconfig(self) -> Tuple[bytes, bytes, bytes, bytes]:
