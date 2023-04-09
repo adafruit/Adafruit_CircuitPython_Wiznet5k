@@ -86,7 +86,8 @@ _LEASE_TIME = 51
 _OPT_END = 255
 
 # Packet buffer
-_BUFF = bytearray(318)
+_BUFF_SIZE = const(318)
+_BUFF = bytearray(_BUFF_SIZE)
 
 
 class DHCP:
@@ -166,7 +167,7 @@ class DHCP:
         :param float time_elapsed: Number of seconds elapsed since DHCP process started
         :param bool renew: Set True for renew and rebind, defaults to False
         """
-        _BUFF[:] = b"\x00" * len(_BUFF)
+        _BUFF = bytearray(_BUFF_SIZE)
         # OP
         _BUFF[0] = _DHCP_BOOT_REQUEST
         # HTYPE
