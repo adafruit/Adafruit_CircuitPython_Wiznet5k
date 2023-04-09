@@ -476,6 +476,10 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             :return bool: True if a W5500 chip is detected, False if not.
             """
             self._chip_type = "w5500"
+            self._write_mr(0x80)
+            if self._read_mr():
+                return False
+
             # assert self.sw_reset() == 0, "Chip not reset properly!"
             self._write_mr(0x08)
             # assert self._read_mr()[0] == 0x08, "Expected 0x08."
