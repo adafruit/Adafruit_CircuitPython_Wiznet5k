@@ -85,10 +85,8 @@ _T2_VAL = 59
 _LEASE_TIME = 51
 _OPT_END = 255
 
-# Packet buffer
+# Packet buffer size
 _BUFF_SIZE = const(318)
-_BUFF = bytearray(_BUFF_SIZE)
-
 
 class DHCP:
     """W5k DHCP Client implementation."""
@@ -167,95 +165,95 @@ class DHCP:
         :param float time_elapsed: Number of seconds elapsed since DHCP process started
         :param bool renew: Set True for renew and rebind, defaults to False
         """
-        _BUFF = bytearray(_BUFF_SIZE)
+        buff = bytearray(_BUFF_SIZE)
         # OP
-        _BUFF[0] = _DHCP_BOOT_REQUEST
+        buff[0] = _DHCP_BOOT_REQUEST
         # HTYPE
-        _BUFF[1] = _DHCP_HTYPE10MB
+        buff[1] = _DHCP_HTYPE10MB
         # HLEN
-        _BUFF[2] = _DHCP_HLENETHERNET
+        buff[2] = _DHCP_HLENETHERNET
         # HOPS
-        _BUFF[3] = _DHCP_HOPS
+        buff[3] = _DHCP_HOPS
 
         # Transaction ID (xid)
         self._initial_xid = htonl(self._transaction_id)
         self._initial_xid = self._initial_xid.to_bytes(4, "big")
-        _BUFF[4:8] = self._initial_xid
+        buff[4:8] = self._initial_xid
 
         # seconds elapsed
-        _BUFF[8] = (int(time_elapsed) & 0xFF00) >> 8
-        _BUFF[9] = int(time_elapsed) & 0x00FF
+        buff[8] = (int(time_elapsed) & 0xFF00) >> 8
+        buff[9] = int(time_elapsed) & 0x00FF
 
         # flags
         flags = htons(0x8000)
         flags = flags.to_bytes(2, "big")
-        _BUFF[10] = flags[1]
-        _BUFF[11] = flags[0]
+        buff[10] = flags[1]
+        buff[11] = flags[0]
 
         # NOTE: Skipping ciaddr/yiaddr/siaddr/giaddr
         # as they're already set to 0.0.0.0
         # Except when renewing, then fill in ciaddr
         if renew:
-            _BUFF[12:16] = bytes(self.local_ip)
+            buff[12:16] = bytes(self.local_ip)
 
         # chaddr
-        _BUFF[28:34] = self._mac_address
+        buff[28:34] = self._mac_address
 
         # NOTE:  192 octets of 0's, BOOTP legacy
 
         # Magic Cookie
-        _BUFF[236:240] = _MAGIC_COOKIE
+        buff[236:240] = _MAGIC_COOKIE
 
         # Option - DHCP Message Type
-        _BUFF[240] = 53
-        _BUFF[241] = 0x01
-        _BUFF[242] = state
+        buff[240] = 53
+        buff[241] = 0x01
+        buff[242] = state
 
         # Option - Client Identifier
-        _BUFF[243] = 61
+        buff[243] = 61
         # Length
-        _BUFF[244] = 0x07
+        buff[244] = 0x07
         # HW Type - ETH
-        _BUFF[245] = 0x01
+        buff[245] = 0x01
         # Client MAC Address
         for mac, val in enumerate(self._mac_address):
-            _BUFF[246 + mac] = val
+            buff[246 + mac] = val
 
         # Option - Host Name
-        _BUFF[252] = 12
+        buff[252] = 12
         hostname_len = len(self._hostname)
         after_hostname = 254 + hostname_len
-        _BUFF[253] = hostname_len
-        _BUFF[254:after_hostname] = self._hostname
+        buff[253] = hostname_len
+        buff[254:after_hostname] = self._hostname
 
         if state == _DHCP_REQUEST and not renew:
             # Set the parsed local IP addr
-            _BUFF[after_hostname] = 50
-            _BUFF[after_hostname + 1] = 0x04
-            _BUFF[after_hostname + 2 : after_hostname + 6] = bytes(self.local_ip)
+            buff[after_hostname] = 50
+            buff[after_hostname + 1] = 0x04
+            buff[after_hostname + 2 : after_hostname + 6] = bytes(self.local_ip)
             # Set the parsed dhcp server ip addr
-            _BUFF[after_hostname + 6] = 54
-            _BUFF[after_hostname + 7] = 0x04
-            _BUFF[after_hostname + 8 : after_hostname + 12] = bytes(self.dhcp_server_ip)
+            buff[after_hostname + 6] = 54
+            buff[after_hostname + 7] = 0x04
+            buff[after_hostname + 8 : after_hostname + 12] = bytes(self.dhcp_server_ip)
 
-        _BUFF[after_hostname + 12] = 55
-        _BUFF[after_hostname + 13] = 0x06
+        buff[after_hostname + 12] = 55
+        buff[after_hostname + 13] = 0x06
         # subnet mask
-        _BUFF[after_hostname + 14] = 1
+        buff[after_hostname + 14] = 1
         # routers on subnet
-        _BUFF[after_hostname + 15] = 3
+        buff[after_hostname + 15] = 3
         # DNS
-        _BUFF[after_hostname + 16] = 6
+        buff[after_hostname + 16] = 6
         # domain name
-        _BUFF[after_hostname + 17] = 15
+        buff[after_hostname + 17] = 15
         # renewal (T1) value
-        _BUFF[after_hostname + 18] = 58
+        buff[after_hostname + 18] = 58
         # rebinding (T2) value
-        _BUFF[after_hostname + 19] = 59
-        _BUFF[after_hostname + 20] = 255
+        buff[after_hostname + 19] = 59
+        buff[after_hostname + 20] = 255
 
         # Send DHCP packet
-        self._sock.send(_BUFF)
+        self._sock.send(buff)
 
     # pylint: disable=too-many-branches, too-many-statements
     def parse_dhcp_response(
@@ -265,89 +263,88 @@ class DHCP:
 
         :return Tuple[int, bytearray]: DHCP packet type and ID.
         """
-        global _BUFF  # pylint: disable=global-statement
         # store packet in buffer
-        _BUFF = bytearray(self._sock.recv(len(_BUFF)))
+        buff = bytearray(self._sock.recv(_BUFF_SIZE))
         if self._debug:
-            print("DHCP Response: ", _BUFF)
+            print("DHCP Response: ", buff)
 
         # -- Parse Packet, FIXED -- #
         # Validate OP
-        if _BUFF[0] != _DHCP_BOOT_REPLY:
+        if buff[0] != _DHCP_BOOT_REPLY:
             raise RuntimeError(
                 "Malformed Packet - \
             DHCP message OP is not expected BOOT Reply."
             )
 
-        xid = _BUFF[4:8]
+        xid = buff[4:8]
         if bytes(xid) != self._initial_xid:
             raise ValueError("DHCP response ID mismatch.")
 
-        self.local_ip = tuple(_BUFF[16:20])
+        self.local_ip = tuple(buff[16:20])
         # Check that there is a server ID.
-        if _BUFF[28:34] == b"\x00\x00\x00\x00\x00\x00":
+        if buff[28:34] == b"\x00\x00\x00\x00\x00\x00":
             raise ValueError("No DHCP server ID in the response.")
 
-        if _BUFF[236:240] != _MAGIC_COOKIE:
+        if buff[236:240] != _MAGIC_COOKIE:
             raise ValueError("No DHCP Magic Cookie in the response.")
 
         # -- Parse Packet, VARIABLE -- #
         ptr = 240
-        while _BUFF[ptr] != _OPT_END:
-            if _BUFF[ptr] == _MSG_TYPE:
+        while buff[ptr] != _OPT_END:
+            if buff[ptr] == _MSG_TYPE:
                 ptr += 1
-                opt_len = _BUFF[ptr]
+                opt_len = buff[ptr]
                 ptr += opt_len
-                msg_type = _BUFF[ptr]
+                msg_type = buff[ptr]
                 ptr += 1
-            elif _BUFF[ptr] == _SUBNET_MASK:
+            elif buff[ptr] == _SUBNET_MASK:
                 ptr += 1
-                opt_len = _BUFF[ptr]
+                opt_len = buff[ptr]
                 ptr += 1
-                self.subnet_mask = tuple(_BUFF[ptr : ptr + opt_len])
+                self.subnet_mask = tuple(buff[ptr : ptr + opt_len])
                 ptr += opt_len
-            elif _BUFF[ptr] == _DHCP_SERVER_ID:
+            elif buff[ptr] == _DHCP_SERVER_ID:
                 ptr += 1
-                opt_len = _BUFF[ptr]
+                opt_len = buff[ptr]
                 ptr += 1
-                self.dhcp_server_ip = tuple(_BUFF[ptr : ptr + opt_len])
+                self.dhcp_server_ip = tuple(buff[ptr : ptr + opt_len])
                 ptr += opt_len
-            elif _BUFF[ptr] == _LEASE_TIME:
+            elif buff[ptr] == _LEASE_TIME:
                 ptr += 1
-                opt_len = _BUFF[ptr]
+                opt_len = buff[ptr]
                 ptr += 1
-                self._lease_time = int.from_bytes(_BUFF[ptr : ptr + opt_len], "big")
+                self._lease_time = int.from_bytes(buff[ptr : ptr + opt_len], "big")
                 ptr += opt_len
-            elif _BUFF[ptr] == _ROUTERS_ON_SUBNET:
+            elif buff[ptr] == _ROUTERS_ON_SUBNET:
                 ptr += 1
-                opt_len = _BUFF[ptr]
+                opt_len = buff[ptr]
                 ptr += 1
-                self.gateway_ip = tuple(_BUFF[ptr : ptr + 4])
+                self.gateway_ip = tuple(buff[ptr : ptr + 4])
                 ptr += opt_len
-            elif _BUFF[ptr] == _DNS_SERVERS:
+            elif buff[ptr] == _DNS_SERVERS:
                 ptr += 1
-                opt_len = _BUFF[ptr]
+                opt_len = buff[ptr]
                 ptr += 1
-                self.dns_server_ip = tuple(_BUFF[ptr : ptr + 4])
+                self.dns_server_ip = tuple(buff[ptr : ptr + 4])
                 ptr += opt_len  # still increment even though we only read 1 addr.
-            elif _BUFF[ptr] == _T1_VAL:
+            elif buff[ptr] == _T1_VAL:
                 ptr += 1
-                opt_len = _BUFF[ptr]
+                opt_len = buff[ptr]
                 ptr += 1
-                self._t1 = int.from_bytes(_BUFF[ptr : ptr + opt_len], "big")
+                self._t1 = int.from_bytes(buff[ptr : ptr + opt_len], "big")
                 ptr += opt_len
-            elif _BUFF[ptr] == _T2_VAL:
+            elif buff[ptr] == _T2_VAL:
                 ptr += 1
-                opt_len = _BUFF[ptr]
+                opt_len = buff[ptr]
                 ptr += 1
-                self._t2 = int.from_bytes(_BUFF[ptr : ptr + opt_len], "big")
+                self._t2 = int.from_bytes(buff[ptr : ptr + opt_len], "big")
                 ptr += opt_len
-            elif _BUFF[ptr] == 0:
+            elif buff[ptr] == 0:
                 break
             else:
                 # We're not interested in this option
                 ptr += 1
-                opt_len = _BUFF[ptr]
+                opt_len = buff[ptr]
                 ptr += 1
                 # no-op
                 ptr += opt_len
