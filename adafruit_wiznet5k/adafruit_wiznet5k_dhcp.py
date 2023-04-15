@@ -88,6 +88,7 @@ _OPT_END = 255
 # Packet buffer size
 _BUFF_SIZE = const(318)
 
+
 class DHCP:
     """W5k DHCP Client implementation."""
 
