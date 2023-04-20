@@ -26,7 +26,6 @@ except ImportError:
 import time
 from random import getrandbits
 from micropython import const
-import adafruit_wiznet5k.adafruit_wiznet5k_socket as socket
 
 _QUERY_FLAG = const(0x00)
 _OPCODE_STANDARD_QUERY = const(0x00)
@@ -229,11 +228,11 @@ class DNS:
         """
         self._debug = debug
         self._iface = iface
-        socket.set_interface(iface)
-        self._sock = socket.socket(type=socket.SOCK_DGRAM)
-        self._sock.settimeout(1)
-
-        self._dns_server = dns_address
+        self._dns_server = (
+            self._iface.unpretty_ip(dns_address)
+            if isinstance(dns_address, str)
+            else dns_address
+        )
         self._query_id = 0  # Request ID.
         self._query_length = 0  # Length of last query.
 
@@ -251,31 +250,29 @@ class DNS:
         self._query_id, self._query_length, buffer = _build_dns_query(hostname)
 
         # Send DNS request packet
-        self._sock.bind(("", _DNS_PORT))
-        self._sock.connect((self._dns_server, _DNS_PORT))
+        dns_socket = self._iface.get_socket()
+        self._iface.socket_connect(
+            dns_socket, bytes(self._dns_server), _DNS_PORT, conn_mode=0x02
+        )
         _debug_print(debug=self._debug, message="* DNS: Sending request packet...")
-        self._sock.send(buffer)
+        self._iface.socket_write(dns_socket, buffer)
 
         # Read and parse the DNS response
         ipaddress = -1
         for _ in range(5):
             #  wait for a response
             socket_timeout = time.monotonic() + 1.0
-            packet_size = self._sock._available()  # pylint: disable=protected-access
-            while packet_size == 0:
-                packet_size = (
-                    self._sock._available()  # pylint: disable=protected-access
-                )
+            while not self._iface.socket_available(dns_socket, 0x02):
                 if time.monotonic() > socket_timeout:
                     _debug_print(
                         debug=self._debug,
                         message="* DNS ERROR: Did not receive DNS response (socket timeout).",
                     )
-                    self._sock.close()
-                    return -1
+                    self._iface.socket_close(dns_socket)
+                    raise RuntimeError("Failed to resolve hostname!")
                 time.sleep(0.05)
             # recv packet into buf
-            buffer = self._sock.recv(512)  # > UDP payload length
+            _, buffer = self._iface.read_udp(dns_socket, 512)
             _debug_print(
                 debug=self._debug,
                 message="DNS Packet Received: {}".format(buffer),
@@ -294,5 +291,5 @@ class DNS:
                     message="* DNS ERROR: Failed to resolve DNS response, retrying…\n"
                     "    ({}).".format(error.args[0]),
                 )
-        self._sock.close()
+        self._iface.socket_close(dns_socket)
         return ipaddress
