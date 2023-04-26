@@ -477,8 +477,8 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             """
             self._chip_type = "w5500"
             self._write_mr(0x80)
-            if self._read_mr():
-                return False
+            while self._read_mr()[0] & 0x80:
+                pass
 
             # assert self.sw_reset() == 0, "Chip not reset properly!"
             self._write_mr(0x08)
