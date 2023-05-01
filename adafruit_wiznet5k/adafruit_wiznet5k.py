@@ -1185,11 +1185,10 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
     @property
     def rcr(self) -> int:
         """Retry count register."""
-        if self._chip_type == "w5500":
-            register = _REG_RCR_W5500
-        else:
-            # Assume a W5100s
-            register = _REG_RCR_W5100s
+        register = {
+            "w5500": _REG_RCR_W5500,
+            "w5100s": _REG_RCR_W5100s,
+        }[self._chip_type]
         return int.from_bytes(self._read(register, 0x00), "big")
 
     @rcr.setter
@@ -1197,21 +1196,19 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         """Retry count register."""
         if 0 > retry_count > 255:
             raise ValueError("Retries must be from 0 to 255.")
-        if self._chip_type == "w5500":
-            register = _REG_RCR_W5500
-        else:
-            # Assume a W5100s
-            register = _REG_RCR_W5100s
+        register = {
+            "w5500": _REG_RCR_W5500,
+            "w5100s": _REG_RCR_W5100s,
+        }[self._chip_type]
         self._write(register, 0x04, retry_count)
 
     @property
     def rtr(self) -> int:
         """Retry time register."""
-        if self._chip_type == "w5500":
-            register = _REG_RTR_W5500
-        else:
-            # Assume a W5100s
-            register = _REG_RTR_W5100s
+        register = {
+            "w5500": _REG_RTR_W5500,
+            "w5100s": _REG_RTR_W5100s,
+        }[self._chip_type]
         return int.from_bytes(self._read(register, 0x00, 2), "big")
 
     @rtr.setter
@@ -1219,11 +1216,10 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         """Retry time register."""
         if 0 > retry_time >= 2**16:
             raise ValueError("Retry time must be from 0 to 65535")
-        if self._chip_type == "w5500":
-            register = _REG_RTR_W5500
-        else:
-            # Assume a W5100s
-            register = _REG_RTR_W5100s
+        register = {
+            "w5500": _REG_RTR_W5500,
+            "w5100s": _REG_RTR_W5100s,
+        }[self._chip_type]
         self._write(register, 0x04, retry_time)
 
     # *** Chip Specific Methods ***
