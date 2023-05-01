@@ -31,7 +31,7 @@ Implementation Notes
 from __future__ import annotations
 
 try:
-    from typing import TYPE_CHECKING, Optional, Union, List, Tuple
+    from typing import TYPE_CHECKING, Optional, Union, Tuple
 
     if TYPE_CHECKING:
         from circuitpython_typing import WriteableBuffer
@@ -167,7 +167,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         cs: digitalio.DigitalInOut,  # pylint: disable=invalid-name
         reset: Optional[digitalio.DigitalInOut] = None,
         is_dhcp: bool = True,
-        mac: Union[List[int], Tuple[int]] = _DEFAULT_MAC,
+        mac: Union[MacAddressRaw, str] = _DEFAULT_MAC,
         hostname: Optional[str] = None,
         debug: bool = False,
     ) -> None:
@@ -176,7 +176,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         :param digitalio.DigitalInOut cs: Chip select pin.
         :param digitalio.DigitalInOut reset: Optional reset pin, defaults to None.
         :param bool is_dhcp: Whether to start DHCP automatically or not, defaults to True.
-        :param Union[List[int], Tuple[int]] mac: The Wiznet's MAC Address, defaults to
+        :param Union[MacAddressRaw, str] mac: The Wiznet's MAC Address, defaults to
             (0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED).
         :param str hostname: The desired hostname, with optional {} to fill in the MAC
             address, defaults to None.
@@ -349,14 +349,18 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         return self._read(_REG_SHAR, 0x00, 6)
 
     @mac_address.setter
-    def mac_address(self, address: MacAddressRaw) -> None:
+    def mac_address(self, address: Union[MacAddressRaw, str]) -> None:
         """
         Set the WIZnet hardware MAC address.
 
-        :param Tuple[int] address: A 6 byte hardware MAC address.
+        :param Union[MacAddressRaw, str] address: A 6 byte hardware MAC address.
 
         :raises ValueError: If the MAC address is invalid
         """
+        try:
+            address = [int(x, 16) for x in address.split(":")]
+        except AttributeError:
+            pass
         try:
             if len(address) != 6:
                 raise ValueError()
