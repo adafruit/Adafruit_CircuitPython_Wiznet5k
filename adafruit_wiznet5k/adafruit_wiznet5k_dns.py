@@ -244,7 +244,6 @@ class DNS:
 
         :return Union[int, bytes] The IPv4 address if successful, -1 otherwise.
         """
-
         if self._dns_server is None:
             return _INVALID_SERVER
         # build DNS request packet

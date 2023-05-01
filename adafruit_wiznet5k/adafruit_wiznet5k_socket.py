@@ -28,6 +28,7 @@ import gc
 import time
 from sys import byteorder
 from micropython import const
+
 import adafruit_wiznet5k as wiznet5k
 
 # pylint: disable=invalid-name
