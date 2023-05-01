@@ -968,7 +968,6 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             self._ch_base_msb = 0x00
             WIZNET5K._sockets_reserved = [False] * (_W5500_MAX_SOCK_NUM - 1)
             self._src_ports_in_use = [0] * _W5500_MAX_SOCK_NUM
-            self._chip_type = "w5500"
             return True
 
         def _detect_and_reset_w5100s() -> bool:
@@ -978,7 +977,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
             :return bool: True if a W5100 chip is detected, False if not.
             """
-            # Reset w5100s
+            self._chip_type = "w5100s"
             self._write_mr(0x80)
             if self._read_mr() != 0x03:
                 return False
@@ -987,12 +986,12 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             self._ch_base_msb = 0x0400
             WIZNET5K._sockets_reserved = [False] * (_W5100_MAX_SOCK_NUM - 1)
             self._src_ports_in_use = [0] * _W5100_MAX_SOCK_NUM
-            self._chip_type = "w5100s"
             return True
 
-        # Detect if chip is Wiznet W5500
-        if not any([_detect_and_reset_w5500(), _detect_and_reset_w5100s()]):
-            raise RuntimeError("Failed to initialize WIZnet module.")
+        for func in [_detect_and_reset_w5100s, _detect_and_reset_w5500]:
+            if func():
+                return
+        raise RuntimeError("Failed to initialize WIZnet module.")
 
     def _sock_num_in_range(self, sock: int) -> None:
         """Check that the socket number is in the range 0 - maximum sockets."""
