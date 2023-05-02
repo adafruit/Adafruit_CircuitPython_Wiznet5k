@@ -60,16 +60,12 @@ from adafruit_wiznet5k.adafruit_wiznet5k_debug import debug_msg
 _REG_MR = const(0x0000)  # Mode
 _REG_GAR = const(0x0001)  # Gateway IP Address
 _REG_SUBR = const(0x0005)  # Subnet Mask Address
-_REG_VERSIONR_W5500 = const(0x0039)  # W5500 Silicon Version
-_REG_VERSIONR_W5100S = const(0x0080)  # W5100S Silicon Version
+_REG_VERSIONR = {"w5100s": const(0x0080), "w5500": const(0x0039)}
 _REG_SHAR = const(0x0009)  # Source Hardware Address
 _REG_SIPR = const(0x000F)  # Source IP Address
-_REG_PHYCFGR_W5500 = const(0x002E)  # W5500 PHY Configuration
-_REG_PHYCFGR_W5100S = const(0x003C)  # W5100S PHY Configuration
-_REG_RCR_W5100s = const(0x0019)  # Retry Count
-_REG_RTR_W5100s = const(0x0017)  # Retry Time
-_REG_RCR_W5500 = const(0x001B)  # Retry Count
-_REG_RTR_W5500 = const(0x0019)  # Retry Time
+_REG_PHYCFGR = {"w5100s": const(0x003C), "w5500": const(0x002E)}
+_REG_RCR = {"w5100s": const(0x0019), "w5500": const(0x001B)}
+_REG_RTR = {"w5100s": const(0x0017), "w5500": const(0x0019)}
 
 # Wiznet5k Socket Registers
 _REG_SNMR = const(0x0000)  # Socket n Mode
@@ -138,8 +134,7 @@ _LOCAL_PORT = const(0x400)
 _DEFAULT_MAC = (0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED)
 
 # Maximum number of sockets to support, differs between chip versions.
-_W5500_MAX_SOCK_NUM = const(0x08)
-_W5100_MAX_SOCK_NUM = const(0x04)
+_MAX_SOCK_NUM = {"w5100s": const(0x04), "w5500": const(0x08)}
 _SOCKET_INVALID = const(0xFF)
 
 
@@ -288,10 +283,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
         :return int: Maximum supported sockets.
         """
-        if self._chip_type == "w5500":
-            return _W5500_MAX_SOCK_NUM
-        # Assume a W5100s
-        return _W5100_MAX_SOCK_NUM
+        return _MAX_SOCK_NUM[self._chip_type]
 
     @property
     def chip(self) -> str:
@@ -424,12 +416,10 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
         :return bool: True if the link is up, False if the link is down.
         """
-        if self._chip_type == "w5500":
-            address = _REG_PHYCFGR_W5500
-        else:
-            # Assume a W5100s
-            address = _REG_PHYCFGR_W5100S
-        return bool(int.from_bytes(self._read(address, 0x00), "big") & 0x01)
+        return bool(
+            int.from_bytes(self._read(_REG_PHYCFGR[self._chip_type], 0x00), "big")
+            & 0x01
+        )
 
     @property
     def ifconfig(self) -> Tuple[bytes, bytes, bytes, bytes]:
@@ -921,10 +911,10 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         :raises RuntimeError: If reset fails.
         """
         self._write_mr(0x80)
+        time.sleep(0.05)
         result = self._read_mr()
-        if self._chip_type == "w5500" and result != 0x00:
-            raise RuntimeError("WIZnet chip reset failed.")
-        if result != 0x03:
+        expected_result = {"w5500": 0x00, "w5100s": 0x03}[self._chip_type]
+        if result != expected_result:
             raise RuntimeError("WIZnet chip reset failed.")
 
     def _w5xxx_init(self) -> None:
@@ -942,9 +932,9 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             :return bool: True if a W5500 chip is detected, False if not.
             """
             self._chip_type = "w5500"
-            self._write_mr(0x80)
-            time.sleep(0.05)
-            if self._read_mr() & 0x80:
+            try:
+                self.sw_reset()
+            except RuntimeError:
                 return False
 
             self._write_mr(0x08)
@@ -959,16 +949,16 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             if self._read_mr() != 0x00:
                 return False
 
-            if self._read(_REG_VERSIONR_W5500, 0x00)[0] != 0x04:
+            if self._read(_REG_VERSIONR[self._chip_type], 0x00)[0] != 0x04:
                 return False
             # Initialize w5500
-            for i in range(_W5500_MAX_SOCK_NUM):
+            for i in range(_MAX_SOCK_NUM[self._chip_type]):
                 ctrl_byte = 0x0C + (i << 5)
                 self._write(0x1E, ctrl_byte, 2)
                 self._write(0x1F, ctrl_byte, 2)
             self._ch_base_msb = 0x00
-            WIZNET5K._sockets_reserved = [False] * (_W5500_MAX_SOCK_NUM - 1)
-            self._src_ports_in_use = [0] * _W5500_MAX_SOCK_NUM
+            WIZNET5K._sockets_reserved = [False] * (_MAX_SOCK_NUM[self._chip_type] - 1)
+            self._src_ports_in_use = [0] * _MAX_SOCK_NUM[self._chip_type]
             return True
 
         def _detect_and_reset_w5100s() -> bool:
@@ -979,19 +969,22 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             :return bool: True if a W5100 chip is detected, False if not.
             """
             self._chip_type = "w5100s"
-            self._write_mr(0x80)
-            if self._read_mr() != 0x03:
+            try:
+                self.sw_reset()
+            except RuntimeError:
                 return False
-            if self._read(_REG_VERSIONR_W5100S, 0x00)[0] != 0x51:
+
+            if self._read(_REG_VERSIONR[self._chip_type], 0x00)[0] != 0x51:
                 return False
             self._ch_base_msb = 0x0400
-            WIZNET5K._sockets_reserved = [False] * (_W5100_MAX_SOCK_NUM - 1)
-            self._src_ports_in_use = [0] * _W5100_MAX_SOCK_NUM
+            WIZNET5K._sockets_reserved = [False] * (_MAX_SOCK_NUM[self._chip_type] - 1)
+            self._src_ports_in_use = [0] * _MAX_SOCK_NUM[self._chip_type]
             return True
 
         for func in [_detect_and_reset_w5100s, _detect_and_reset_w5500]:
             if func():
                 return
+        self._chip_type = None
         raise RuntimeError("Failed to initialize WIZnet module.")
 
     def _sock_num_in_range(self, sock: int) -> None:
@@ -1061,8 +1054,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         if self._chip_type == "w5500":
             cntl_byte = (sock << 5) + 0x0C
             self._write(address, cntl_byte, data)
-        else:
-            # Assume a W5100s
+        elif self._chip_type == "w5100s":
             cntl_byte = 0
             self._write(self._ch_base_msb + sock * _CH_SIZE + address, cntl_byte, data)
 
@@ -1071,8 +1063,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         if self._chip_type == "w5500":
             cntl_byte = (sock << 5) + 0x08
             register = self._read(address, cntl_byte)
-        else:
-            # Assume a W5100s
+        elif self._chip_type == "w5100s":
             cntl_byte = 0
             register = self._read(
                 self._ch_base_msb + sock * _CH_SIZE + address, cntl_byte
@@ -1145,8 +1136,8 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
     def write_sndipr(self, sock: int, ip_addr: bytes) -> None:
         """Write to socket destination IP Address."""
-        for offset in range(4):
-            self._write_socket_register(sock, _REG_SNDIPR + offset, ip_addr[offset])
+        for offset, value in enumerate(ip_addr):
+            self._write_socket_register(sock, _REG_SNDIPR + offset, value)
 
     def write_sndport(self, sock: int, port: int) -> None:
         """Write to socket destination port."""
@@ -1186,42 +1177,26 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
     @property
     def rcr(self) -> int:
         """Retry count register."""
-        register = {
-            "w5500": _REG_RCR_W5500,
-            "w5100s": _REG_RCR_W5100s,
-        }[self._chip_type]
-        return int.from_bytes(self._read(register, 0x00), "big")
+        return int.from_bytes(self._read(_REG_RCR[self._chip_type], 0x00), "big")
 
     @rcr.setter
     def rcr(self, retry_count: int) -> None:
         """Retry count register."""
         if 0 > retry_count > 255:
             raise ValueError("Retries must be from 0 to 255.")
-        register = {
-            "w5500": _REG_RCR_W5500,
-            "w5100s": _REG_RCR_W5100s,
-        }[self._chip_type]
-        self._write(register, 0x04, retry_count)
+        self._write(_REG_RCR[self._chip_type], 0x04, retry_count)
 
     @property
     def rtr(self) -> int:
         """Retry time register."""
-        register = {
-            "w5500": _REG_RTR_W5500,
-            "w5100s": _REG_RTR_W5100s,
-        }[self._chip_type]
-        return int.from_bytes(self._read(register, 0x00, 2), "big")
+        return int.from_bytes(self._read(_REG_RTR[self._chip_type], 0x00, 2), "big")
 
     @rtr.setter
     def rtr(self, retry_time: int) -> None:
         """Retry time register."""
         if 0 > retry_time >= 2**16:
             raise ValueError("Retry time must be from 0 to 65535")
-        register = {
-            "w5500": _REG_RTR_W5500,
-            "w5100s": _REG_RTR_W5100s,
-        }[self._chip_type]
-        self._write(register, 0x04, retry_time)
+        self._write(_REG_RTR[self._chip_type], 0x04, retry_time)
 
     # *** Chip Specific Methods ***
 
@@ -1231,8 +1206,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             device.write((address >> 8).to_bytes(1, "big"))
             device.write((address & 0xFF).to_bytes(1, "big"))
             device.write(call_back.to_bytes(1, "big"))
-        else:
-            # Assume a W5100s
+        elif self._chip_type == "w5100s":
             device.write((0x0F).to_bytes(1, "big"))
             device.write((address >> 8).to_bytes(1, "big"))
             device.write((address & 0xFF).to_bytes(1, "big"))
@@ -1243,8 +1217,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             device.write((address >> 8).to_bytes(1, "big"))
             device.write((address & 0xFF).to_bytes(1, "big"))
             device.write(call_back.to_bytes(1, "big"))
-        else:
-            # Assume a W5100s
+        elif self._chip_type == "w5100s":
             device.write((0xF0).to_bytes(1, "big"))
             device.write((address >> 8).to_bytes(1, "big"))
             device.write((address & 0xFF).to_bytes(1, "big"))
@@ -1255,8 +1228,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             # Read data from the starting address of snrx_rd
             ctrl_byte = 0x18 + (socket_number << 5)
             bytes_read = self._read(pointer, ctrl_byte, bytes_to_read)
-        else:
-            # Assume a W5100s
+        elif self._chip_type == "w5100s":
             offset = pointer & _SOCK_MASK
             src_addr = offset + (socket_number * _SOCK_SIZE + 0x6000)
             if offset + bytes_to_read > _SOCK_SIZE:
@@ -1278,8 +1250,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             cntl_byte = 0x14 + (socket_number << 5)
             self._write(dst_addr, cntl_byte, buffer[:bytes_to_write])
 
-        else:
-            # Assume a W5100s
+        elif self._chip_type == "w5100s":
             dst_addr = offset + (socket_number * _SOCK_SIZE + 0x4000)
 
             if offset + bytes_to_write > _SOCK_SIZE:
