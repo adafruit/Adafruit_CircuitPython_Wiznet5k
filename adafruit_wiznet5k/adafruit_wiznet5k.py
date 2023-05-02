@@ -38,7 +38,7 @@ try:
         import busio
         import digitalio
 
-        IpAddressRaw4 = Union[bytes, Tuple[int, int, int, int]]
+        IpAddress4Raw = Union[bytes, Tuple[int, int, int, int]]
         MacAddressRaw = Union[bytes, Tuple[int, int, int, int, int, int]]
 except ImportError:
     pass
@@ -438,7 +438,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
     @ifconfig.setter
     def ifconfig(
-        self, params: Tuple[IpAddressRaw4, IpAddressRaw4, IpAddressRaw4, IpAddressRaw4]
+        self, params: Tuple[IpAddress4Raw, IpAddress4Raw, IpAddress4Raw, IpAddress4Raw]
     ) -> None:
         """
         Set network configuration.
@@ -515,7 +515,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
     def socket_connect(
         self,
         socket_num: int,
-        dest: Union[bytes, IpAddressRaw4],
+        dest: Union[bytes, IpAddress4Raw],
         port: int,
         conn_mode: int = _SNMR_TCP,
     ) -> int:
@@ -910,7 +910,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
         :raises RuntimeError: If reset fails.
         """
-        self._write_mr(0x80)
+        self._write_mr(_MR_RST)
         time.sleep(0.05)
         result = self._read_mr()
         expected_result = {"w5500": 0x00, "w5100s": 0x03}[self._chip_type]
