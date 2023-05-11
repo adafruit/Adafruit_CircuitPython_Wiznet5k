@@ -461,6 +461,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
         self._dns = dns_server
 
+    # pylint: disable=too-many-return-statements
     def _w5xxx_init(self) -> int:
         """
         Detect and initialize a Wiznet5k ethernet module.
