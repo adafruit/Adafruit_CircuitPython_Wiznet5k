@@ -599,6 +599,7 @@ class DHCP:
             matches, a client ID exists and the 'magic cookie' is set. If any of these tests
             fail or no message type is found in the options, raises a ValueError.
         """
+
         # pylint: disable=too-many-branches
         def option_reader(pointer: int) -> Tuple[int, int, bytes]:
             """Helper function to extract DHCP option data from a

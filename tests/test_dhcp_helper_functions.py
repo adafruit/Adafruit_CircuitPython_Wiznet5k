@@ -641,7 +641,6 @@ class TestHandleDhcpMessage:
 
 
 class TestReceiveResponse:
-
     minimum_packet_length = 236
 
     @freeze_time("2022-10-10")
