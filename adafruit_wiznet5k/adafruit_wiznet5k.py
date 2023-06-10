@@ -236,7 +236,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         # attempt to initialize the module
         self._ch_base_msb = 0
         self._src_ports_in_use = []
-        self._w5xxx_init()
+        self._wiznet_chip_init()
 
         # Set MAC address
         self.mac_address = mac
@@ -951,12 +951,38 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         if result != expected_result:
             raise RuntimeError("WIZnet chip reset failed.")
 
-    def _w5xxx_init(self) -> None:
+    def _wiznet_chip_init(self) -> None:
         """
         Detect and initialize a WIZnet 5k Ethernet module.
 
         :raises RuntimeError: If no WIZnet chip is detected.
         """
+
+        def _detect_and_reset_w6100() -> bool:
+            """
+            Detect and reset a W6100 chip. Called at startup to initialize the
+            interface hardware.
+
+            :return bool: True if a W6100 chip is detected, False if not.
+            """
+            self._chip_type = "w6100"
+            try:
+                self.sw_reset()
+            except RuntimeError:
+                return False
+
+            if self._read(_REG_VERSIONR[self._chip_type], 0x00)[0] != 0x61:
+                return False
+            # Initialize w6100.
+            self._write(0x41F5, 0x04, 0x3A)  # Unlock network settings.
+            for i in range(_MAX_SOCK_NUM[self._chip_type]):
+                ctrl_byte = 0x0C + (i << 5)
+                self._write(0x1E, ctrl_byte, 2)
+                self._write(0x1F, ctrl_byte, 2)
+            self._ch_base_msb = 0x00
+            WIZNET5K._sockets_reserved = [False] * (_MAX_SOCK_NUM[self._chip_type] - 1)
+            self._src_ports_in_use = [0] * _MAX_SOCK_NUM[self._chip_type]
+            return True
 
         def _detect_and_reset_w5500() -> bool:
             """
@@ -1015,7 +1041,11 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             self._src_ports_in_use = [0] * _MAX_SOCK_NUM[self._chip_type]
             return True
 
-        for func in [_detect_and_reset_w5100s, _detect_and_reset_w5500]:
+        for func in [
+            _detect_and_reset_w5100s,
+            _detect_and_reset_w5500,
+            _detect_and_reset_w6100,
+        ]:
             if func():
                 return
         self._chip_type = None
