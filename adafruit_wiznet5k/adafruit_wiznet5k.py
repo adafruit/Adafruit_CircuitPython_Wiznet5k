@@ -56,18 +56,33 @@ import adafruit_wiznet5k.adafruit_wiznet5k_dhcp as dhcp
 import adafruit_wiznet5k.adafruit_wiznet5k_dns as dns
 from adafruit_wiznet5k.adafruit_wiznet5k_debug import debug_msg
 
-# Wiznet5k Registers
-_REG_MR = const(0x0000)  # Mode
-_REG_GAR = const(0x0001)  # Gateway IP Address
-_REG_SUBR = const(0x0005)  # Subnet Mask Address
-_REG_VERSIONR = {"w5100s": const(0x0080), "w5500": const(0x0039)}
-_REG_SHAR = const(0x0009)  # Source Hardware Address
-_REG_SIPR = const(0x000F)  # Source IP Address
-_REG_PHYCFGR = {"w5100s": const(0x003C), "w5500": const(0x002E)}
-_REG_RCR = {"w5100s": const(0x0019), "w5500": const(0x001B)}
-_REG_RTR = {"w5100s": const(0x0017), "w5500": const(0x0019)}
+# *** Wiznet Common Registers ***
+# Mode (used only for initialization and soft reset).
+_REG_MR = {"w5100s": const(0x0000), "w5500": const(0x0000), "w6100": const(0x4000)}
+# Gateway IPv4 Address.
+_REG_GAR = {"w5100s": const(0x0001), "w5500": const(0x0001), "w6100": const(0x4130)}
+# Subnet Mask Address
+_REG_SUBR = {"w5100s": const(0x0005), "w5500": const(0x0005), "w6100": const(0x4134)}
+# Chip version.
+_REG_VERSIONR = {
+    "w5100s": const(0x0080),
+    "w5500": const(0x0039),
+    "w6100": const(0x0000),
+}
+# Source Hardware Address
+_REG_SHAR = {"w5100s": const(0x0009), "w5500": const(0x0009), "w6100": const(0x4120)}
+# Source IP Address
+_REG_SIPR = {"w5100s": const(0x000F), "w5500": const(0x000F), "w6100": const(0x4138)}
+# Register with link status flag (PHYCFGR for 5xxxx, PHYSR for 6100).
+_REG_LINK_FLAG = {
+    "w5100s": const(0x003C),
+    "w5500": const(0x002E),
+    "w6100": const(0x3000),
+}
+_REG_RCR = {"w5100s": const(0x0019), "w5500": const(0x001B), "w6100": const(0x4204)}
+_REG_RTR = {"w5100s": const(0x0017), "w5500": const(0x0019), "w6100": const(0x4200)}
 
-# Wiznet5k Socket Registers
+# Wiznet Socket Registers.
 _REG_SNMR = const(0x0000)  # Socket n Mode
 _REG_SNCR = const(0x0001)  # Socket n Command
 _REG_SNIR = const(0x0002)  # Socket n Interrupt
@@ -301,7 +316,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
         :return bytes: IP address as four bytes.
         """
-        return self._read(_REG_SIPR, 0x00, 4)
+        return self._read(_REG_SIPR[self._chip_type], 0x00, 4)
 
     @staticmethod
     def pretty_ip(ipv4: bytes) -> str:
@@ -338,7 +353,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
         :return bytes: Six byte MAC address.
         """
-        return self._read(_REG_SHAR, 0x00, 6)
+        return self._read(_REG_SHAR[self._chip_type], 0x00, 6)
 
     @mac_address.setter
     def mac_address(self, address: Union[MacAddressRaw, str]) -> None:
@@ -357,7 +372,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             if len(address) != 6:
                 raise ValueError()
             # Bytes conversion will raise ValueError if values are not 0-255
-            self._write(_REG_SHAR, 0x04, bytes(address))
+            self._write(_REG_SHAR[self._chip_type], 0x04, bytes(address))
         except ValueError:
             # pylint: disable=raise-missing-from
             raise ValueError("Invalid MAC address.")
@@ -417,7 +432,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         :return bool: True if the link is up, False if the link is down.
         """
         return bool(
-            int.from_bytes(self._read(_REG_PHYCFGR[self._chip_type], 0x00), "big")
+            int.from_bytes(self._read(_REG_LINK_FLAG[self._chip_type], 0x00), "big")
             & 0x01
         )
 
@@ -431,8 +446,8 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         """
         return (
             self.ip_address,
-            self._read(_REG_SUBR, 0x00, 4),
-            self._read(_REG_GAR, 0x00, 4),
+            self._read(_REG_SUBR[self._chip_type], 0x00, 4),
+            self._read(_REG_GAR[self._chip_type], 0x00, 4),
             self._dns,
         )
 
@@ -451,9 +466,9 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
                 raise ValueError("IPv4 address must be 4 bytes.")
         ip_address, subnet_mask, gateway_address, dns_server = params
 
-        self._write(_REG_SIPR, 0x04, bytes(ip_address))
-        self._write(_REG_SUBR, 0x04, bytes(subnet_mask))
-        self._write(_REG_GAR, 0x04, bytes(gateway_address))
+        self._write(_REG_SIPR[self._chip_type], 0x04, bytes(ip_address))
+        self._write(_REG_SUBR[self._chip_type], 0x04, bytes(subnet_mask))
+        self._write(_REG_GAR[self._chip_type], 0x04, bytes(gateway_address))
 
         self._dns = bytes(dns_server)
 
@@ -999,11 +1014,11 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
     def _read_mr(self) -> int:
         """Read from the Mode Register (MR)."""
-        return int.from_bytes(self._read(_REG_MR, 0x00), "big")
+        return int.from_bytes(self._read(_REG_MR[self._chip_type], 0x00), "big")
 
     def _write_mr(self, data: int) -> None:
         """Write to the mode register (MR)."""
-        self._write(_REG_MR, 0x04, data)
+        self._write(_REG_MR[self._chip_type], 0x04, data)
 
     # *** Low Level Methods ***
 
@@ -1131,7 +1146,9 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         """Read socket destination IP address."""
         data = []
         for offset in range(4):
-            data.append(self._read_socket_register(sock, _REG_SIPR + offset))
+            data.append(
+                self._read_socket_register(sock, _REG_SIPR[self._chip_type] + offset)
+            )
         return bytes(data)
 
     def write_sndipr(self, sock: int, ip_addr: bytes) -> None:
