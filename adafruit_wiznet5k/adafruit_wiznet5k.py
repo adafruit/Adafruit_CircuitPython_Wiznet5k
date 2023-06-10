@@ -1240,7 +1240,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
     def _chip_read(self, device: "busio.SPI", address: int, call_back: int) -> None:
         """Chip specific calls for _read method."""
-        if self._chip_type == "w5500":
+        if self._chip_type in ("w5500", "w6100"):
             device.write((address >> 8).to_bytes(1, "big"))
             device.write((address & 0xFF).to_bytes(1, "big"))
             device.write(call_back.to_bytes(1, "big"))
@@ -1251,7 +1251,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
     def _chip_write(self, device: "busio.SPI", address: int, call_back: int) -> None:
         """Chip specific calls for _write."""
-        if self._chip_type == "w5500":
+        if self._chip_type in ("w5500", "w6100"):
             device.write((address >> 8).to_bytes(1, "big"))
             device.write((address & 0xFF).to_bytes(1, "big"))
             device.write(call_back.to_bytes(1, "big"))
@@ -1262,7 +1262,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
     def _chip_socket_read(self, socket_number, pointer, bytes_to_read):
         """Chip specific calls for socket_read."""
-        if self._chip_type == "w5500":
+        if self._chip_type in ("w5500", "w6100"):
             # Read data from the starting address of snrx_rd
             ctrl_byte = 0x18 + (socket_number << 5)
             bytes_read = self._read(pointer, ctrl_byte, bytes_to_read)
@@ -1283,7 +1283,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         self, socket_number: int, offset: int, bytes_to_write: int, buffer: bytes
     ):
         """Chip specific calls for socket_write."""
-        if self._chip_type == "w5500":
+        if self._chip_type in ("w5500", "w6100"):
             dst_addr = offset + (socket_number * _SOCK_SIZE + 0x8000)
             cntl_byte = 0x14 + (socket_number << 5)
             self._write(dst_addr, cntl_byte, buffer[:bytes_to_write])
