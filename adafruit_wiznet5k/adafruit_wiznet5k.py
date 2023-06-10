@@ -82,18 +82,37 @@ _REG_LINK_FLAG = {
 _REG_RCR = {"w5100s": const(0x0019), "w5500": const(0x001B), "w6100": const(0x4204)}
 _REG_RTR = {"w5100s": const(0x0017), "w5500": const(0x0019), "w6100": const(0x4200)}
 
-# Wiznet Socket Registers.
-_REG_SNMR = const(0x0000)  # Socket n Mode
-_REG_SNCR = const(0x0001)  # Socket n Command
-_REG_SNIR = const(0x0002)  # Socket n Interrupt
-_REG_SNSR = const(0x0003)  # Socket n Status
-_REG_SNPORT = const(0x0004)  # Socket n Source Port
-_REG_SNDIPR = const(0x000C)  # Destination IP Address
-_REG_SNDPORT = const(0x0010)  # Destination Port
-_REG_SNRX_RSR = const(0x0026)  # RX Free Size
-_REG_SNRX_RD = const(0x0028)  # Read Size Pointer
-_REG_SNTX_FSR = const(0x0020)  # Socket n TX Free Size
-_REG_SNTX_WR = const(0x0024)  # TX Write Pointer
+# *** Wiznet Socket Registers ***
+# Socket n Mode.
+_REG_SNMR = const(0x0000)
+# Socket n Command.
+_REG_SNCR = {"w5100s": const(0x0001), "w5500": const(0x0001), "w6100": const(0x0010)}
+# Socket n Interrupt.
+_REG_SNIR = {"w5100s": const(0x0002), "w5500": const(0x0002), "w6100": const(0x0020)}
+# Socket n Status.
+_REG_SNSR = {"w5100s": const(0x0003), "w5500": const(0x0003), "w6100": const(0x0030)}
+# Socket n Source Port.
+_REG_SNPORT = {"w5100s": const(0x0004), "w5500": const(0x0004), "w6100": const(0x0114)}
+# Destination IPv4 Address.
+_REG_SNDIPR = {"w5100s": const(0x000C), "w5500": const(0x000C), "w6100": const(0x0120)}
+# Destination Port.
+_REG_SNDPORT = {"w5100s": const(0x0010), "w5500": const(0x0010), "w6100": const(0x0140)}
+# RX Free Size.
+_REG_SNRX_RSR = {
+    "w5100s": const(0x0026),
+    "w5500": const(0x0026),
+    "w6100": const(0x0224),
+}
+# Read Size Pointer.
+_REG_SNRX_RD = {"w5100s": const(0x0028), "w5500": const(0x0028), "w6100": const(0x0228)}
+# Socket n TX Free Size.
+_REG_SNTX_FSR = {
+    "w5100s": const(0x0020),
+    "w5500": const(0x0020),
+    "w6100": const(0x0204),
+}
+# TX Write Pointer.
+_REG_SNTX_WR = {"w5100s": const(0x0024), "w5500": const(0x0024), "w6100": const(0x020C)}
 
 # SNSR Commands
 SNSR_SOCK_CLOSED = const(0x00)
@@ -149,7 +168,7 @@ _LOCAL_PORT = const(0x400)
 _DEFAULT_MAC = (0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED)
 
 # Maximum number of sockets to support, differs between chip versions.
-_MAX_SOCK_NUM = {"w5100s": const(0x04), "w5500": const(0x08)}
+_MAX_SOCK_NUM = {"w5100s": const(0x04), "w5500": const(0x08), "w6100": const(0x08)}
 _SOCKET_INVALID = const(0xFF)
 
 
@@ -405,7 +424,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         self._sock_num_in_range(socket_num)
         for octet in range(4):
             self._pbuff[octet] = self._read_socket_register(
-                socket_num, _REG_SNDIPR + octet
+                socket_num, _REG_SNDIPR[self._chip_type] + octet
             )
         return self.pretty_ip(self._pbuff[:4])
 
@@ -420,7 +439,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         :raises ValueError: If the socket number is out of range.
         """
         self._sock_num_in_range(socket_num)
-        return self._read_two_byte_sock_reg(socket_num, _REG_SNDPORT)
+        return self._read_two_byte_sock_reg(socket_num, _REG_SNDPORT[self._chip_type])
 
     @property
     def link_status(self) -> bool:
@@ -1120,27 +1139,27 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
     def _read_snrx_rd(self, sock: int) -> int:
         """Read socket n RX Read Data Pointer Register."""
-        return self._read_two_byte_sock_reg(sock, _REG_SNRX_RD)
+        return self._read_two_byte_sock_reg(sock, _REG_SNRX_RD[self._chip_type])
 
     def _write_snrx_rd(self, sock: int, data: int) -> None:
         """Write socket n RX Read Data Pointer Register."""
-        self._write_two_byte_sock_reg(sock, _REG_SNRX_RD, data)
+        self._write_two_byte_sock_reg(sock, _REG_SNRX_RD[self._chip_type], data)
 
     def _read_sntx_wr(self, sock: int) -> int:
         """Read the socket write buffer pointer for socket `sock`."""
-        return self._read_two_byte_sock_reg(sock, _REG_SNTX_WR)
+        return self._read_two_byte_sock_reg(sock, _REG_SNTX_WR[self._chip_type])
 
     def _write_sntx_wr(self, sock: int, data: int) -> None:
         """Write the socket write buffer pointer for socket `sock`."""
-        self._write_two_byte_sock_reg(sock, _REG_SNTX_WR, data)
+        self._write_two_byte_sock_reg(sock, _REG_SNTX_WR[self._chip_type], data)
 
     def _read_sntx_fsr(self, sock: int) -> int:
         """Read socket n TX Free Size Register"""
-        return self._read_two_byte_sock_reg(sock, _REG_SNTX_FSR)
+        return self._read_two_byte_sock_reg(sock, _REG_SNTX_FSR[self._chip_type])
 
     def _read_snrx_rsr(self, sock: int) -> int:
         """Read socket n Received Size Register"""
-        return self._read_two_byte_sock_reg(sock, _REG_SNRX_RSR)
+        return self._read_two_byte_sock_reg(sock, _REG_SNRX_RSR[self._chip_type])
 
     def _read_sndipr(self, sock) -> bytes:
         """Read socket destination IP address."""
@@ -1154,23 +1173,25 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
     def write_sndipr(self, sock: int, ip_addr: bytes) -> None:
         """Write to socket destination IP Address."""
         for offset, value in enumerate(ip_addr):
-            self._write_socket_register(sock, _REG_SNDIPR + offset, value)
+            self._write_socket_register(
+                sock, _REG_SNDIPR[self._chip_type] + offset, value
+            )
 
     def write_sndport(self, sock: int, port: int) -> None:
         """Write to socket destination port."""
-        self._write_two_byte_sock_reg(sock, _REG_SNDPORT, port)
+        self._write_two_byte_sock_reg(sock, _REG_SNDPORT[self._chip_type], port)
 
     def read_snsr(self, sock: int) -> int:
         """Read Socket n Status Register."""
-        return self._read_socket_register(sock, _REG_SNSR)
+        return self._read_socket_register(sock, _REG_SNSR[self._chip_type])
 
     def read_snir(self, sock: int) -> int:
         """Read Socket n Interrupt Register."""
-        return self._read_socket_register(sock, _REG_SNIR)
+        return self._read_socket_register(sock, _REG_SNIR[self._chip_type])
 
     def write_snir(self, sock: int, data: int) -> None:
         """Write to Socket n Interrupt Register."""
-        self._write_socket_register(sock, _REG_SNIR, data)
+        self._write_socket_register(sock, _REG_SNIR[self._chip_type], data)
 
     def _read_snmr(self, sock: int) -> int:
         """Read the socket MR register."""
@@ -1182,13 +1203,13 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
     def write_sock_port(self, sock: int, port: int) -> None:
         """Write to the socket port number."""
-        self._write_two_byte_sock_reg(sock, _REG_SNPORT, port)
+        self._write_two_byte_sock_reg(sock, _REG_SNPORT[self._chip_type], port)
 
     def write_sncr(self, sock: int, data: int) -> None:
         """Write to socket command register."""
-        self._write_socket_register(sock, _REG_SNCR, data)
+        self._write_socket_register(sock, _REG_SNCR[self._chip_type], data)
         # Wait for command to complete before continuing.
-        while self._read_socket_register(sock, _REG_SNCR):
+        while self._read_socket_register(sock, _REG_SNCR[self._chip_type]):
             pass
 
     @property
