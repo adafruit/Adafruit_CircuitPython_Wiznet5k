@@ -940,6 +940,14 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
     def sw_reset(self) -> None:
         """
+        Soft reset and reinitialize the WIZnet chip.
+
+        :raises RuntimeError: If reset fails.
+        """
+        self._wiznet_chip_init()
+
+    def _sw_reset(self) -> None:
+        """
         Perform a soft reset on the WIZnet chip.
 
         :raises RuntimeError: If reset fails.
@@ -967,7 +975,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             """
             self._chip_type = "w6100"
             try:
-                self.sw_reset()
+                self._sw_reset()
             except RuntimeError:
                 return False
 
@@ -993,7 +1001,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             """
             self._chip_type = "w5500"
             try:
-                self.sw_reset()
+                self._sw_reset()
             except RuntimeError:
                 return False
 
@@ -1030,7 +1038,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             """
             self._chip_type = "w5100s"
             try:
-                self.sw_reset()
+                self._sw_reset()
             except RuntimeError:
                 return False
 
