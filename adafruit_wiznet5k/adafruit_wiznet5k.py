@@ -242,7 +242,6 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         self.src_port = 0
         self._dns = b"\x00\x00\x00\x00"
         # udp related
-        self.udp_datasize = [0] * self.max_sockets
         self.udp_from_ip = [b"\x00\x00\x00\x00"] * self.max_sockets
         self.udp_from_port = [0] * self.max_sockets
 
@@ -513,22 +512,27 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         self._sock_num_in_range(socket_num)
 
         number_of_bytes = self._get_rx_rcv_size(socket_num)
+        if self.read_snsr(socket_num) == SNMR_UDP:
+            number_of_bytes -= 8  # Subtract UDP header from packet size.
+        if number_of_bytes < 0:
+            raise ValueError("Negative number of bytes found on socket.")
+        return number_of_bytes
 
-        if sock_type == _SNMR_TCP:
-            return number_of_bytes
-        if number_of_bytes > 0:
-            if self.udp_datasize[socket_num]:
-                return self.udp_datasize[socket_num]
-            # parse the udp rx packet
-            # read the first 8 header bytes
-            udp_bytes, self._pbuff[:8] = self.socket_read(socket_num, 8)
-            if udp_bytes > 0:
-                self.udp_from_ip[socket_num] = self._pbuff[:4]
-                self.udp_from_port[socket_num] = (self._pbuff[4] << 8) + self._pbuff[5]
-                self.udp_datasize[socket_num] = (self._pbuff[6] << 8) + self._pbuff[7]
-                udp_bytes = self.udp_datasize[socket_num]
-                return udp_bytes
-        return 0
+        # if sock_type == _SNMR_TCP:
+        #     return number_of_bytes
+        # if number_of_bytes > 0:
+        #     if self.udp_datasize[socket_num]:
+        #         return self.udp_datasize[socket_num]
+        #     # parse the udp rx packet
+        #     # read the first 8 header bytes
+        #     udp_bytes, self._pbuff[:8] = self.socket_read(socket_num, 8)
+        #     if udp_bytes > 0:
+        #         self.udp_from_ip[socket_num] = self._pbuff[:4]
+        #         self.udp_from_port[socket_num] = (self._pbuff[4] << 8) + self._pbuff[5]
+        #         self.udp_datasize[socket_num] = (self._pbuff[6] << 8) + self._pbuff[7]
+        #         udp_bytes = self.udp_datasize[socket_num]
+        #         return udp_bytes
+        # return 0
 
     def socket_status(self, socket_num: int) -> int:
         """
@@ -590,8 +594,6 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
                 )
                 if self.socket_status(socket_num) == SNSR_SOCK_CLOSED:
                     raise ConnectionError("Failed to establish connection.")
-        elif conn_mode == SNMR_UDP:
-            self.udp_datasize[socket_num] = 0
         return 1
 
     def get_socket(self, *, reserve_socket=False) -> int:
@@ -805,7 +807,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         :param int socket_num: The socket to read data from.
         :param int length: The number of bytes to read from the socket.
 
-        :return Tuple[int, bytes]: If the read was successful then the first
+        :returns Tuple[int, bytes]: If the read was successful then the first
             item of the tuple is the length of the data and the second is the data.
             If the read was unsuccessful then 0, b"" is returned.
 
@@ -858,16 +860,24 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         """
         self._sock_num_in_range(socket_num)
         bytes_on_socket, bytes_read = 0, b""
-        if self.udp_datasize[socket_num] > 0:
-            if self.udp_datasize[socket_num] <= length:
+        # Parse the UDP Rx packet.
+        _, self._pbuff[:8] = self.socket_read(socket_num, 8)
+        try:
+            self.udp_from_ip[socket_num] = self._pbuff[:4]
+            self.udp_from_port[socket_num] = int.from_bytes(self._pbuff[4:6], "big")
+            udp_data_bytes = int.from_bytes(self._pbuff[6:8], "big")
+        except IndexError as err:
+            raise IndexError("Invalid UDP packet header.") from err
+        # Read the UDP packet data.
+        if udp_data_bytes:
+            if udp_data_bytes <= length:
                 bytes_on_socket, bytes_read = self.socket_read(
-                    socket_num, self.udp_datasize[socket_num]
+                    socket_num, udp_data_bytes
                 )
             else:
                 bytes_on_socket, bytes_read = self.socket_read(socket_num, length)
                 # just consume the rest, it is lost to the higher layers
-                self.socket_read(socket_num, self.udp_datasize[socket_num] - length)
-            self.udp_datasize[socket_num] = 0
+                self.socket_read(socket_num, udp_data_bytes - length)
         return bytes_on_socket, bytes_read
 
     def socket_write(
