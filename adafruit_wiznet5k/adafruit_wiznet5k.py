@@ -1120,27 +1120,6 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
                 pass
             bus_device.write(data)
 
-    def _write_socket_register(self, sock: int, address: int, data: int) -> None:
-        """Write to a WIZnet 5k socket register."""
-        if self._chip_type in ("w5500", "w6100"):
-            cntl_byte = (sock << 5) + 0x0C
-            self._write(address, cntl_byte, data)
-        elif self._chip_type == "w5100s":
-            cntl_byte = 0
-            self._write(self._ch_base_msb + sock * _CH_SIZE + address, cntl_byte, data)
-
-    def _read_socket_register(self, sock: int, address: int) -> int:
-        """Read a WIZnet 5k socket register."""
-        if self._chip_type in ("w5500", "w6100"):
-            cntl_byte = (sock << 5) + 0x08
-            register = self._read(address, cntl_byte)
-        elif self._chip_type == "w5100s":
-            cntl_byte = 0
-            register = self._read(
-                self._ch_base_msb + sock * _CH_SIZE + address, cntl_byte
-            )
-        return int.from_bytes(register, "big")
-
     def _read_two_byte_sock_reg(self, sock: int, reg_address: int) -> int:
         """Read a two byte socket register."""
         register = self._read_socket_register(sock, reg_address) << 8
@@ -1353,3 +1332,24 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             self.udp_from_port[socket_num] = int.from_bytes(self._pbuff[6:], "big")
             return int.from_bytes(self._pbuff[:2], "big") & 0x07FF
         raise ValueError("Unsupported chip type.")
+
+    def _write_socket_register(self, sock: int, address: int, data: int) -> None:
+        """Write to a WIZnet 5k socket register."""
+        if self._chip_type in ("w5500", "w6100"):
+            cntl_byte = (sock << 5) + 0x0C
+            self._write(address, cntl_byte, data)
+        elif self._chip_type == "w5100s":
+            cntl_byte = 0
+            self._write(self._ch_base_msb + sock * _CH_SIZE + address, cntl_byte, data)
+
+    def _read_socket_register(self, sock: int, address: int) -> int:
+        """Read a WIZnet 5k socket register."""
+        if self._chip_type in ("w5500", "w6100"):
+            cntl_byte = (sock << 5) + 0x08
+            register = self._read(address, cntl_byte)
+        elif self._chip_type == "w5100s":
+            cntl_byte = 0
+            register = self._read(
+                self._ch_base_msb + sock * _CH_SIZE + address, cntl_byte
+            )
+        return int.from_bytes(register, "big")
