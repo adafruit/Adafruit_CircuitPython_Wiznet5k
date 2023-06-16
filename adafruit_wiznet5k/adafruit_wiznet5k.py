@@ -860,24 +860,19 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         """
         self._sock_num_in_range(socket_num)
         bytes_on_socket, bytes_read = 0, b""
-        # Parse the UDP Rx packet.
-        _, self._pbuff[:8] = self.socket_read(socket_num, 8)
-        try:
-            self.udp_from_ip[socket_num] = self._pbuff[:4]
-            self.udp_from_port[socket_num] = int.from_bytes(self._pbuff[4:6], "big")
-            udp_data_bytes = int.from_bytes(self._pbuff[6:8], "big")
-        except IndexError as err:
-            raise IndexError("Invalid UDP packet header.") from err
+        # Parse the UDP packet header.
+        header_length, self._pbuff[:8] = self.socket_read(socket_num, 8)
+        if header_length != 8:
+            raise ValueError("Invalid UDP header.")
+        data_length = self._chip_parse_udp_header(socket_num)
         # Read the UDP packet data.
-        if udp_data_bytes:
-            if udp_data_bytes <= length:
-                bytes_on_socket, bytes_read = self.socket_read(
-                    socket_num, udp_data_bytes
-                )
+        if data_length:
+            if data_length <= length:
+                bytes_on_socket, bytes_read = self.socket_read(socket_num, data_length)
             else:
                 bytes_on_socket, bytes_read = self.socket_read(socket_num, length)
                 # just consume the rest, it is lost to the higher layers
-                self.socket_read(socket_num, udp_data_bytes - length)
+                self.socket_read(socket_num, data_length - length)
         return bytes_on_socket, bytes_read
 
     def socket_write(
@@ -1340,3 +1335,21 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
                 self._write(dst_addr, 0x00, buffer[split_point:bytes_to_write])
             else:
                 self._write(dst_addr, 0x00, buffer[:bytes_to_write])
+
+    def _chip_parse_udp_header(self, socket_num) -> int:
+        """
+        Parse chip specific UDP header data for IPv4 packets.
+
+        Sets the source IPv4 address and port number and returns the UDP data length.
+
+        :return int: The UDP data length.
+        """
+        if self._chip_type in ("w5100s", "w5500"):
+            self.udp_from_ip[socket_num] = self._pbuff[:4]
+            self.udp_from_port[socket_num] = int.from_bytes(self._pbuff[4:6], "big")
+            return int.from_bytes(self._pbuff[6:], "big")
+        if self._chip_type == "w6100":
+            self.udp_from_ip[socket_num] = self._pbuff[3:7]
+            self.udp_from_port[socket_num] = int.from_bytes(self._pbuff[6:], "big")
+            return int.from_bytes(self._pbuff[:2], "big") & 0x07FF
+        raise ValueError("Unsupported chip type.")

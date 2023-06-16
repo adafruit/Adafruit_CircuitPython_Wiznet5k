@@ -295,30 +295,18 @@ class DHCP:
         :returns int: The number of bytes stored in the global buffer.
         """
         debug_msg("Receiving a DHCP response.", self._debug)
-        # DHCP returns the query plus additional data. The query length is 236 bytes.
-        minimum_packet_length = 236
-        buffer = bytearray(b"")
-        bytes_read = 0
-        debug_msg("+ Beginning to receive…", self._debug)
-        while bytes_read < minimum_packet_length and time.monotonic() < timeout:
-            if self._eth.socket_available(self._wiz_sock, _SNMR_UDP):
-                x = self._eth.read_udp(self._wiz_sock, _BUFF_LENGTH - bytes_read)[1]
-                buffer.extend(x)
-                bytes_read = len(buffer)
-                debug_msg("+ Bytes read so far {}".format(bytes_read), self._debug)
-                debug_msg(x, self._debug)
-            if bytes_read == _BUFF_LENGTH:
-                break
-        debug_msg("Received {} bytes".format(bytes_read), self._debug)
-        if bytes_read < minimum_packet_length:
-            bytes_read = 0
-        else:
-            _BUFF[:bytes_read] = buffer
-            _BUFF[bytes_read:] = bytearray(_BUFF_LENGTH - bytes_read)
-        del buffer
-        gc.collect()
-        debug_msg(_BUFF[:bytes_read], self._debug)
-        return bytes_read
+        while time.monotonic() < timeout:
+            # DHCP returns the query plus additional data. The query length is 236 bytes.
+            if self._eth.socket_available(self._wiz_sock, _SNMR_UDP) > 236:
+                bytes_count, bytes_read = self._eth.read_udp(
+                    self._wiz_sock, _BUFF_LENGTH
+                )
+                _BUFF[:bytes_count] = bytes_read
+                debug_msg("Received {} bytes".format(bytes_count), self._debug)
+                del bytes_read
+                gc.collect()
+                return bytes_count
+        raise TimeoutError("No DHCP response received.")
 
     def _process_messaging_states(self, *, message_type: int):
         """
