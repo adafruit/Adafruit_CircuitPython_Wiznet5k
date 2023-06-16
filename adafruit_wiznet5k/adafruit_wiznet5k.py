@@ -5,6 +5,7 @@
 # SPDX-FileCopyrightText: 2020 Brent Rubell for Adafruit Industries
 # SPDX-FileCopyrightText: 2021 Patrick Van Oosterwijck
 # SPDX-FileCopyrightText: 2021 Adam Cummick
+# SPDX-FileCopyrightText: 2023 Martin Stephens
 #
 # SPDX-License-Identifier: MIT
 """
@@ -155,7 +156,7 @@ _SOCK_MASK = const(0x7FF)
 _MR_RST = const(0x80)  # Mode Register RST
 # Socket mode register
 _SNMR_CLOSE = const(0x00)
-_SNMR_TCP = const(0x21)
+SNMR_TCP = const(0x21)
 SNMR_UDP = const(0x02)
 _SNMR_IPRAW = const(0x03)
 _SNMR_MACRAW = const(0x04)
@@ -377,7 +378,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         """
         Set the WIZnet hardware MAC address.
 
-        :param Union[MacAddressRaw, str] address: A 6 byte hardware MAC address.
+        :param Union[MacAddressRaw, str] address: A hardware MAC address.
 
         :raises ValueError: If the MAC address is invalid
         """
@@ -397,7 +398,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
     @staticmethod
     def pretty_mac(mac: bytes) -> str:
         """
-        Convert a byte MAC address to a ':' seperated string for display.
+        Convert a bytes MAC address to a ':' seperated string for display.
 
         :param bytes mac: The MAC address.
 
@@ -406,7 +407,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         :raises ValueError: If MAC address is not 6 bytes.
         """
         if len(mac) != 6:
-            raise ValueError("Wrong length for MAC address.")
+            raise ValueError("Incorrect length for MAC address.")
         return ":".join(f"{byte:02x}" for byte in mac)
 
     def remote_ip(self, socket_num: int) -> str:
@@ -491,7 +492,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
     # *** Public Socket Methods ***
 
-    def socket_available(self, socket_num: int, sock_type: int = _SNMR_TCP) -> int:
+    def socket_available(self, socket_num: int, sock_type: int = SNMR_TCP) -> int:
         """
         Number of bytes available to be read from the socket.
 
@@ -502,6 +503,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         :return int: Number of bytes available to read.
 
         :raises ValueError: If the socket number is out of range.
+        :raises ValueError: If the number of bytes on a UDP socket is negative.
         """
         debug_msg(
             "socket_available called on socket {}, protocol {}".format(
@@ -517,22 +519,6 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         if number_of_bytes < 0:
             raise ValueError("Negative number of bytes found on socket.")
         return number_of_bytes
-
-        # if sock_type == _SNMR_TCP:
-        #     return number_of_bytes
-        # if number_of_bytes > 0:
-        #     if self.udp_datasize[socket_num]:
-        #         return self.udp_datasize[socket_num]
-        #     # parse the udp rx packet
-        #     # read the first 8 header bytes
-        #     udp_bytes, self._pbuff[:8] = self.socket_read(socket_num, 8)
-        #     if udp_bytes > 0:
-        #         self.udp_from_ip[socket_num] = self._pbuff[:4]
-        #         self.udp_from_port[socket_num] = (self._pbuff[4] << 8) + self._pbuff[5]
-        #         self.udp_datasize[socket_num] = (self._pbuff[6] << 8) + self._pbuff[7]
-        #         udp_bytes = self.udp_datasize[socket_num]
-        #         return udp_bytes
-        # return 0
 
     def socket_status(self, socket_num: int) -> int:
         """
@@ -552,9 +538,9 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
     def socket_connect(
         self,
         socket_num: int,
-        dest: Union[bytes, IpAddress4Raw],
+        dest: IpAddress4Raw,
         port: int,
-        conn_mode: int = _SNMR_TCP,
+        conn_mode: int = SNMR_TCP,
     ) -> int:
         """
         Open and verify a connection from a socket to a destination IPv4 address
@@ -562,7 +548,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         be made.
 
         :param int socket_num: ID of the socket to be connected.
-        :param Union[bytes, Address4Bytes] dest: The destination as a host name or IP address.
+        :param IpAddress4Raw dest: The destination as a host name or IP address.
         :param int port: Port to connect to (0 - 65,535).
         :param int conn_mode: The connection mode. Use SNMR_TCP for TCP or SNMR_UDP for UDP,
             defaults to SNMR_TCP.
@@ -585,7 +571,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         self.write_sndport(socket_num, port)
         self.write_sncr(socket_num, _CMD_SOCK_CONNECT)
 
-        if conn_mode == _SNMR_TCP:
+        if conn_mode == SNMR_TCP:
             # wait for tcp connection establishment
             while self.socket_status(socket_num) != SNSR_SOCK_ESTABLISHED:
                 time.sleep(0.001)
@@ -652,7 +638,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         WIZNET5K._sockets_reserved[socket_number - 1] = False
 
     def socket_listen(
-        self, socket_num: int, port: int, conn_mode: int = _SNMR_TCP
+        self, socket_num: int, port: int, conn_mode: int = SNMR_TCP
     ) -> None:
         """
         Listen on a socket's port.
@@ -717,7 +703,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         )
         return next_socknum, (dest_ip, dest_port)
 
-    def socket_open(self, socket_num: int, conn_mode: int = _SNMR_TCP) -> None:
+    def socket_open(self, socket_num: int, conn_mode: int = SNMR_TCP) -> None:
         """
         Open an IP socket.
 
