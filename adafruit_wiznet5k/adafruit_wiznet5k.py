@@ -848,6 +848,8 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         bytes_on_socket, bytes_read = 0, b""
         # Parse the UDP packet header.
         header_length, self._pbuff[:8] = self.socket_read(socket_num, 8)
+        if not header_length:
+            return bytes_on_socket, bytes_read
         if header_length != 8:
             raise ValueError("Invalid UDP header.")
         data_length = self._chip_parse_udp_header(socket_num)
