@@ -1171,7 +1171,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         data = []
         for offset in range(4):
             data.append(
-                self._read_socket_register(sock, _REG_SIPR[self._chip_type] + offset)
+                self._read_socket_register(sock, _REG_SNDIPR[self._chip_type] + offset)
             )
         return bytes(data)
 
