@@ -261,7 +261,7 @@ class DNS:
         ipaddress = -1
         for _ in range(5):
             #  wait for a response
-            socket_timeout = time.monotonic() + 1.0
+            socket_timeout = time.monotonic() + 5.0
             while not self._iface.socket_available(dns_socket, 0x02):
                 if time.monotonic() > socket_timeout:
                     _debug_print(
