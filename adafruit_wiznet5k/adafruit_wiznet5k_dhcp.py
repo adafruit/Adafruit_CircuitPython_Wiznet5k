@@ -366,9 +366,8 @@ class DHCP:
             raise ValueError(
                 "FSM can only send messages while in SELECTING or REQUESTING states."
             )
+        message_length = self._generate_dhcp_message(message_type=msg_type_out)
         for attempt in range(4):  # Initial attempt plus 3 retries.
-            message_length = self._generate_dhcp_message(message_type=msg_type_out)
-
             if self._renew:
                 dhcp_server_address = self.dhcp_server_ip
             else:
