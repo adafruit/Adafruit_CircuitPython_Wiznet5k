@@ -197,7 +197,6 @@ class DHCP:
         state machine INIT state."""
         debug_msg("Resetting DHCP state machine.", self._debug)
         self._socket_release()
-        self._dhcp_connection_setup()
         self.dhcp_server_ip = _BROADCAST_SERVER_ADDR
         self._eth.ifconfig = (
             _UNASSIGNED_IP_ADDR,
@@ -366,6 +365,7 @@ class DHCP:
             raise ValueError(
                 "FSM can only send messages while in SELECTING or REQUESTING states."
             )
+        self._dhcp_connection_setup()
         message_length = self._generate_dhcp_message(message_type=msg_type_out)
         for attempt in range(4):  # Initial attempt plus 3 retries.
             if self._renew:
@@ -431,7 +431,6 @@ class DHCP:
             if self._dhcp_state == _STATE_RENEWING:
                 debug_msg("FSM state is RENEWING.", self._debug)
                 self._renew = "renew"
-                self._dhcp_connection_setup()
                 self._start_time = time.monotonic()
                 self._dhcp_state = _STATE_REQUESTING
 
@@ -439,7 +438,6 @@ class DHCP:
                 debug_msg("FSM state is REBINDING.", self._debug)
                 self._renew = "rebind"
                 self.dhcp_server_ip = _BROADCAST_SERVER_ADDR
-                self._dhcp_connection_setup()
                 self._start_time = time.monotonic()
                 self._dhcp_state = _STATE_REQUESTING
 
