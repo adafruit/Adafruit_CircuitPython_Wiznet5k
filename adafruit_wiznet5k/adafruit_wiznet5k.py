@@ -1057,6 +1057,11 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         if not self.link_status:
             raise ConnectionError("The Ethernet connection is down.")
 
+    @staticmethod
+    def _read_socket_reservations() -> list[int]:
+        """Return the list of reserved sockets."""
+        return WIZNET5K._sockets_reserved
+
     def _read_mr(self) -> int:
         """Read from the Mode Register (MR)."""
         return int.from_bytes(self._read(_REG_MR[self._chip_type], 0x00), "big")
@@ -1181,6 +1186,10 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             self._write_socket_register(
                 sock, _REG_SNDIPR[self._chip_type] + offset, value
             )
+
+    def _read_sndport(self, sock: int) -> int:
+        """Read socket destination port."""
+        return self._read_two_byte_sock_reg(sock, _REG_SNDPORT[self._chip_type])
 
     def _write_sndport(self, sock: int, port: int) -> None:
         """Write to socket destination port."""
