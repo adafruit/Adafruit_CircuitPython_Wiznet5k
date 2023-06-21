@@ -196,7 +196,6 @@ class DHCP:
         """Close the socket and set attributes to default values used by the
         state machine INIT state."""
         debug_msg("Resetting DHCP state machine.", self._debug)
-        self._socket_release()
         self.dhcp_server_ip = _BROADCAST_SERVER_ADDR
         self._eth.ifconfig = (
             _UNASSIGNED_IP_ADDR,
@@ -215,7 +214,7 @@ class DHCP:
     def _socket_release(self) -> None:
         """Close the socket if it exists."""
         debug_msg("Releasing socket.", self._debug)
-        if self._wiz_sock:
+        if self._wiz_sock is not None:
             self._eth.socket_close(self._wiz_sock)
             self._wiz_sock = None
         debug_msg("  Socket released.", self._debug)
@@ -386,12 +385,16 @@ class DHCP:
                         return msg_type_in
                     except ValueError as error:
                         debug_msg(error, self._debug)
+                    finally:
+                        self._socket_release()
                 if not self._blocking or self._renew:
                     debug_msg(
                         "No message, FSM is nonblocking or renewing, exiting loop.",
                         self._debug,
                     )
+                    self._socket_release()
                     return 0  # Did not receive a response in a single attempt.
+        self._socket_release()
         raise TimeoutError(
             "No response from DHCP server after {} retries.".format(attempt)
         )
@@ -409,7 +412,6 @@ class DHCP:
                 now = time.monotonic()
                 if now < self._t1:
                     debug_msg("No timers have expired. Exiting FSM.", self._debug)
-                    self._socket_release()
                     return
                 if now > self._lease:
                     debug_msg(
