@@ -70,17 +70,17 @@ def getdefaulttimeout() -> Optional[float]:
     return _default_socket_timeout
 
 
-def setdefaulttimeout(timeout: Optional[float]) -> None:
+def setdefaulttimeout(_timeout: Optional[float]) -> None:
     """
     Set the default timeout in seconds (float) for new socket objects. When the socket
     module is first imported, the default is None. See settimeout() for possible values
     and their respective meanings.
 
-    :param Optional[float] timeout: The default timeout in seconds or None.
+    :param Optional[float] _timeout: The default timeout in seconds or None.
     """
     global _default_socket_timeout  # pylint: disable=global-statement
-    if timeout is None or (isinstance(timeout, (int, float)) and timeout >= 0):
-        _default_socket_timeout = timeout
+    if _timeout is None or (isinstance(_timeout, (int, float)) and _timeout >= 0):
+        _default_socket_timeout = _timeout
     else:
         raise ValueError("Timeout must be None, 0.0 or a positive numeric value.")
 
@@ -450,8 +450,8 @@ class socket:
 
         :return int: Number of bytes sent.
         """
-        timeout = 0 if self._timeout is None else self._timeout
-        bytes_sent = _the_interface.socket_write(self._socknum, data, timeout)
+        _timeout = 0 if self._timeout is None else self._timeout
+        bytes_sent = _the_interface.socket_write(self._socknum, data, _timeout)
         gc.collect()
         return bytes_sent
 
@@ -498,7 +498,7 @@ class socket:
         stamp = time.monotonic()
         while not self._available():
             if self._timeout and 0 < self._timeout < time.monotonic() - stamp:
-                break
+                raise timeout("timed out")
             time.sleep(0.05)
         bytes_on_socket = self._available()
         if not bytes_on_socket:
@@ -730,3 +730,11 @@ class socket:
     def proto(self):
         """Socket protocol (always 0x00 in this implementation)."""
         return 0
+
+
+class timeout(TimeoutError):
+    """TimeoutError class. An instance of this error will be raised by recv_into() if
+    the timeout has elapsed and we haven't received any data yet."""
+
+    def __init__(self, msg):
+        super().__init__(msg)
