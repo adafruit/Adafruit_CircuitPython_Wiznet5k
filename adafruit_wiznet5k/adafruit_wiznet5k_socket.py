@@ -410,7 +410,7 @@ class socket:
         current_socknum = self._socknum
         # Create a new socket object and swap socket nums, so we can continue listening
         client_sock = socket()
-        self._socknum = client_sock._socknum
+        self._socknum = client_sock._socknum  # pylint: disable=protected-access
         client_sock._socknum = current_socknum  # pylint: disable=protected-access
         self._bind((None, self._listen_port))
         self.listen()
