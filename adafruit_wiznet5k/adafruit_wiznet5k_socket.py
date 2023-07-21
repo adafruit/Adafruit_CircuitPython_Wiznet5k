@@ -406,12 +406,12 @@ class socket:
                 self.close()
                 self.listen()
 
-        new_listen_socknum, addr = _the_interface.socket_accept(self._socknum)
+        _, addr = _the_interface.socket_accept(self._socknum)
         current_socknum = self._socknum
         # Create a new socket object and swap socket nums, so we can continue listening
         client_sock = socket()
+        self._socknum = client_sock._socknum  # pylint: disable=protected-access
         client_sock._socknum = current_socknum  # pylint: disable=protected-access
-        self._socknum = new_listen_socknum
         self._bind((None, self._listen_port))
         self.listen()
         while self._status != wiznet5k.adafruit_wiznet5k.SNSR_SOCK_LISTEN:
