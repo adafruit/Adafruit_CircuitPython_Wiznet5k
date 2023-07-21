@@ -147,7 +147,6 @@ class DHCP:
 
         # Set socket interface
         self._eth = eth
-        self._wiz_sock = None
 
         # DHCP state machine
         self._dhcp_state = _STATE_INIT
@@ -196,8 +195,6 @@ class DHCP:
         """Close the socket and set attributes to default values used by the
         state machine INIT state."""
         debug_msg("Resetting DHCP state machine.", self._debug)
-        self._socket_release()
-        self._dhcp_connection_setup()
         self.dhcp_server_ip = _BROADCAST_SERVER_ADDR
         self._eth.ifconfig = (
             _UNASSIGNED_IP_ADDR,
@@ -212,45 +209,6 @@ class DHCP:
         self._renew = None
         self._increment_transaction_id()
         self._start_time = time.monotonic()
-
-    def _socket_release(self) -> None:
-        """Close the socket if it exists."""
-        debug_msg("Releasing socket.", self._debug)
-        if self._wiz_sock:
-            self._eth.socket_close(self._wiz_sock)
-            self._wiz_sock = None
-        debug_msg("  Socket released.", self._debug)
-
-    def _dhcp_connection_setup(self, timeout: float = 5.0) -> None:
-        """Initialise a UDP socket.
-
-        Attempt to initialise a UDP socket. If the finite state machine (FSM) is in
-        blocking mode, repeat failed attempts until a socket is initialised or
-        the operation times out, then raise an exception. If the FSM is in non-blocking
-        mode, ignore the error and return.
-
-        :param int timeout: Time to keep retrying if the FSM is in blocking mode.
-            Defaults to 5.
-
-        :raises TimeoutError: If the FSM is in blocking mode and a socket cannot be
-            initialised.
-        """
-        stop_time = time.monotonic() + timeout
-        debug_msg("Setting up connection for DHCP.", self._debug)
-        while self._wiz_sock is None and time.monotonic() < stop_time:
-            self._wiz_sock = self._eth.get_socket()
-            if self._wiz_sock == 0xFF:
-                self._wiz_sock = None
-        while time.monotonic() < stop_time:
-            self._eth.write_snmr(self._wiz_sock, 0x02)  # Set UDP connection
-            self._eth.write_sock_port(self._wiz_sock, 68)  # Set DHCP client port.
-            self._eth.write_sncr(self._wiz_sock, 0x01)  # Open the socket.
-            if self._eth.read_snsr(self._wiz_sock) == 0x22:
-                self._eth.write_sndport(2, _DHCP_SERVER_PORT)
-                debug_msg("+ Connection OK, port set.", self._debug)
-                return
-        self._wiz_sock = None
-        raise RuntimeError("Unable to initialize UDP socket.")
 
     def _increment_transaction_id(self) -> None:
         """Increment the transaction ID and roll over from 0x7fffffff to 0."""
@@ -280,7 +238,7 @@ class DHCP:
         delay = 2**attempt * interval + randint(-1, 1) + time.monotonic()
         return delay
 
-    def _receive_dhcp_response(self, timeout: float) -> int:
+    def _receive_dhcp_response(self, socket_num: int, timeout: float) -> int:
         """
         Receive data from the socket in response to a DHCP query.
 
@@ -290,23 +248,22 @@ class DHCP:
         If the packet is too short, it is discarded and zero is returned. The
         maximum packet size is limited by the size of the global buffer.
 
-        :param float timeout: time.monotonic at which attempt should timeout.
+        :param int socket_num: Socket to read from.
+        :param float timeout: time.monotonic at which attempt should time out.
 
         :returns int: The number of bytes stored in the global buffer.
         """
         debug_msg("Receiving a DHCP response.", self._debug)
         while time.monotonic() < timeout:
             # DHCP returns the query plus additional data. The query length is 236 bytes.
-            if self._eth.socket_available(self._wiz_sock, _SNMR_UDP) > 236:
-                bytes_count, bytes_read = self._eth.read_udp(
-                    self._wiz_sock, _BUFF_LENGTH
-                )
+            if self._eth.socket_available(socket_num, _SNMR_UDP) > 236:
+                bytes_count, bytes_read = self._eth.read_udp(socket_num, _BUFF_LENGTH)
                 _BUFF[:bytes_count] = bytes_read
                 debug_msg("Received {} bytes".format(bytes_count), self._debug)
                 del bytes_read
                 gc.collect()
                 return bytes_count
-        raise TimeoutError("No DHCP response received.")
+        return 0  # No bytes received.
 
     def _process_messaging_states(self, *, message_type: int):
         """
@@ -357,6 +314,7 @@ class DHCP:
         :raises TimeoutError: If the FSM is in blocking mode and no valid response has
             been received before the timeout expires.
         """
+        # pylint: disable=too-many-branches
         debug_msg("Processing SELECTING or REQUESTING state.", self._debug)
         if self._dhcp_state == _STATE_SELECTING:
             msg_type_out = _DHCP_DISCOVER
@@ -366,36 +324,53 @@ class DHCP:
             raise ValueError(
                 "FSM can only send messages while in SELECTING or REQUESTING states."
             )
-        for attempt in range(4):  # Initial attempt plus 3 retries.
-            message_length = self._generate_dhcp_message(message_type=msg_type_out)
+        debug_msg("Setting up connection for DHCP.", self._debug)
+        if self._renew:
+            dhcp_server = self.dhcp_server_ip
+        else:
+            dhcp_server = _BROADCAST_SERVER_ADDR
+        sock_num = None
+        deadline = time.monotonic() + 5.0
+        try:
+            while sock_num is None:
+                sock_num = self._eth.get_socket()
+                if sock_num == 0xFF:
+                    sock_num = None
+                if time.monotonic() > deadline:
+                    raise RuntimeError("Unable to initialize UDP socket.")
 
-            if self._renew:
-                dhcp_server_address = self.dhcp_server_ip
-            else:
-                dhcp_server_address = _BROADCAST_SERVER_ADDR
-            self._eth.write_sndipr(self._wiz_sock, dhcp_server_address)
-            self._eth.write_sndport(self._wiz_sock, _DHCP_SERVER_PORT)
-            self._eth.socket_write(self._wiz_sock, _BUFF[:message_length])
-            next_resend = self._next_retry_time(attempt=attempt)
-            while time.monotonic() < next_resend:
-                if self._receive_dhcp_response(next_resend):
-                    try:
-                        msg_type_in = self._parse_dhcp_response()
+            self._eth.src_port = 68
+            self._eth.socket_connect(
+                sock_num, dhcp_server, _DHCP_SERVER_PORT, conn_mode=0x02
+            )
+            self._eth.src_port = 0
+
+            message_length = self._generate_dhcp_message(message_type=msg_type_out)
+            for attempt in range(4):  # Initial attempt plus 3 retries.
+                self._eth.socket_write(sock_num, _BUFF[:message_length])
+                next_resend = self._next_retry_time(attempt=attempt)
+                while time.monotonic() < next_resend:
+                    if self._receive_dhcp_response(sock_num, next_resend):
+                        try:
+                            msg_type_in = self._parse_dhcp_response()
+                            debug_msg(
+                                "Received message type {}".format(msg_type_in),
+                                self._debug,
+                            )
+                            return msg_type_in
+                        except ValueError as error:
+                            debug_msg(error, self._debug)
+                    if not self._blocking or self._renew:
                         debug_msg(
-                            "Received message type {}".format(msg_type_in), self._debug
+                            "No message, FSM is nonblocking or renewing, exiting loop.",
+                            self._debug,
                         )
-                        return msg_type_in
-                    except ValueError as error:
-                        debug_msg(error, self._debug)
-                if not self._blocking or self._renew:
-                    debug_msg(
-                        "No message, FSM is nonblocking or renewing, exiting loop.",
-                        self._debug,
-                    )
-                    return 0  # Did not receive a response in a single attempt.
-        raise TimeoutError(
-            "No response from DHCP server after {} retries.".format(attempt)
-        )
+                        return 0  # Did not receive a response in a single attempt.
+            raise TimeoutError(
+                "No response from DHCP server after {} retries.".format(attempt)
+            )
+        finally:
+            self._eth.socket_close(sock_num)  # Close the socket whatever happens.
 
     def _dhcp_state_machine(self, *, blocking: bool = False) -> None:
         """
@@ -410,7 +385,6 @@ class DHCP:
                 now = time.monotonic()
                 if now < self._t1:
                     debug_msg("No timers have expired. Exiting FSM.", self._debug)
-                    self._socket_release()
                     return
                 if now > self._lease:
                     debug_msg(
@@ -432,7 +406,6 @@ class DHCP:
             if self._dhcp_state == _STATE_RENEWING:
                 debug_msg("FSM state is RENEWING.", self._debug)
                 self._renew = "renew"
-                self._dhcp_connection_setup()
                 self._start_time = time.monotonic()
                 self._dhcp_state = _STATE_REQUESTING
 
@@ -440,7 +413,6 @@ class DHCP:
                 debug_msg("FSM state is REBINDING.", self._debug)
                 self._renew = "rebind"
                 self.dhcp_server_ip = _BROADCAST_SERVER_ADDR
-                self._dhcp_connection_setup()
                 self._start_time = time.monotonic()
                 self._dhcp_state = _STATE_REQUESTING
 
