@@ -219,10 +219,12 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
 
         # Reset wiznet module prior to initialization.
         if reset:
+            debug_msg("* Resetting WIZnet chip", self._debug)
+            reset.switch_to_output()
             reset.value = False
             time.sleep(0.1)
             reset.value = True
-            time.sleep(0.1)
+            time.sleep(5)
 
         # Setup chip_select pin.
         time.sleep(1)
