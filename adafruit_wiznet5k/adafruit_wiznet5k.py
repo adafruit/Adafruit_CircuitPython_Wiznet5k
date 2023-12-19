@@ -386,7 +386,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         """
         try:
             address = [int(x, 16) for x in address.split(":")]
-        except AttributeError:
+        except TypeError:
             pass
         try:
             if len(address) != 6:
