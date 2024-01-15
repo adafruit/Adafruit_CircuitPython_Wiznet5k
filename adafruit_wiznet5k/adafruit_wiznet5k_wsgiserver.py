@@ -229,7 +229,7 @@ class WSGIServer:
             body = client.recv(int(env["CONTENT_LENGTH"]))
             env["wsgi.input"] = io.StringIO(body)
         else:
-            body = client.recv(1024)
+            body = client.recv(0)
             env["wsgi.input"] = io.StringIO(body)
         for name, value in headers.items():
             key = "HTTP_" + name.replace("-", "_").upper()
