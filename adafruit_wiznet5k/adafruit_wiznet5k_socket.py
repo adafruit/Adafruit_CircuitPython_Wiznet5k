@@ -70,16 +70,16 @@ def getdefaulttimeout() -> Optional[float]:
     return _default_socket_timeout
 
 
-def setdefaulttimeout(timeout: Optional[float]) -> None:
+def setdefaulttimeout(_timeout: Optional[float]) -> None:
     """
     Set the default timeout in seconds (float) for new socket objects. When the socket
     module is first imported, the default is None. See settimeout() for possible values
     and their respective meanings.
 
-    :param Optional[float] timeout: The default timeout in seconds or None.
+    :param Optional[float] _timeout: The default timeout in seconds or None.
     """
     global _default_socket_timeout  # pylint: disable=global-statement
-    if timeout is None or (isinstance(timeout, (int, float)) and timeout >= 0):
+    if _timeout is None or (isinstance(timeout, (int, float)) and timeout >= 0):
         _default_socket_timeout = timeout
     else:
         raise ValueError("Timeout must be None, 0.0 or a positive numeric value.")
@@ -450,8 +450,8 @@ class socket:
 
         :return int: Number of bytes sent.
         """
-        timeout = 0 if self._timeout is None else self._timeout
-        bytes_sent = _the_interface.socket_write(self._socknum, data, timeout)
+        _timeout = 0 if self._timeout is None else self._timeout
+        bytes_sent = _the_interface.socket_write(self._socknum, data, _timeout)
         gc.collect()
         return bytes_sent
 
@@ -762,3 +762,6 @@ class timeout(TimeoutError):
 
     def __init__(self, msg):
         super().__init__(msg)
+
+
+# pylint: enable=unused-argument, redefined-builtin, invalid-name
