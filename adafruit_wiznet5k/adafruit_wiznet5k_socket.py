@@ -567,7 +567,9 @@ class socket:
             # _readline
             if len(self._buffer) > 0:
                 bytes_to_read = min(num_to_read, len(self._buffer))
-                buffer[num_read : num_read + bytes_to_read] = self._buffer[:bytes_to_read]
+                buffer[num_read : num_read + bytes_to_read] = self._buffer[
+                    :bytes_to_read
+                ]
                 num_read += bytes_to_read
                 num_to_read -= bytes_to_read
                 self._buffer = self._buffer[bytes_to_read:]
@@ -579,9 +581,13 @@ class socket:
                 last_read_time = time.monotonic()
                 bytes_to_read = min(num_to_read, num_avail)
                 if self._sock_type == SOCK_STREAM:
-                    bytes_read = _the_interface.socket_read(self._socknum, bytes_to_read)[1]
+                    bytes_read = _the_interface.socket_read(
+                        self._socknum, bytes_to_read
+                    )[1]
                 else:
-                    bytes_read = _the_interface.read_udp(self._socknum, bytes_to_read)[1]
+                    bytes_read = _the_interface.read_udp(self._socknum, bytes_to_read)[
+                        1
+                    ]
                 buffer[num_read : num_read + len(bytes_read)] = bytes_read
                 num_read += len(bytes_read)
                 num_to_read -= len(bytes_read)
