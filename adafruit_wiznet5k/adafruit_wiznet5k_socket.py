@@ -406,12 +406,12 @@ class socket:
                 self.close()
                 self.listen()
 
-        new_listen_socknum, addr = _the_interface.socket_accept(self._socknum)
+        _, addr = _the_interface.socket_accept(self._socknum)
         current_socknum = self._socknum
         # Create a new socket object and swap socket nums, so we can continue listening
         client_sock = socket()
+        self._socknum = client_sock._socknum  # pylint: disable=protected-access
         client_sock._socknum = current_socknum  # pylint: disable=protected-access
-        self._socknum = new_listen_socknum
         self._bind((None, self._listen_port))
         self.listen()
         while self._status != wiznet5k.adafruit_wiznet5k.SNSR_SOCK_LISTEN:
@@ -495,21 +495,9 @@ class socket:
 
         :return bytes: Data from the socket.
         """
-        stamp = time.monotonic()
-        while not self._available():
-            if self._timeout and 0 < self._timeout < time.monotonic() - stamp:
-                raise timeout("timed out")
-            time.sleep(0.05)
-        bytes_on_socket = self._available()
-        if not bytes_on_socket:
-            return b""
-        bytes_to_read = min(bytes_on_socket, bufsize)
-        if self._sock_type == SOCK_STREAM:
-            bytes_read = _the_interface.socket_read(self._socknum, bytes_to_read)[1]
-        else:
-            bytes_read = _the_interface.read_udp(self._socknum, bytes_to_read)[1]
-        gc.collect()
-        return bytes(bytes_read)
+        buf = bytearray(bufsize)
+        self.recv_into(buf, bufsize)
+        return bytes(buf)
 
     def _embed_recv(
         self, bufsize: int = 0, flags: int = 0
@@ -568,12 +556,48 @@ class socket:
 
         :return int: the number of bytes received
         """
-        if nbytes == 0:
-            nbytes = len(buffer)
-        bytes_received = self.recv(nbytes)
-        nbytes = len(bytes_received)
-        buffer[:nbytes] = bytes_received
-        return nbytes
+        if not 0 <= nbytes <= len(buffer):
+            raise ValueError("nbytes must be 0 to len(buffer)")
+
+        last_read_time = time.monotonic()
+        num_to_read = len(buffer) if nbytes == 0 else nbytes
+        num_read = 0
+        while num_to_read > 0:
+            # we might have read socket data into the self._buffer with:
+            # _readline
+            if len(self._buffer) > 0:
+                bytes_to_read = min(num_to_read, len(self._buffer))
+                buffer[num_read : num_read + bytes_to_read] = self._buffer[
+                    :bytes_to_read
+                ]
+                num_read += bytes_to_read
+                num_to_read -= bytes_to_read
+                self._buffer = self._buffer[bytes_to_read:]
+                # explicitly recheck num_to_read to avoid extra checks
+                continue
+
+            num_avail = self._available()
+            if num_avail > 0:
+                last_read_time = time.monotonic()
+                bytes_to_read = min(num_to_read, num_avail)
+                if self._sock_type == SOCK_STREAM:
+                    bytes_read = _the_interface.socket_read(
+                        self._socknum, bytes_to_read
+                    )[1]
+                else:
+                    bytes_read = _the_interface.read_udp(self._socknum, bytes_to_read)[
+                        1
+                    ]
+                buffer[num_read : num_read + len(bytes_read)] = bytes_read
+                num_read += len(bytes_read)
+                num_to_read -= len(bytes_read)
+            elif num_read > 0:
+                # We got a message, but there are no more bytes to read, so we can stop.
+                break
+            # No bytes yet, or more bytes requested.
+            if self._timeout > 0 and time.monotonic() - last_read_time > self._timeout:
+                raise timeout("timed out")
+        return num_read
 
     @_check_socket_closed
     def recvfrom_into(
@@ -738,3 +762,6 @@ class timeout(TimeoutError):
 
     def __init__(self, msg):
         super().__init__(msg)
+
+
+# pylint: enable=unused-argument, redefined-builtin, invalid-name
