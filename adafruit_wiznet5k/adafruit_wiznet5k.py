@@ -165,7 +165,7 @@ _SNMR_PPPOE = const(0x05)
 _MAX_PACKET = const(4000)
 _LOCAL_PORT = const(0x400)
 # Default hardware MAC address
-_DEFAULT_MAC = (0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED)
+_DEFAULT_MAC = "DE:AD:BE:EF:FE:ED"
 
 # Maximum number of sockets to support, differs between chip versions.
 _MAX_SOCK_NUM = {"w5100s": const(0x04), "w5500": const(0x08), "w6100": const(0x08)}

@@ -79,8 +79,8 @@ def setdefaulttimeout(_timeout: Optional[float]) -> None:
     :param Optional[float] _timeout: The default timeout in seconds or None.
     """
     global _default_socket_timeout  # pylint: disable=global-statement
-    if _timeout is None or (isinstance(timeout, (int, float)) and timeout >= 0):
-        _default_socket_timeout = timeout
+    if _timeout is None or (isinstance(_timeout, (int, float)) and _timeout >= 0):
+        _default_socket_timeout = _timeout
     else:
         raise ValueError("Timeout must be None, 0.0 or a positive numeric value.")
 
