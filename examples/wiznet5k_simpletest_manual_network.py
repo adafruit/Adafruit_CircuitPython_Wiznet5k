@@ -4,9 +4,10 @@
 import board
 import busio
 import digitalio
-import adafruit_requests as requests
+import adafruit_connection_manager
+import adafruit_requests
 from adafruit_wiznet5k.adafruit_wiznet5k import WIZNET5K
-import adafruit_wiznet5k.adafruit_wiznet5k_socket as socket
+import adafruit_wiznet5k.adafruit_wiznet5k_socket as pool
 
 TEXT_URL = "http://wifitest.adafruit.com/testwifi/index.html"
 
@@ -27,8 +28,9 @@ eth = WIZNET5K(spi_bus, cs, is_dhcp=False)
 # Set network configuration
 eth.ifconfig = (IP_ADDRESS, SUBNET_MASK, GATEWAY_ADDRESS, DNS_SERVER)
 
-# Initialize a requests object with a socket and ethernet interface
-requests.set_socket(socket, eth)
+# Initialize a requests session
+ssl_context = adafruit_connection_manager.create_fake_ssl_context(pool, eth)
+requests = adafruit_requests.Session(pool, ssl_context)
 
 print("Chip Version:", eth.chip)
 print("MAC Address:", [hex(i) for i in eth.mac_address])

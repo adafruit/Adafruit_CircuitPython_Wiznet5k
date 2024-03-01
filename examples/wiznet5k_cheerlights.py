@@ -6,12 +6,13 @@ import board
 import busio
 from digitalio import DigitalInOut
 
-import adafruit_requests as requests
+import adafruit_connection_manager
+import adafruit_requests
 
 import neopixel
 import adafruit_fancyled.adafruit_fancyled as fancy
 from adafruit_wiznet5k.adafruit_wiznet5k import WIZNET5K
-import adafruit_wiznet5k.adafruit_wiznet5k_socket as socket
+import adafruit_wiznet5k.adafruit_wiznet5k_socket as pool
 
 cs = DigitalInOut(board.D10)
 spi_bus = busio.SPI(board.SCK, MOSI=board.MOSI, MISO=board.MISO)
@@ -19,8 +20,9 @@ spi_bus = busio.SPI(board.SCK, MOSI=board.MOSI, MISO=board.MISO)
 # Initialize ethernet interface with DHCP
 eth = WIZNET5K(spi_bus, cs)
 
-# Initialize a requests object with a socket and ethernet interface
-requests.set_socket(socket, eth)
+# Initialize a requests session
+ssl_context = adafruit_connection_manager.create_fake_ssl_context(pool, eth)
+requests = adafruit_requests.Session(pool, ssl_context)
 
 DATA_SOURCE = "http://api.thingspeak.com/channels/1417/feeds.json?results=1"
 DATA_LOCATION = ["feeds", 0, "field2"]
