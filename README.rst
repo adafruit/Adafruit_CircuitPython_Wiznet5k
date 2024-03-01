@@ -67,7 +67,6 @@ wifitest.adafruit.com.
     import adafruit_connection_manager
     import adafruit_requests
     from adafruit_wiznet5k.adafruit_wiznet5k import WIZNET5K
-    import adafruit_wiznet5k.adafruit_wiznet5k_socket as pool
 
     print("Wiznet5k WebClient Test")
 
@@ -81,7 +80,8 @@ wifitest.adafruit.com.
     eth = WIZNET5K(spi_bus, cs)
 
     # Initialize a requests session
-    ssl_context = adafruit_connection_manager.create_fake_ssl_context(pool, eth)
+    pool = adafruit_connection_manager.get_radio_socketpool(eth)
+    ssl_context = adafruit_connection_manager.get_radio_ssl_context(eth)
     requests = adafruit_requests.Session(pool, ssl_context)
 
     print("Chip Version:", eth.chip)

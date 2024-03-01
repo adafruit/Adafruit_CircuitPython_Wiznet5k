@@ -7,7 +7,6 @@ import digitalio
 import adafruit_connection_manager
 import adafruit_requests
 from adafruit_wiznet5k.adafruit_wiznet5k import WIZNET5K
-import adafruit_wiznet5k.adafruit_wiznet5k_socket as pool
 
 TEXT_URL = "http://wifitest.adafruit.com/testwifi/index.html"
 
@@ -29,7 +28,8 @@ eth = WIZNET5K(spi_bus, cs, is_dhcp=False)
 eth.ifconfig = (IP_ADDRESS, SUBNET_MASK, GATEWAY_ADDRESS, DNS_SERVER)
 
 # Initialize a requests session
-ssl_context = adafruit_connection_manager.create_fake_ssl_context(pool, eth)
+pool = adafruit_connection_manager.get_radio_socketpool(eth)
+ssl_context = adafruit_connection_manager.get_radio_ssl_context(eth)
 requests = adafruit_requests.Session(pool, ssl_context)
 
 print("Chip Version:", eth.chip)
