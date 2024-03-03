@@ -402,6 +402,9 @@ class socket:
         ):
             if self._timeout and 0 < self._timeout < time.monotonic() - stamp:
                 raise TimeoutError("Failed to accept connection.")
+            if self._status == wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSE_WAIT:
+                self._disconnect()
+                self.listen()
             if self._status == wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSED:
                 self.close()
                 self.listen()
