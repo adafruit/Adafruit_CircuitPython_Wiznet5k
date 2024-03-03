@@ -414,7 +414,7 @@ class socket:
         client_sock._socknum = current_socknum  # pylint: disable=protected-access
         self._bind((None, self._listen_port))
         self.listen()
-        while self._status != wiznet5k.adafruit_wiznet5k.SNSR_SOCK_LISTEN:
+        if self._status != wiznet5k.adafruit_wiznet5k.SNSR_SOCK_LISTEN:
             raise RuntimeError("Failed to open new listening socket")
         return client_sock, addr
 
