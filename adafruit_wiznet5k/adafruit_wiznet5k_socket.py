@@ -17,7 +17,7 @@ A socket compatible interface with the Wiznet5k module.
 from __future__ import annotations
 
 try:
-    from typing import TYPE_CHECKING, Optional, Tuple, List, Union
+    from typing import TYPE_CHECKING, List, Optional, Tuple, Union
 
     if TYPE_CHECKING:
         from adafruit_wiznet5k.adafruit_wiznet5k import WIZNET5K
@@ -27,6 +27,7 @@ except ImportError:
 import gc
 import time
 from sys import byteorder
+
 from micropython import const
 
 import adafruit_wiznet5k as wiznet5k
@@ -79,7 +80,7 @@ def setdefaulttimeout(_timeout: Optional[float]) -> None:
     :param Optional[float] _timeout: The default timeout in seconds or None.
     """
     global _default_socket_timeout  # pylint: disable=global-statement
-    if _timeout is None or (isinstance(_timeout, (int, float)) and _timeout >= 0):
+    if _timeout is None or _timeout >= 0:
         _default_socket_timeout = _timeout
     else:
         raise ValueError("Timeout must be None, 0.0 or a positive numeric value.")
@@ -496,7 +497,11 @@ class socket:
         :return bytes: Data from the socket.
         """
         buf = bytearray(bufsize)
-        self.recv_into(buf, bufsize)
+        nread = self.recv_into(buf, bufsize)
+        if nread == 0:
+            return b""
+        if nread < bufsize:
+            return bytes(buf[:nread])
         return bytes(buf)
 
     def _embed_recv(
@@ -595,7 +600,13 @@ class socket:
                 # We got a message, but there are no more bytes to read, so we can stop.
                 break
             # No bytes yet, or more bytes requested.
-            if self._timeout > 0 and time.monotonic() - last_read_time > self._timeout:
+            if self._timeout is None:
+                # blocking mode
+                continue
+            if self._timeout == 0:
+                # non-blocking mode
+                break
+            if time.monotonic() - last_read_time > self._timeout:
                 raise timeout("timed out")
         return num_read
 
@@ -688,7 +699,7 @@ class socket:
 
         :param Optional[float] value: Socket read timeout in seconds.
         """
-        if value is None or (isinstance(value, (int, float)) and value >= 0):
+        if value is None or value >= 0:
             self._timeout = value
         else:
             raise ValueError("Timeout must be None, 0.0 or a positive numeric value.")
