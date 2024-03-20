@@ -27,6 +27,7 @@ except ImportError:
 import gc
 import time
 from sys import byteorder
+from errno import ETIMEDOUT
 
 from micropython import const
 
@@ -400,11 +401,15 @@ class socket:
         while self._status not in (
             wiznet5k.adafruit_wiznet5k.SNSR_SOCK_SYNRECV,
             wiznet5k.adafruit_wiznet5k.SNSR_SOCK_ESTABLISHED,
+            wiznet5k.adafruit_wiznet5k.SNSR_SOCK_LISTEN,
         ):
             if self._timeout and 0 < self._timeout < time.monotonic() - stamp:
                 raise TimeoutError("Failed to accept connection.")
             if self._status == wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSED:
                 self.close()
+                self.listen()
+            if self._status == wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSE_WAIT:
+                self._disconnect()
                 self.listen()
 
         _, addr = _the_interface.socket_accept(self._socknum)
@@ -772,7 +777,7 @@ class timeout(TimeoutError):
     the timeout has elapsed and we haven't received any data yet."""
 
     def __init__(self, msg):
-        super().__init__(msg)
+        super().__init__(ETIMEDOUT, msg)
 
 
 # pylint: enable=unused-argument, redefined-builtin, invalid-name
