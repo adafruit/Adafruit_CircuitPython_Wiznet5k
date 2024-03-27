@@ -25,13 +25,12 @@ except ImportError:
     pass
 
 import gc
-import time
 from sys import byteorder
 
 from micropython import const
+from adafruit_ticks import ticks_ms, ticks_diff
 
 import adafruit_wiznet5k as wiznet5k
-from adafruit_ticks import ticks_ms, ticks_diff
 
 # pylint: disable=invalid-name
 _the_interface: Optional[WIZNET5K] = None
