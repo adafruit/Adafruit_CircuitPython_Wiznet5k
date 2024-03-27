@@ -26,6 +26,7 @@ except ImportError:
 import time
 from random import getrandbits
 from micropython import const
+from adafruit_ticks import ticks_ms, ticks_diff
 
 _QUERY_FLAG = const(0x00)
 _OPCODE_STANDARD_QUERY = const(0x00)
@@ -261,9 +262,10 @@ class DNS:
         ipaddress = -1
         for _ in range(5):
             #  wait for a response
-            socket_timeout = time.monotonic() + 5.0
+            socket_timeout = 5000
+            start_time = ticks_ms()
             while not self._iface.socket_available(dns_socket, 0x02):
-                if time.monotonic() > socket_timeout:
+                if ticks_diff(ticks_ms(), start_time) > socket_timeout:
                     _debug_print(
                         debug=self._debug,
                         message="* DNS ERROR: Did not receive DNS response (socket timeout).",

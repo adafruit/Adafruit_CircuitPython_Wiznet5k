@@ -25,10 +25,10 @@ except ImportError:
     pass
 
 import gc
-import time
 from sys import byteorder
 
 from micropython import const
+from adafruit_ticks import ticks_ms, ticks_diff
 
 import adafruit_wiznet5k as wiznet5k
 
@@ -396,12 +396,15 @@ class socket:
             the connection, and address is the address bound to the socket on the other
             end of the connection.
         """
-        stamp = time.monotonic()
+        stamp = ticks_ms()
         while self._status not in (
             wiznet5k.adafruit_wiznet5k.SNSR_SOCK_SYNRECV,
             wiznet5k.adafruit_wiznet5k.SNSR_SOCK_ESTABLISHED,
         ):
-            if self._timeout and 0 < self._timeout < time.monotonic() - stamp:
+            if (
+                self._timeout
+                and 0 < self._timeout < ticks_diff(ticks_ms(), stamp) / 1000
+            ):
                 raise TimeoutError("Failed to accept connection.")
             if self._status == wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSED:
                 self.close()
@@ -564,7 +567,7 @@ class socket:
         if not 0 <= nbytes <= len(buffer):
             raise ValueError("nbytes must be 0 to len(buffer)")
 
-        last_read_time = time.monotonic()
+        last_read_time = ticks_ms()
         num_to_read = len(buffer) if nbytes == 0 else nbytes
         num_read = 0
         while num_to_read > 0:
@@ -583,7 +586,7 @@ class socket:
 
             num_avail = self._available()
             if num_avail > 0:
-                last_read_time = time.monotonic()
+                last_read_time = ticks_ms()
                 bytes_to_read = min(num_to_read, num_avail)
                 if self._sock_type == SOCK_STREAM:
                     bytes_read = _the_interface.socket_read(
@@ -606,7 +609,7 @@ class socket:
             if self._timeout == 0:
                 # non-blocking mode
                 break
-            if time.monotonic() - last_read_time > self._timeout:
+            if ticks_diff(ticks_ms(), last_read_time) / 1000 > self._timeout:
                 raise timeout("timed out")
         return num_read
 
@@ -644,7 +647,7 @@ class socket:
 
         :return bytes: The data read from the socket.
         """
-        stamp = time.monotonic()
+        stamp = ticks_ms()
         while b"\r\n" not in self._buffer:
             avail = self._available()
             if avail:
@@ -655,7 +658,7 @@ class socket:
                 if (
                     self._timeout
                     and not avail
-                    and 0 < self._timeout < time.monotonic() - stamp
+                    and 0 < self._timeout < ticks_diff(ticks_ms(), stamp) / 1000
                 ):
                     self.close()
                     raise RuntimeError("Didn't receive response, failing out...")

@@ -51,6 +51,7 @@ from random import randint
 import time
 import gc
 from micropython import const
+from adafruit_ticks import ticks_ms, ticks_diff
 
 from adafruit_bus_device.spi_device import SPIDevice
 import adafruit_wiznet5k.adafruit_wiznet5k_dhcp as dhcp
@@ -249,8 +250,9 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         self.udp_from_port = [0] * self.max_sockets
 
         # Wait to give the Ethernet link to initialise.
-        stop_time = time.monotonic() + 5
-        while time.monotonic() < stop_time:
+        start_time = ticks_ms()
+        timeout = 5000
+        while ticks_diff(ticks_ms(), start_time) < timeout:
             if self.link_status:
                 break
             debug_msg("Ethernet link is down…", self._debug)
@@ -764,9 +766,10 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         self._sock_num_in_range(socket_num)
         self._write_sncr(socket_num, _CMD_SOCK_CLOSE)
         debug_msg("  Waiting for socket to close…", self._debug)
-        timeout = time.monotonic() + 5.0
+        start = ticks_ms()
+        timeout = 5000
         while self._read_snsr(socket_num) != SNSR_SOCK_CLOSED:
-            if time.monotonic() > timeout:
+            if ticks_diff(ticks_ms(), start) > timeout:
                 raise RuntimeError(
                     "Wiznet5k failed to close socket, status = {}.".format(
                         self._read_snsr(socket_num)
@@ -889,7 +892,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             bytes_to_write = _SOCK_SIZE
         else:
             bytes_to_write = len(buffer)
-        stop_time = time.monotonic() + timeout
+        start_time = ticks_ms()
 
         # If buffer is available, start the transfer
         free_size = self._get_tx_free_size(socket_num)
@@ -897,7 +900,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
             free_size = self._get_tx_free_size(socket_num)
             status = self.socket_status(socket_num)
             if status not in (SNSR_SOCK_ESTABLISHED, SNSR_SOCK_CLOSE_WAIT) or (
-                timeout and time.monotonic() > stop_time
+                timeout and ticks_diff(ticks_ms(), start_time) / 1000 > timeout
             ):
                 raise RuntimeError("Unable to write data to the socket.")
 
@@ -920,7 +923,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
                 _SNSR_SOCK_CLOSING,
             ):
                 raise RuntimeError("No data was sent, socket was closed.")
-            if timeout and time.monotonic() > stop_time:
+            if timeout and ticks_diff(ticks_ms(), start_time) / 1000 > timeout:
                 raise RuntimeError("Operation timed out. No data sent.")
             if self.read_snir(socket_num) & SNIR_TIMEOUT:
                 self.write_snir(socket_num, SNIR_TIMEOUT)
