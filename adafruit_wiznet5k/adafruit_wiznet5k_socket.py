@@ -152,6 +152,9 @@ SOCK_DGRAM = 2
 
 _SOCKET_TYPE_TO_WIZNET = b"\0\x21\2"
 
+SOL_SOCKET = 0xFFF
+SO_REUSEADDR = 0x0004
+
 AF_INET = const(3)
 _SOCKET_INVALID = const(255)
 
@@ -681,6 +684,20 @@ class socket:
         return _the_interface.socket_available(
             self._socknum, _SOCKET_TYPE_TO_WIZNET[self._sock_type]
         )
+
+    @_check_socket_closed
+    def setsockopt(  # pylint: disable=no-self-use
+        self, level: int, opt: int, value: any
+    ) -> None:
+        """
+        Set a socket option.
+
+        Only SOL_SOCKET SO_REUSEADDR is accepted (and the value is ignored).
+
+        Other calls result in OSError."""
+        if level == SOL_SOCKET and opt == SO_REUSEADDR:
+            return
+        raise OSError
 
     @_check_socket_closed
     def settimeout(self, value: Optional[float]) -> None:
