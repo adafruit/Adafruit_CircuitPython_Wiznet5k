@@ -32,120 +32,6 @@ from adafruit_ticks import ticks_ms, ticks_diff
 
 import adafruit_wiznet5k as wiznet5k
 
-# pylint: disable=invalid-name
-_the_interface: Optional[WIZNET5K] = None
-_default_socket_timeout = None
-
-
-def _is_ipv4_string(ipv4_address: str) -> bool:
-    """Check for a valid IPv4 address in dotted-quad string format
-    (for example, "123.45.67.89").
-
-    :param: str ipv4_address: The string to test.
-
-    :return bool: True if a valid IPv4 address, False otherwise.
-    """
-    octets = ipv4_address.split(".", 3)
-    if len(octets) == 4 and "".join(octets).isdigit():
-        if all((0 <= int(octet) <= 255 for octet in octets)):
-            return True
-    return False
-
-
-def set_interface(iface: WIZNET5K) -> None:
-    """
-    Helper to set the global internet interface.
-
-    :param wiznet5k.adafruit_wiznet5k.WIZNET5K iface: The ethernet interface.
-    """
-    global _the_interface  # pylint: disable=global-statement, invalid-name
-    _the_interface = iface
-
-
-def getdefaulttimeout() -> Optional[float]:
-    """
-    Return the default timeout in seconds for new socket objects. A value of
-    None indicates that new socket objects have no timeout. When the socket module is
-    first imported, the default is None.
-    """
-    return _default_socket_timeout
-
-
-def setdefaulttimeout(_timeout: Optional[float]) -> None:
-    """
-    Set the default timeout in seconds (float) for new socket objects. When the socket
-    module is first imported, the default is None. See settimeout() for possible values
-    and their respective meanings.
-
-    :param Optional[float] _timeout: The default timeout in seconds or None.
-    """
-    global _default_socket_timeout  # pylint: disable=global-statement
-    if _timeout is None or _timeout >= 0:
-        _default_socket_timeout = _timeout
-    else:
-        raise ValueError("Timeout must be None, 0.0 or a positive numeric value.")
-
-
-def htonl(x: int) -> int:
-    """
-    Convert 32-bit positive integer from host to network byte order.
-
-    :param int x: 32-bit positive integer from host.
-
-    :return int: 32-bit positive integer in network byte order.
-    """
-    if byteorder == "big":
-        return x
-    return int.from_bytes(x.to_bytes(4, "little"), "big")
-
-
-def htons(x: int) -> int:
-    """
-    Convert 16-bit positive integer from host to network byte order.
-
-    :param int x: 16-bit positive integer from host.
-
-    :return int: 16-bit positive integer in network byte order.
-    """
-    if byteorder == "big":
-        return x
-    return ((x << 8) & 0xFF00) | ((x >> 8) & 0xFF)
-
-
-def inet_aton(ip_address: str) -> bytes:
-    """
-    Convert an IPv4 address from dotted-quad string format (for example, "123.45.67.89")
-    to 32-bit packed binary format, as a bytes object four characters in length. This is
-    useful when conversing with a program that uses the standard C library and needs
-    objects of type struct in_addr, which is the C type for the 32-bit packed binary this
-    function returns.
-
-    :param str ip_address: The IPv4 address to convert.
-
-    :return bytes: The converted IPv4 address.
-    """
-    if not _is_ipv4_string(ip_address):
-        raise ValueError("The IPv4 address must be a dotted-quad string.")
-    return _the_interface.unpretty_ip(ip_address)
-
-
-def inet_ntoa(ip_address: Union[bytes, bytearray]) -> str:
-    """
-    Convert a 32-bit packed IPv4 address (a bytes-like object four bytes in length) to
-    its standard dotted-quad string representation (for example, ‘123.45.67.89’). This is
-    useful when conversing with a program that uses the standard C library and needs
-    objects of type struct in_addr, which is the C type for the 32-bit packed binary data
-    this function takes as an argument.
-
-    :param Union[bytes, bytearray ip_address: The IPv4 address to convert.
-
-    :return str: The converted ip_address:
-    """
-    if len(ip_address) != 4:
-        raise ValueError("The IPv4 address must be 4 bytes.")
-    return _the_interface.pretty_ip(ip_address)
-
-
 SOCK_STREAM = const(0x21)  # TCP
 _TCP_MODE = 80
 SOCK_DGRAM = const(0x02)  # UDP
@@ -153,67 +39,195 @@ AF_INET = const(3)
 _SOCKET_INVALID = const(255)
 
 
-# pylint: disable=too-many-arguments, unused-argument
-def getaddrinfo(
-    host: str,
-    port: int,
-    family: int = 0,
-    type: int = 0,
-    proto: int = 0,
-    flags: int = 0,
-) -> List[Tuple[int, int, int, str, Tuple[str, int]]]:
-    """
-    Translate the host/port argument into a sequence of 5-tuples that contain all the necessary
-    arguments for creating a socket connected to that service.
+class SocketPool:
+    """WIZNET5K SocketPool library"""
 
-    :param str host: a domain name, a string representation of an IPv4 address or
-        None.
-    :param int port: Port number to connect to (0 - 65536).
-    :param int family: Ignored and hardcoded as 0x03 (the only family implemented) by the function.
-    :param int type: The type of socket, either SOCK_STREAM (0x21) for TCP or SOCK_DGRAM (0x02)
-        for UDP, defaults to 0.
-    :param int proto: Unused in this implementation of socket.
-    :param int flags: Unused in this implementation of socket.
+    def __init__(self, iface: Optional[WIZNET5K] = None):
+        self._interface = iface
+        self._default_socket_timeout = None
 
-    :return List[Tuple[int, int, int, str, Tuple[str, int]]]: Address info entries in the form
-        (family, type, proto, canonname, sockaddr). In these tuples, family, type, proto are meant
-        to be passed to the socket() function. canonname will always be an empty string, sockaddr
-        is a tuple describing a socket address, whose format is (address, port), and is meant to be
-        passed to the socket.connect() method.
-    """
-    if not isinstance(port, int):
-        raise ValueError("Port must be an integer")
-    if not _is_ipv4_string(host):
-        host = gethostbyname(host)
-    return [(AF_INET, type, proto, "", (host, port))]
+        # pylint: disable=invalid-name
+        self.SOCK_STREAM = SOCK_STREAM
+        self._TCP_MODE = _TCP_MODE
+        self.SOCK_DGRAM = SOCK_DGRAM
+        self.AF_INET = AF_INET
+        self._SOCKET_INVALID = _SOCKET_INVALID
 
+    @staticmethod
+    def _is_ipv4_string(ipv4_address: str) -> bool:
+        """Check for a valid IPv4 address in dotted-quad string format
+        (for example, "123.45.67.89").
 
-def gethostbyname(hostname: str) -> str:
-    """
-    Translate a host name to IPv4 address format. The IPv4 address is returned as a string, such
-    as '100.50.200.5'. If the host name is an IPv4 address itself it is returned unchanged.
+        :param: str ipv4_address: The string to test.
 
-    :param str hostname: Hostname to lookup.
+        :return bool: True if a valid IPv4 address, False otherwise.
+        """
+        octets = ipv4_address.split(".", 3)
+        if len(octets) == 4 and "".join(octets).isdigit():
+            if all((0 <= int(octet) <= 255 for octet in octets)):
+                return True
+        return False
 
-    :return str: IPv4 address (a string of the form '0.0.0.0').
-    """
-    if _is_ipv4_string(hostname):
-        return hostname
-    address = _the_interface.get_host_by_name(hostname)
-    address = "{}.{}.{}.{}".format(address[0], address[1], address[2], address[3])
-    return address
+    def set_interface(self, iface: WIZNET5K) -> None:
+        """
+        Helper to set the global internet interface.
+
+        :param wiznet5k.adafruit_wiznet5k.WIZNET5K iface: The ethernet interface.
+        """
+        self._interface = iface
+
+    def getdefaulttimeout(self) -> Optional[float]:
+        """
+        Return the default timeout in seconds for new socket objects. A value of
+        None indicates that new socket objects have no timeout. When the socket module is
+        first imported, the default is None.
+        """
+        return self._default_socket_timeout
+
+    def setdefaulttimeout(self, _timeout: Optional[float]) -> None:
+        """
+        Set the default timeout in seconds (float) for new socket objects. When the socket
+        module is first imported, the default is None. See settimeout() for possible values
+        and their respective meanings.
+
+        :param Optional[float] _timeout: The default timeout in seconds or None.
+        """
+        if _timeout is None or _timeout >= 0:
+            self._default_socket_timeout = _timeout
+        else:
+            raise ValueError("Timeout must be None, 0.0 or a positive numeric value.")
+
+    @staticmethod
+    def htonl(x: int) -> int:
+        """
+        Convert 32-bit positive integer from host to network byte order.
+
+        :param int x: 32-bit positive integer from host.
+
+        :return int: 32-bit positive integer in network byte order.
+        """
+        if byteorder == "big":
+            return x
+        return int.from_bytes(x.to_bytes(4, "little"), "big")
+
+    @staticmethod
+    def htons(x: int) -> int:
+        """
+        Convert 16-bit positive integer from host to network byte order.
+
+        :param int x: 16-bit positive integer from host.
+
+        :return int: 16-bit positive integer in network byte order.
+        """
+        if byteorder == "big":
+            return x
+        return ((x << 8) & 0xFF00) | ((x >> 8) & 0xFF)
+
+    def inet_aton(self, ip_address: str) -> bytes:
+        """
+        Convert an IPv4 address from dotted-quad string format (for example, "123.45.67.89")
+        to 32-bit packed binary format, as a bytes object four characters in length. This is
+        useful when conversing with a program that uses the standard C library and needs
+        objects of type struct in_addr, which is the C type for the 32-bit packed binary this
+        function returns.
+
+        :param str ip_address: The IPv4 address to convert.
+
+        :return bytes: The converted IPv4 address.
+        """
+        if not self._is_ipv4_string(ip_address):
+            raise ValueError("The IPv4 address must be a dotted-quad string.")
+        return self._interface.unpretty_ip(ip_address)
+
+    def inet_ntoa(self, ip_address: Union[bytes, bytearray]) -> str:
+        """
+        Convert a 32-bit packed IPv4 address (a bytes-like object four bytes in length) to
+        its standard dotted-quad string representation (for example, ‘123.45.67.89’). This is
+        useful when conversing with a program that uses the standard C library and needs
+        objects of type struct in_addr, which is the C type for the 32-bit packed binary data
+        this function takes as an argument.
+
+        :param Union[bytes, bytearray ip_address: The IPv4 address to convert.
+
+        :return str: The converted ip_address:
+        """
+        if len(ip_address) != 4:
+            raise ValueError("The IPv4 address must be 4 bytes.")
+        return self._interface.pretty_ip(ip_address)
+
+    # pylint: disable=too-many-arguments, unused-argument
+    def getaddrinfo(
+        self,
+        host: str,
+        port: int,
+        family: int = 0,
+        type: int = 0,
+        proto: int = 0,
+        flags: int = 0,
+    ) -> List[Tuple[int, int, int, str, Tuple[str, int]]]:
+        """
+        Translate the host/port argument into a sequence of 5-tuples that contain all the necessary
+        arguments for creating a socket connected to that service.
+
+        :param str host: a domain name, a string representation of an IPv4 address or
+            None.
+        :param int port: Port number to connect to (0 - 65536).
+        :param int family: Ignored and hardcoded as 0x03 (the only family implemented) by the
+            function.
+        :param int type: The type of socket, either SOCK_STREAM (0x21) for TCP or SOCK_DGRAM (0x02)
+            for UDP, defaults to 0.
+        :param int proto: Unused in this implementation of socket.
+        :param int flags: Unused in this implementation of socket.
+
+        :return List[Tuple[int, int, int, str, Tuple[str, int]]]: Address info entries in the form
+            (family, type, proto, canonname, sockaddr). In these tuples, family, type, proto are
+            meant to be passed to the socket() function. canonname will always be an empty string,
+            sockaddr is a tuple describing a socket address, whose format is (address, port), and
+            is meant to be passed to the socket.connect() method.
+        """
+        if not isinstance(port, int):
+            raise ValueError("Port must be an integer")
+        if not self._is_ipv4_string(host):
+            host = self.gethostbyname(host)
+        return [(AF_INET, type, proto, "", (host, port))]
+
+    def gethostbyname(self, hostname: str) -> str:
+        """
+        Translate a host name to IPv4 address format. The IPv4 address is returned as a string, such
+        as '100.50.200.5'. If the host name is an IPv4 address itself it is returned unchanged.
+
+        :param str hostname: Hostname to lookup.
+
+        :return str: IPv4 address (a string of the form '0.0.0.0').
+        """
+        if self._is_ipv4_string(hostname):
+            return hostname
+        address = self._interface.get_host_by_name(hostname)
+        address = "{}.{}.{}.{}".format(address[0], address[1], address[2], address[3])
+        return address
+
+    def socket(
+        self,
+        family: int = AF_INET,
+        type: int = SOCK_STREAM,
+        proto: int = 0,
+        fileno: Optional[int] = None,
+    ):
+        """Method to return a socket"""
+        return Socket(self, family, type, proto, fileno)
 
 
 # pylint: disable=invalid-name, too-many-public-methods
-class socket:
+class Socket:
     """
     A simplified implementation of the Python 'socket' class for connecting
     to a Wiznet5k module.
     """
 
-    # pylint: disable=redefined-builtin,unused-argument
+    # pylint: disable=redefined-builtin,too-many-arguments,unused-argument
     def __init__(
         self,
+        socket_pool: SocketPool,
         family: int = AF_INET,
         type: int = SOCK_STREAM,
         proto: int = 0,
@@ -228,41 +242,43 @@ class socket:
         """
         if family != AF_INET:
             raise RuntimeError("Only AF_INET family supported by W5K modules.")
+        self._socket_pool = socket_pool
+        self._interface = self._socket_pool._interface
         self._socket_closed = False
         self._sock_type = type
         self._buffer = b""
-        self._timeout = _default_socket_timeout
+        self._timeout = self._socket_pool._default_socket_timeout
         self._listen_port = None
 
-        self._socknum = _the_interface.get_socket(reserve_socket=True)
+        self._socknum = self._interface.get_socket(reserve_socket=True)
         if self._socknum == _SOCKET_INVALID:
             raise RuntimeError("Failed to allocate socket.")
 
     def __del__(self):
-        _the_interface.release_socket(self._socknum)
+        self._interface.release_socket(self._socknum)
 
     def __enter__(self):
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
-        _the_interface.release_socket(self._socknum)
+        self._interface.release_socket(self._socknum)
         if self._sock_type == SOCK_STREAM:
-            _the_interface.write_snir(
+            self._interface.write_snir(
                 self._socknum, 0xFF
             )  # Reset socket interrupt register.
-            _the_interface.socket_disconnect(self._socknum)
+            self._interface.socket_disconnect(self._socknum)
             mask = (
                 wiznet5k.adafruit_wiznet5k.SNIR_TIMEOUT
                 | wiznet5k.adafruit_wiznet5k.SNIR_DISCON
             )
-            while not _the_interface.read_snir(self._socknum) & mask:
+            while not self._interface.read_snir(self._socknum) & mask:
                 pass
-        _the_interface.write_snir(
+        self._interface.write_snir(
             self._socknum, 0xFF
         )  # Reset socket interrupt register.
-        _the_interface.socket_close(self._socknum)
+        self._interface.socket_close(self._socknum)
         while (
-            _the_interface.socket_status(self._socknum)
+            self._interface.socket_status(self._socknum)
             != wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSED
         ):
             pass
@@ -285,7 +301,7 @@ class socket:
 
         :return int: Status of the socket.
         """
-        return _the_interface.socket_status(self._socknum)
+        return self._interface.socket_status(self._socknum)
 
     @property
     def _connected(self) -> bool:
@@ -296,9 +312,9 @@ class socket:
         """
         # pylint: disable=protected-access
 
-        if self._socknum >= _the_interface.max_sockets:
+        if self._socknum >= self._interface.max_sockets:
             return False
-        status = _the_interface.socket_status(self._socknum)
+        status = self._interface.socket_status(self._socknum)
         if (
             status == wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSE_WAIT
             and self._available() == 0
@@ -322,7 +338,7 @@ class socket:
 
         :return Tuple[str, int]: IPv4 address and port the socket is connected to.
         """
-        return _the_interface.remote_ip(self._socknum), _the_interface.remote_port(
+        return self._interface.remote_ip(self._socknum), self._interface.remote_port(
             self._socknum
         )
 
@@ -352,20 +368,20 @@ class socket:
         :param Tuple[Optional[str], int] address: Address as a (host, port) tuple.
         """
         if address[0]:
-            if gethostbyname(address[0]) != _the_interface.pretty_ip(
-                _the_interface.ip_address
+            if self._socket_pool.gethostbyname(address[0]) != self._interface.pretty_ip(
+                self._interface.ip_address
             ):
                 raise ValueError(
                     "The IPv4 address requested must match {}, "
                     "the one assigned to the WIZNET5K interface.".format(
-                        _the_interface.pretty_ip(_the_interface.ip_address)
+                        self._interface.pretty_ip(self._interface.ip_address)
                     )
                 )
         self._listen_port = address[1]
         # For UDP servers we need to open the socket here because we won't call
         # listen
         if self._sock_type == SOCK_DGRAM:
-            _the_interface.socket_listen(
+            self._interface.socket_listen(
                 self._socknum,
                 self._listen_port,
                 wiznet5k.adafruit_wiznet5k.SNMR_UDP,
@@ -381,13 +397,13 @@ class socket:
         """
         if self._listen_port is None:
             raise RuntimeError("Use bind to set the port before listen!")
-        _the_interface.socket_listen(self._socknum, self._listen_port)
+        self._interface.socket_listen(self._socknum, self._listen_port)
         self._buffer = b""
 
     @_check_socket_closed
     def accept(
         self,
-    ) -> Tuple[socket, Tuple[str, int]]:
+    ) -> Tuple[Socket, Tuple[str, int]]:
         """
         Accept a connection. The socket must be bound to an address and listening for connections.
 
@@ -410,10 +426,10 @@ class socket:
                 self.close()
                 self.listen()
 
-        _, addr = _the_interface.socket_accept(self._socknum)
+        _, addr = self._interface.socket_accept(self._socknum)
         current_socknum = self._socknum
         # Create a new socket object and swap socket nums, so we can continue listening
-        client_sock = socket()
+        client_sock = Socket(self._socket_pool)
         self._socknum = client_sock._socknum  # pylint: disable=protected-access
         client_sock._socknum = current_socknum  # pylint: disable=protected-access
         self._bind((None, self._listen_port))
@@ -430,14 +446,14 @@ class socket:
         :param Tuple[str, int] address: Remote socket as a (host, port) tuple.
         """
         if self._listen_port is not None:
-            _the_interface.src_port = self._listen_port
-        result = _the_interface.socket_connect(
+            self._interface.src_port = self._listen_port
+        result = self._interface.socket_connect(
             self._socknum,
-            _the_interface.unpretty_ip(gethostbyname(address[0])),
+            self._interface.unpretty_ip(self._socket_pool.gethostbyname(address[0])),
             address[1],
             self._sock_type,
         )
-        _the_interface.src_port = 0
+        self._interface.src_port = 0
         if not result:
             raise RuntimeError("Failed to connect to host ", address[0])
         self._buffer = b""
@@ -455,7 +471,7 @@ class socket:
         :return int: Number of bytes sent.
         """
         _timeout = 0 if self._timeout is None else self._timeout
-        bytes_sent = _the_interface.socket_write(self._socknum, data, _timeout)
+        bytes_sent = self._interface.socket_write(self._socknum, data, _timeout)
         gc.collect()
         return bytes_sent
 
@@ -522,9 +538,9 @@ class socket:
         avail = self._available()
         if avail:
             if self._sock_type == SOCK_STREAM:
-                self._buffer += _the_interface.socket_read(self._socknum, avail)[1]
+                self._buffer += self._interface.socket_read(self._socknum, avail)[1]
             elif self._sock_type == SOCK_DGRAM:
-                self._buffer += _the_interface.read_udp(self._socknum, avail)[1]
+                self._buffer += self._interface.read_udp(self._socknum, avail)[1]
         gc.collect()
         ret = self._buffer
         self._buffer = b""
@@ -547,8 +563,8 @@ class socket:
         return (
             self.recv(bufsize),
             (
-                _the_interface.pretty_ip(_the_interface.udp_from_ip[self._socknum]),
-                _the_interface.udp_from_port[self._socknum],
+                self._interface.pretty_ip(self._interface.udp_from_ip[self._socknum]),
+                self._interface.udp_from_port[self._socknum],
             ),
         )
 
@@ -589,11 +605,11 @@ class socket:
                 last_read_time = ticks_ms()
                 bytes_to_read = min(num_to_read, num_avail)
                 if self._sock_type == SOCK_STREAM:
-                    bytes_read = _the_interface.socket_read(
+                    bytes_read = self._interface.socket_read(
                         self._socknum, bytes_to_read
                     )[1]
                 else:
-                    bytes_read = _the_interface.read_udp(self._socknum, bytes_to_read)[
+                    bytes_read = self._interface.read_udp(self._socknum, bytes_to_read)[
                         1
                     ]
                 buffer[num_read : num_read + len(bytes_read)] = bytes_read
@@ -631,8 +647,8 @@ class socket:
         return (
             self.recv_into(buffer, nbytes),
             (
-                _the_interface.remote_ip(self._socknum),
-                _the_interface.remote_port(self._socknum),
+                self._interface.remote_ip(self._socknum),
+                self._interface.remote_port(self._socknum),
             ),
         )
 
@@ -652,9 +668,9 @@ class socket:
             avail = self._available()
             if avail:
                 if self._sock_type == SOCK_STREAM:
-                    self._buffer += _the_interface.socket_read(self._socknum, avail)[1]
+                    self._buffer += self._interface.socket_read(self._socknum, avail)[1]
                 elif self._sock_type == SOCK_DGRAM:
-                    self._buffer += _the_interface.read_udp(self._socknum, avail)[1]
+                    self._buffer += self._interface.read_udp(self._socknum, avail)[1]
                 if (
                     self._timeout
                     and not avail
@@ -670,7 +686,7 @@ class socket:
         """Disconnect a TCP socket."""
         if self._sock_type != SOCK_STREAM:
             raise RuntimeError("Socket must be a TCP socket.")
-        _the_interface.socket_disconnect(self._socknum)
+        self._interface.socket_disconnect(self._socknum)
 
     @_check_socket_closed
     def close(self) -> None:
@@ -678,8 +694,8 @@ class socket:
         Mark the socket closed. Once that happens, all future operations on the socket object
         will fail. The remote end will receive no more data.
         """
-        _the_interface.release_socket(self._socknum)
-        _the_interface.socket_close(self._socknum)
+        self._interface.release_socket(self._socknum)
+        self._interface.socket_close(self._socknum)
         self._socket_closed = True
 
     def _available(self) -> int:
@@ -688,7 +704,7 @@ class socket:
 
         :return int: Number of bytes available.
         """
-        return _the_interface.socket_available(self._socknum, self._sock_type)
+        return self._interface.socket_available(self._socknum, self._sock_type)
 
     @_check_socket_closed
     def settimeout(self, value: Optional[float]) -> None:
