@@ -614,6 +614,12 @@ class socket:
             elif num_read > 0:
                 # We got a message, but there are no more bytes to read, so we can stop.
                 break
+            elif self._status in (
+                wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSED,
+                wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSE_WAIT,
+            ):
+                # No bytes to read and we will not get more, stop.
+                break
             # No bytes yet, or more bytes requested.
             if self._timeout is None:
                 # blocking mode
