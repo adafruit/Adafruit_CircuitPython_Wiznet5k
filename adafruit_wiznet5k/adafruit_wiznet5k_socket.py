@@ -26,6 +26,7 @@ except ImportError:
 
 import gc
 from sys import byteorder
+from errno import ETIMEDOUT
 
 from micropython import const
 from adafruit_ticks import ticks_ms, ticks_diff
@@ -400,6 +401,7 @@ class socket:
         while self._status not in (
             wiznet5k.adafruit_wiznet5k.SNSR_SOCK_SYNRECV,
             wiznet5k.adafruit_wiznet5k.SNSR_SOCK_ESTABLISHED,
+            wiznet5k.adafruit_wiznet5k.SNSR_SOCK_LISTEN,
         ):
             if (
                 self._timeout
@@ -778,7 +780,7 @@ class timeout(TimeoutError):
     the timeout has elapsed and we haven't received any data yet."""
 
     def __init__(self, msg):
-        super().__init__(msg)
+        super().__init__(ETIMEDOUT, msg)
 
 
 # pylint: enable=unused-argument, redefined-builtin, invalid-name
