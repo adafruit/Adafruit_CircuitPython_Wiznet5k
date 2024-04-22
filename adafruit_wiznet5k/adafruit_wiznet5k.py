@@ -184,10 +184,6 @@ def _unprettyfy(data: str, seperator: str, correct_length: int) -> bytes:
 class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-attributes
     """Interface for WIZNET5K module."""
 
-    _TCP_MODE = const(0x21)
-    _UDP_MODE = const(0x02)
-    _TLS_MODE = const(0x03)  # This is NOT currently implemented
-
     _sockets_reserved = []
 
     # pylint: disable=too-many-arguments
