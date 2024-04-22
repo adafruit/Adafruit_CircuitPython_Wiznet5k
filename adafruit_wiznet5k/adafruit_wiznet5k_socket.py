@@ -408,9 +408,6 @@ class socket:
             if self._status == wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSED:
                 self.close()
                 self.listen()
-            if self._status == wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSE_WAIT:
-                self._disconnect()
-                self.listen()
 
         _, addr = _the_interface.socket_accept(self._socknum)
         current_socknum = self._socknum
