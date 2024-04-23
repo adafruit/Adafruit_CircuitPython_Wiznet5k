@@ -41,20 +41,7 @@ import io
 import gc
 from micropython import const
 import adafruit_wiznet5k as wiznet5k
-import adafruit_wiznet5k.adafruit_wiznet5k_socket as socket
-
-_the_interface: Optional[WIZNET5K] = None  # pylint: disable=invalid-name
-
-
-def set_interface(iface: WIZNET5K) -> None:
-    """
-    Helper to set the global internet interface.
-
-    :param wiznet5k.adafruit_wiznet5k.WIZNET5K: Ethernet interface.
-    """
-    global _the_interface  # pylint: disable=global-statement, invalid-name
-    _the_interface = iface
-    socket.set_interface(iface)
+import adafruit_wiznet5k.adafruit_wiznet5k_socketpool as socketpool
 
 
 # pylint: disable=invalid-name
@@ -63,6 +50,7 @@ class WSGIServer:
 
     def __init__(
         self,
+        socket_source: socketpool.SocketPool,
         port: int = 80,
         debug: bool = False,
         application: Optional[callable] = None,
@@ -72,6 +60,7 @@ class WSGIServer:
         :param bool debug: Enable debugging, defaults to False.
         :param Optional[callable] application: Application to call in response to a HTTP request.
         """
+        self._socket_source = socket_source
         self.application = application
         self.port = port
         self._timeout = 20
@@ -80,7 +69,7 @@ class WSGIServer:
 
         self._response_status = None
         self._response_headers = []
-        if _the_interface.chip == "w5100s":
+        if self._socket_source._interface.chip == "w5100s":
             self.MAX_SOCK_NUM = const(2)
         else:
             self.MAX_SOCK_NUM = const(6)
@@ -95,13 +84,15 @@ class WSGIServer:
         invoked on receiving an incoming request.
         """
         for _ in range(self.MAX_SOCK_NUM):
-            new_sock = socket.socket()
+            new_sock = self._socket_source.socket()
             new_sock.settimeout(self._timeout)
             new_sock.bind((None, self.port))
             new_sock.listen()
             self._client_sock.append(new_sock)
         if self._debug:
-            ip = _the_interface.pretty_ip(_the_interface.ip_address)
+            ip = self._socket_source._interface.pretty_ip(  # pylint: disable=protected-access
+                self._socket_source._interface.ip_address  # pylint: disable=protected-access
+            )
             print("Server available at {0}:{1}".format(ip, self.port))
 
     def update_poll(self) -> None:
@@ -127,7 +118,7 @@ class WSGIServer:
                 self._client_sock.remove(sock)
         for _ in range(len(self._client_sock), self.MAX_SOCK_NUM):
             try:
-                new_sock = socket.socket()
+                new_sock = self._socket_source.socket()
                 new_sock.settimeout(self._timeout)
                 new_sock.bind((None, self.port))
                 new_sock.listen()
@@ -135,7 +126,7 @@ class WSGIServer:
             except RuntimeError:
                 pass
 
-    def finish_response(self, result: str, client: socket.socket) -> None:
+    def finish_response(self, result: str, client: socketpool.Socket) -> None:
         """
         Called after the application callable returns result data to respond with.
         Creates the HTTP Response payload from the response_headers and results data,
@@ -182,7 +173,7 @@ class WSGIServer:
         self._response_status = status
         self._response_headers = [("Server", "w5kWSGIServer")] + response_headers
 
-    def _get_environ(self, client: socket.socket) -> Dict:
+    def _get_environ(self, client: socketpool.Socket) -> Dict:
         """
         The application callable will be given the resulting environ dictionary.
         It contains metadata about the incoming request and the request body ("wsgi.input")
@@ -203,7 +194,11 @@ class WSGIServer:
 
         env["REQUEST_METHOD"] = method
         env["SCRIPT_NAME"] = ""
-        env["SERVER_NAME"] = _the_interface.pretty_ip(_the_interface.ip_address)
+        env[
+            "SERVER_NAME"
+        ] = self._socket_source._interface.pretty_ip(  # pylint: disable=protected-access
+            self._socket_source._interface.ip_address  # pylint: disable=protected-access
+        )
         env["SERVER_PROTOCOL"] = ver
         env["SERVER_PORT"] = self.port
         if path.find("?") >= 0:

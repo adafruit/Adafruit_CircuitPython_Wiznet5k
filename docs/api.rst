@@ -7,7 +7,7 @@
 .. automodule:: adafruit_wiznet5k.adafruit_wiznet5k
    :members:
 
-.. automodule:: adafruit_wiznet5k.adafruit_wiznet5k_socket
+.. automodule:: adafruit_wiznet5k.adafruit_wiznet5k_socketpool
    :members:
 
 .. automodule:: adafruit_wiznet5k.adafruit_wiznet5k_dhcp

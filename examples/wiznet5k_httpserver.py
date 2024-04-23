@@ -5,7 +5,7 @@ import board
 import digitalio
 from adafruit_httpserver import Server, Request, Response
 from adafruit_wiznet5k.adafruit_wiznet5k import WIZNET5K
-import adafruit_wiznet5k.adafruit_wiznet5k_socket as socket
+import adafruit_wiznet5k.adafruit_wiznet5k_socketpool as socketpool
 
 print("Wiznet5k HTTPServer Test")
 
@@ -18,11 +18,11 @@ spi_bus = board.SPI()
 # Initialize ethernet interface with DHCP
 eth = WIZNET5K(spi_bus, cs)
 
-# set the interface on the socket source
-socket.set_interface(eth)
+# Create a socket pool
+pool = socketpool.SocketPool(eth)
 
 # initialize the server
-server = Server(socket, "/static", debug=True)
+server = Server(pool, "/static", debug=True)
 
 
 @server.route("/")

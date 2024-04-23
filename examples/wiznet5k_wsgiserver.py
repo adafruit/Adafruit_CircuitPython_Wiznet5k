@@ -15,6 +15,9 @@
 # There's also an endpoint that demonstrates that `requests` can be used to
 # get data from another socket and serve it.
 #
+# NOTE:
+# if you get a "RuntimeError: pystack exhausted" error, try adding
+# CIRCUITPY_PYSTACK_SIZE=3072 (or a higher mulriple of 1536) and trying again
 
 import board
 import busio
@@ -123,8 +126,7 @@ def btc(request):  # pylint: disable=unused-argument
 
 
 # Here we setup our server, passing in our web_app as the application
-server.set_interface(eth)
-wsgiServer = server.WSGIServer(80, application=web_app)
+wsgiServer = server.WSGIServer(pool, 80, application=web_app)
 
 print("Open this IP in your browser: ", eth.pretty_ip(eth.ip_address))
 
