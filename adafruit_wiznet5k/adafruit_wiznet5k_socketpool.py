@@ -264,7 +264,7 @@ class Socket:
         self._interface.release_socket(self._socknum)
         if self._sock_type == SocketPool.SOCK_STREAM:
             self._interface.write_snir(
-                self._socknum, 0xFF
+                self._socknum, 0xFF & (~wiznet5k.adafruit_wiznet5k.SNIR_DISCON)
             )  # Reset socket interrupt register.
             self._interface.socket_disconnect(self._socknum)
             mask = (
