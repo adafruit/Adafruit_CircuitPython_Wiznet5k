@@ -7,7 +7,7 @@ import board
 import busio
 import digitalio
 from adafruit_wiznet5k.adafruit_wiznet5k import WIZNET5K
-import adafruit_wiznet5k.adafruit_wiznet5k_socket as socket
+import adafruit_wiznet5k.adafruit_wiznet5k_socketpool as socketpool
 
 print("Wiznet5k SimpleServer Test")
 
@@ -21,8 +21,8 @@ spi_bus = busio.SPI(board.SCK, MOSI=board.MOSI, MISO=board.MISO)
 eth = WIZNET5K(spi_bus, cs, is_dhcp=True)
 
 # Initialize a socket for our server
-socket.set_interface(eth)
-server = socket.socket()  # Allocate socket for the server
+pool = socketpool.SocketPool(eth)
+server = pool.socket()  # Allocate socket for the server
 server_ip = eth.pretty_ip(eth.ip_address)  # IP address of server
 server_port = 50007  # Port to listen on
 server.bind((server_ip, server_port))  # Bind to IP and Port
