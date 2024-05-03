@@ -37,7 +37,7 @@ _SOCKET_INVALID = const(255)
 _global_socketpool = {}
 
 
-class SocketPoolContants:  # pylint: disable=too-few-public-methods
+class SocketPoolConstants:  # pylint: disable=too-few-public-methods
     """Helper class for the constants that are needed everywhere"""
 
     # These must match circuitpython "socketpoool" values. However, we cannot
@@ -51,7 +51,7 @@ class SocketPoolContants:  # pylint: disable=too-few-public-methods
     AF_INET = const(3)
 
 
-class SocketPool(SocketPoolContants):
+class SocketPool(SocketPoolConstants):
     """WIZNET5K SocketPool library"""
 
     def __new__(cls, iface: WIZNET5K):
@@ -191,7 +191,7 @@ class SocketPool(SocketPoolContants):
             raise ValueError("Port must be an integer")
         if not self._is_ipv4_string(host):
             host = self.gethostbyname(host)
-        return [(SocketPoolContants.AF_INET, type, proto, "", (host, port))]
+        return [(SocketPoolConstants.AF_INET, type, proto, "", (host, port))]
 
     def gethostbyname(self, hostname: str) -> str:
         """
@@ -210,8 +210,8 @@ class SocketPool(SocketPoolContants):
 
     def socket(  # pylint: disable=redefined-builtin
         self,
-        family: int = SocketPoolContants.AF_INET,
-        type: int = SocketPoolContants.SOCK_STREAM,
+        family: int = SocketPoolConstants.AF_INET,
+        type: int = SocketPoolConstants.SOCK_STREAM,
         proto: int = 0,
         fileno: Optional[int] = None,
     ):
