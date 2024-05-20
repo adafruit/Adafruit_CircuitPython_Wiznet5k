@@ -40,7 +40,7 @@ _global_socketpool = {}
 class SocketPool:
     """WIZNET5K SocketPool library"""
 
-    # These must match circuitpython "socketpoool" values. However, we cannot
+    # These must match circuitpython "socketpool" values. However, we cannot
     # depend on socketpool being importable, so hard-code them here.
     SOCK_STREAM = 1
     SOCK_DGRAM = 2
