@@ -37,10 +37,10 @@ _SOCKET_INVALID = const(255)
 _global_socketpool = {}
 
 
-class SocketPoolContants:  # pylint: disable=too-few-public-methods
-    """Helper class for the constants that are needed everywhere"""
+class SocketPool:
+    """WIZNET5K SocketPool library"""
 
-    # These must match circuitpython "socketpoool" values. However, we cannot
+    # These must match circuitpython "socketpool" values. However, we cannot
     # depend on socketpool being importable, so hard-code them here.
     SOCK_STREAM = 1
     SOCK_DGRAM = 2
@@ -49,10 +49,6 @@ class SocketPoolContants:  # pylint: disable=too-few-public-methods
     SO_REUSEADDR = 0x0004
 
     AF_INET = const(3)
-
-
-class SocketPool(SocketPoolContants):
-    """WIZNET5K SocketPool library"""
 
     def __new__(cls, iface: WIZNET5K):
         # We want to make sure to return the same pool for the same interface
@@ -191,7 +187,7 @@ class SocketPool(SocketPoolContants):
             raise ValueError("Port must be an integer")
         if not self._is_ipv4_string(host):
             host = self.gethostbyname(host)
-        return [(SocketPoolContants.AF_INET, type, proto, "", (host, port))]
+        return [(SocketPool.AF_INET, type, proto, "", (host, port))]
 
     def gethostbyname(self, hostname: str) -> str:
         """
@@ -210,8 +206,8 @@ class SocketPool(SocketPoolContants):
 
     def socket(  # pylint: disable=redefined-builtin
         self,
-        family: int = SocketPoolContants.AF_INET,
-        type: int = SocketPoolContants.SOCK_STREAM,
+        family: int = AF_INET,
+        type: int = SOCK_STREAM,
         proto: int = 0,
         fileno: Optional[int] = None,
     ):
