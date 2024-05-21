@@ -21,9 +21,9 @@ try:
 except ImportError:
     pass
 
+import errno
 import gc
 from sys import byteorder
-from errno import ETIMEDOUT
 
 from micropython import const
 from adafruit_ticks import ticks_ms, ticks_diff
@@ -638,7 +638,7 @@ class Socket:
                 # non-blocking mode
                 break
             if ticks_diff(ticks_ms(), last_read_time) / 1000 > self._timeout:
-                raise timeout("timed out")
+                raise OSError(errno.ETIMEDOUT)
         return num_read
 
     @_check_socket_closed
@@ -813,11 +813,3 @@ class Socket:
     def proto(self):
         """Socket protocol (always 0x00 in this implementation)."""
         return 0
-
-
-class timeout(TimeoutError):  # pylint: disable=invalid-name
-    """TimeoutError class. An instance of this error will be raised by recv_into() if
-    the timeout has elapsed and we haven't received any data yet."""
-
-    def __init__(self, msg):
-        super().__init__(ETIMEDOUT, msg)
