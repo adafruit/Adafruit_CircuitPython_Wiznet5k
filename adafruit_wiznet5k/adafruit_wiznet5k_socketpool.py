@@ -141,7 +141,7 @@ class SocketPool:
     def inet_ntoa(self, ip_address: Union[bytes, bytearray]) -> str:
         """
         Convert a 32-bit packed IPv4 address (a bytes-like object four bytes in length) to
-        its standard dotted-quad string representation (for example, ‘123.45.67.89’). This is
+        its standard dotted-quad string representation (for example, "123.45.67.89"). This is
         useful when conversing with a program that uses the standard C library and needs
         objects of type struct in_addr, which is the C type for the 32-bit packed binary data
         this function takes as an argument.
