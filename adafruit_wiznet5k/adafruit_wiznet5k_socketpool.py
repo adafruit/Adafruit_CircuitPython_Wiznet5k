@@ -655,8 +655,8 @@ class Socket:
         return (
             self.recv_into(buffer, nbytes),
             (
-                self._interface.remote_ip(self._socknum),
-                self._interface.remote_port(self._socknum),
+                self._interface.pretty_ip(self._interface.udp_from_ip[self._socknum]),
+                self._interface.udp_from_port[self._socknum],
             ),
         )
 
