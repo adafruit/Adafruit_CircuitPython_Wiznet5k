@@ -337,7 +337,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         return self._read(_REG_SIPR[self._chip_type], 0x00, 4)
 
     @property
-    def ipv4_address(self) -> bytes:
+    def ipv4_address(self) -> str:
         """
         Configured IP address for the WIZnet Ethernet hardware.
 
