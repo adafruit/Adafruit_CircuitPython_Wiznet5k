@@ -294,8 +294,12 @@ class DHCP:
                 debug_msg("Message is ACK, setting FSM state to BOUND.", self._debug)
                 lease = self._lease or 60
                 self._lease_timeout = ticks_add(self._start_ticks, lease * 1000)
-                self._t1_timeout = ticks_add(self._start_ticks, (self._t1 or (lease // 2)) * 1000)
-                self._t2_timeout = ticks_add(self._start_ticks, (self._t2 or (lease - lease // 8)) * 1000)
+                self._t1_timeout = ticks_add(
+                    self._start_ticks, (self._t1 or (lease // 2)) * 1000
+                )
+                self._t2_timeout = ticks_add(
+                    self._start_ticks, (self._t2 or (lease - lease // 8)) * 1000
+                )
                 self._increment_transaction_id()
                 if not self._renew:
                     self._eth.ifconfig = (
