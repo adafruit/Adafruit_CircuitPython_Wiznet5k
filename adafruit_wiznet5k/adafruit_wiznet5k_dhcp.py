@@ -26,10 +26,9 @@ except ImportError:
 
 
 import gc
-import time
 from random import randint
 from micropython import const
-from adafruit_ticks import ticks_ms, ticks_diff, ticks_add
+from adafruit_ticks import ticks_ms, ticks_diff, ticks_add, ticks_less
 from adafruit_wiznet5k.adafruit_wiznet5k_debug import (  # pylint: disable=ungrouped-imports
     debug_msg,
 )
@@ -152,7 +151,6 @@ class DHCP:
         # DHCP state machine
         self._dhcp_state = _STATE_INIT
         self._transaction_id = randint(1, 0x7FFFFFFF)
-        self._start_time = 0.0
         self._start_ticks = 0
         self._blocking = False
         self._renew = None
@@ -165,9 +163,12 @@ class DHCP:
         self.dns_server_ip = _UNASSIGNED_IP_ADDR
 
         # Lease expiry times
-        self._t1 = 0
-        self._t2 = 0
-        self._lease = 0
+        self._t1_timeout = 0
+        self._t2_timeout = 0
+        self._lease_timeout = 0
+        self._t1 = None
+        self._t2 = None
+        self._lease = None
 
         # Host name
         mac_string = "".join("{:02X}".format(o) for o in mac_address)
@@ -210,8 +211,10 @@ class DHCP:
         self.dns_server_ip = _UNASSIGNED_IP_ADDR
         self._renew = None
         self._increment_transaction_id()
-        self._start_time = time.monotonic()
         self._start_ticks = ticks_ms()
+        self._lease = None
+        self._t1 = None
+        self._t2 = None
 
     def _increment_transaction_id(self) -> None:
         """Increment the transaction ID and roll over from 0x7fffffff to 0."""
@@ -289,11 +292,14 @@ class DHCP:
                 self._dhcp_state = _STATE_INIT
             elif message_type == _DHCP_ACK:
                 debug_msg("Message is ACK, setting FSM state to BOUND.", self._debug)
-                self._t1 = ticks_add(self._start_ticks, self._lease // 2)
-                self._t2 = ticks_diff(
-                    ticks_add(self._start_ticks, self._lease), self._lease // 8
+                lease = self._lease or 60
+                self._lease_timeout = ticks_add(self._start_ticks, lease * 1000)
+                self._t1_timeout = ticks_add(
+                    self._start_ticks, (self._t1 or (lease // 2)) * 1000
                 )
-                self._lease = ticks_add(self._lease, self._start_ticks)
+                self._t2_timeout = ticks_add(
+                    self._start_ticks, (self._t2 or (lease - lease // 8)) * 1000
+                )
                 self._increment_transaction_id()
                 if not self._renew:
                     self._eth.ifconfig = (
@@ -391,16 +397,16 @@ class DHCP:
         while True:
             if self._dhcp_state == _STATE_BOUND:
                 now = ticks_ms()
-                if ticks_diff(now, self._t1) < 0:
+                if ticks_less(now, self._t1_timeout):
                     debug_msg("No timers have expired. Exiting FSM.", self._debug)
                     return
-                if ticks_diff(now, self._lease) > 0:
+                if ticks_less(self._lease_timeout, now):
                     debug_msg(
                         "Lease has expired, switching state to INIT.", self._debug
                     )
                     self._blocking = True
                     self._dhcp_state = _STATE_INIT
-                elif ticks_diff(now, self._t2) > 0:
+                elif ticks_less(self._t2_timeout, now):
                     debug_msg(
                         "T2 has expired, switching state to REBINDING.", self._debug
                     )
@@ -414,16 +420,20 @@ class DHCP:
             if self._dhcp_state == _STATE_RENEWING:
                 debug_msg("FSM state is RENEWING.", self._debug)
                 self._renew = "renew"
-                self._start_time = time.monotonic()
                 self._start_ticks = ticks_ms()
+                self._lease = None
+                self._t1 = None
+                self._t2 = None
                 self._dhcp_state = _STATE_REQUESTING
 
             if self._dhcp_state == _STATE_REBINDING:
                 debug_msg("FSM state is REBINDING.", self._debug)
                 self._renew = "rebind"
                 self.dhcp_server_ip = _BROADCAST_SERVER_ADDR
-                self._start_time = time.monotonic()
                 self._start_ticks = ticks_ms()
+                self._lease = None
+                self._t1 = None
+                self._t2 = None
                 self._dhcp_state = _STATE_REQUESTING
 
             if self._dhcp_state == _STATE_INIT:
