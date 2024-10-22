@@ -196,6 +196,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         mac: Union[MacAddressRaw, str] = _DEFAULT_MAC,
         hostname: Optional[str] = None,
         debug: bool = False,
+        spi_baudrate: int = 8000000,
     ) -> None:
         """
         :param busio.SPI spi_bus: The SPI bus the Wiznet module is connected to.
@@ -207,10 +208,12 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         :param str hostname: The desired hostname, with optional {} to fill in the MAC
             address, defaults to None.
         :param bool debug: Enable debugging output, defaults to False.
+        : param int spi_baudrate: The SPI clock frequency, defaults to 8MHz.
+            Might not be the actual baudrate, dependent on the hardware.
         """
         self._debug = debug
         self._chip_type = None
-        self._device = SPIDevice(spi_bus, cs, baudrate=8000000, polarity=0, phase=0)
+        self._device = SPIDevice(spi_bus, cs, baudrate=spi_baudrate, polarity=0, phase=0)
         # init c.s.
         self._cs = cs
 
