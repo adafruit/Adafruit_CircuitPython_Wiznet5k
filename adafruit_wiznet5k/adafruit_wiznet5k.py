@@ -213,7 +213,9 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         """
         self._debug = debug
         self._chip_type = None
-        self._device = SPIDevice(spi_bus, cs, baudrate=spi_baudrate, polarity=0, phase=0)
+        self._device = SPIDevice(
+            spi_bus, cs, baudrate=spi_baudrate, polarity=0, phase=0
+        )
         # init c.s.
         self._cs = cs
 
