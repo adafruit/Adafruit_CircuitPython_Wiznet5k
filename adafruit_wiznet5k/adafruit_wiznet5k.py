@@ -208,7 +208,7 @@ class WIZNET5K:  # pylint: disable=too-many-public-methods, too-many-instance-at
         :param str hostname: The desired hostname, with optional {} to fill in the MAC
             address, defaults to None.
         :param bool debug: Enable debugging output, defaults to False.
-        : param int spi_baudrate: The SPI clock frequency, defaults to 8MHz.
+        :param int spi_baudrate: The SPI clock frequency, defaults to 8MHz.
             Might not be the actual baudrate, dependent on the hardware.
         """
         self._debug = debug
