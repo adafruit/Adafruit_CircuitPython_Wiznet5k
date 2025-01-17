@@ -601,7 +601,14 @@ class Socket:
                 self._buffer = self._buffer[bytes_to_read:]
                 # explicitly recheck num_to_read to avoid extra checks
                 continue
-
+            # We need to read the socket status here before seeing if any bytes are available.
+            # Why? Because otherwise we have a bad race condition in the if/elif/... logic below
+            # that can cause recv_into to fail when the other side closes the connection after
+            # sending bytes. The problem is that initially we can have num_avail=0 while the
+            # socket state is not in CLOSED or CLOSED_WAIT. Then after the if but before the elif
+            # that checks the socket state, bytes arrive and the other end closes the connection.
+            # So now bytes are available but we see the CLOSED/CLOSED_WAIT state and ignore them.
+            status_before_getting_available = self._status
             num_avail = self._available()
             if num_avail > 0:
                 last_read_time = ticks_ms()
@@ -620,7 +627,9 @@ class Socket:
             elif num_read > 0:
                 # We got a message, but there are no more bytes to read, so we can stop.
                 break
-            elif self._status in (
+            # See note where we set status_before_getting_available for why we can't just check
+            # _status here
+            elif status_before_getting_available in (
                 wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSED,
                 wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSE_WAIT,
             ):
