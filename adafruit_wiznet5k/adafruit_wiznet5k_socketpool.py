@@ -431,17 +431,20 @@ class Socket:
             if (
                 addr[0] == "0.0.0.0"
                 or addr[1] == 0
-                or self._interface.socket_status(self._socknum) != wiznet5k.adafruit_wiznet5k.SNSR_SOCK_ESTABLISHED
+                or self._interface.socket_status(self._socknum)
+                != wiznet5k.adafruit_wiznet5k.SNSR_SOCK_ESTABLISHED
             ):
                 if self._timeout == 0:
                     # non-blocking mode
                     raise OSError(errno.EAGAIN)
-                elif self._timeout and 0 < self._timeout < ticks_diff(ticks_ms(), stamp) / 1000:
+                if (
+                    self._timeout
+                    and 0 < self._timeout < ticks_diff(ticks_ms(), stamp) / 1000
+                ):
                     # blocking mode with timeout
                     raise OSError(errno.ETIMEDOUT)
-                else:
-                    # blocking mode / timeout not expired
-                    continue
+                # blocking mode / timeout not expired
+                continue
             current_socknum = self._socknum
             # Create a new socket object and swap socket nums, so we can continue listening
             client_sock = Socket(self._socket_pool)
@@ -586,7 +589,7 @@ class Socket:
         )
 
     @_check_socket_closed
-    def recv_into(  # pylint: disable=unused-argument
+    def recv_into(  # pylint: disable=unused-argument,too-many-branches
         self, buffer: bytearray, nbytes: int = 0, flags: int = 0
     ) -> int:
         """
@@ -651,8 +654,7 @@ class Socket:
                 # non-blocking mode
                 if num_read == 0:
                     raise OSError(errno.EAGAIN)
-                else:
-                    break
+                break
             if ticks_diff(ticks_ms(), last_read_time) / 1000 > self._timeout:
                 raise OSError(errno.ETIMEDOUT)
         return num_read
