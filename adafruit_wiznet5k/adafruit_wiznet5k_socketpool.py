@@ -408,33 +408,53 @@ class Socket:
             end of the connection.
         """
         stamp = ticks_ms()
-        while self._status not in (
-            wiznet5k.adafruit_wiznet5k.SNSR_SOCK_SYNRECV,
-            wiznet5k.adafruit_wiznet5k.SNSR_SOCK_ESTABLISHED,
-            wiznet5k.adafruit_wiznet5k.SNSR_SOCK_LISTEN,
-        ):
-            if (
-                self._timeout
-                and 0 < self._timeout < ticks_diff(ticks_ms(), stamp) / 1000
+        while True:
+            while self._status not in (
+                wiznet5k.adafruit_wiznet5k.SNSR_SOCK_SYNRECV,
+                wiznet5k.adafruit_wiznet5k.SNSR_SOCK_ESTABLISHED,
+                wiznet5k.adafruit_wiznet5k.SNSR_SOCK_LISTEN,
             ):
-                raise TimeoutError("Failed to accept connection.")
-            if self._status == wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSE_WAIT:
-                self._disconnect()
-                self.listen()
-            if self._status == wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSED:
-                self.close()
-                self.listen()
+                if (
+                    self._timeout
+                    and 0 < self._timeout < ticks_diff(ticks_ms(), stamp) / 1000
+                ):
+                    raise TimeoutError("Failed to accept connection.")
+                if self._status == wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSE_WAIT:
+                    self._disconnect()
+                    self.listen()
+                if self._status == wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSED:
+                    self.close()
+                    self.listen()
 
-        _, addr = self._interface.socket_accept(self._socknum)
-        current_socknum = self._socknum
-        # Create a new socket object and swap socket nums, so we can continue listening
-        client_sock = Socket(self._socket_pool)
-        self._socknum = client_sock._socknum  # pylint: disable=protected-access
-        client_sock._socknum = current_socknum  # pylint: disable=protected-access
-        self._bind((None, self._listen_port))
-        self.listen()
-        if self._status != wiznet5k.adafruit_wiznet5k.SNSR_SOCK_LISTEN:
-            raise RuntimeError("Failed to open new listening socket")
+            _, addr = self._interface.socket_accept(self._socknum)
+            # if any of the following conditions are true, we haven't accepted a connection
+            if (
+                addr[0] == "0.0.0.0"
+                or addr[1] == 0
+                or self._interface.socket_status(self._socknum)
+                != wiznet5k.adafruit_wiznet5k.SNSR_SOCK_ESTABLISHED
+            ):
+                if self._timeout == 0:
+                    # non-blocking mode
+                    raise OSError(errno.EAGAIN)
+                if (
+                    self._timeout
+                    and 0 < self._timeout < ticks_diff(ticks_ms(), stamp) / 1000
+                ):
+                    # blocking mode with timeout
+                    raise OSError(errno.ETIMEDOUT)
+                # blocking mode / timeout not expired
+                continue
+            current_socknum = self._socknum
+            # Create a new socket object and swap socket nums, so we can continue listening
+            client_sock = Socket(self._socket_pool)
+            self._socknum = client_sock._socknum  # pylint: disable=protected-access
+            client_sock._socknum = current_socknum  # pylint: disable=protected-access
+            self._bind((None, self._listen_port))
+            self.listen()
+            if self._status != wiznet5k.adafruit_wiznet5k.SNSR_SOCK_LISTEN:
+                raise RuntimeError("Failed to open new listening socket")
+            break
         return client_sock, addr
 
     @_check_socket_closed
@@ -569,7 +589,7 @@ class Socket:
         )
 
     @_check_socket_closed
-    def recv_into(  # pylint: disable=unused-argument
+    def recv_into(  # pylint: disable=unused-argument,too-many-branches
         self, buffer: bytearray, nbytes: int = 0, flags: int = 0
     ) -> int:
         """
@@ -632,6 +652,8 @@ class Socket:
                 continue
             if self._timeout == 0:
                 # non-blocking mode
+                if num_read == 0:
+                    raise OSError(errno.EAGAIN)
                 break
             if ticks_diff(ticks_ms(), last_read_time) / 1000 > self._timeout:
                 raise OSError(errno.ETIMEDOUT)
@@ -702,6 +724,8 @@ class Socket:
         Mark the socket closed. Once that happens, all future operations on the socket object
         will fail. The remote end will receive no more data.
         """
+        if self._sock_type == SocketPool.SOCK_STREAM:
+            self._disconnect()
         self._interface.release_socket(self._socknum)
         self._interface.socket_close(self._socknum)
         self._socket_closed = True
