@@ -705,6 +705,8 @@ class Socket:
         Mark the socket closed. Once that happens, all future operations on the socket object
         will fail. The remote end will receive no more data.
         """
+        if self._sock_type == SocketPool.SOCK_STREAM:
+            self._disconnect()
         self._interface.release_socket(self._socknum)
         self._interface.socket_close(self._socknum)
         self._socket_closed = True
