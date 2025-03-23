@@ -425,7 +425,7 @@ class Socket:
                 if self._status == wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSED:
                     self.close()
                     self.listen()
-    
+
             _, addr = self._interface.socket_accept(self._socknum)
             # if any of the following conditions are true, we haven't accepted a connection
             if (
