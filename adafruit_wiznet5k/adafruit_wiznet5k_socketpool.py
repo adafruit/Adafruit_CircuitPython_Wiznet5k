@@ -632,7 +632,10 @@ class Socket:
                 continue
             if self._timeout == 0:
                 # non-blocking mode
-                break
+                if num_read == 0:
+                    raise OSError(errno.EAGAIN)
+                else:
+                    break
             if ticks_diff(ticks_ms(), last_read_time) / 1000 > self._timeout:
                 raise OSError(errno.ETIMEDOUT)
         return num_read
