@@ -13,10 +13,11 @@ ethernet modules.
 * Author(s): MCQN Ltd, Brent Rubell, Martin Stephens
 
 """
+
 from __future__ import annotations
 
 try:
-    from typing import TYPE_CHECKING, Union, Tuple
+    from typing import TYPE_CHECKING, Tuple, Union
 
     if TYPE_CHECKING:
         from adafruit_wiznet5k.adafruit_wiznet5k import WIZNET5K
@@ -25,8 +26,9 @@ except ImportError:
 
 import time
 from random import getrandbits
+
+from adafruit_ticks import ticks_diff, ticks_ms
 from micropython import const
-from adafruit_ticks import ticks_ms, ticks_diff
 
 _QUERY_FLAG = const(0x00)
 _OPCODE_STANDARD_QUERY = const(0x00)
@@ -96,7 +98,6 @@ def _build_dns_query(domain: bytes) -> Tuple[int, int, bytearray]:
 def _parse_dns_response(
     *, response: bytearray, query_id: int, query_length: int, debug: bool
 ) -> bytearray:
-    # pylint: disable=too-many-branches
     """
     Parses a DNS query response.
 
@@ -113,15 +114,9 @@ def _parse_dns_response(
     """
     # Validate request identifier
     response_id = int.from_bytes(response[0:2], "big")
-    _debug_print(
-        debug=debug, message="Parsing packet with ID {x:#x}".format(x=response_id)
-    )
+    _debug_print(debug=debug, message=f"Parsing packet with ID {response_id:#x}")
     if response_id != query_id:
-        raise ValueError(
-            "Response ID 0x{x:x} does not match query ID 0x{y:x}".format(
-                x=response_id, y=query_id
-            )
-        )
+        raise ValueError(f"Response ID 0x{response_id:x} does not match query ID 0x{query_id:x}")
     # Validate flags
     flags = int.from_bytes(response[2:4], "big")
     # Mask out authenticated, truncated and recursion bits, unimportant to parsing.
@@ -129,21 +124,20 @@ def _parse_dns_response(
     # Check that the response bit is set, the query is standard and no error occurred.
     if flags != 0x8000:
         # noinspection PyStringFormat
-        raise ValueError("Invalid flags {x:#04x}, {x:#016b}.".format(x=flags))
+        raise ValueError(f"Invalid flags {flags:#04x}, {flags:#016b}.")
     # Number of questions
     question_count = int.from_bytes(response[4:6], "big")
     # Never more than one question per DNS query in this implementation.
     if question_count != 1:
-        raise ValueError("Question count should be 1, is {}.".format(question_count))
+        raise ValueError(f"Question count should be 1, is {question_count}.")
     # Number of answers
     answer_count = int.from_bytes(response[6:8], "big")
-    _debug_print(debug=debug, message="* DNS Answer Count: {}.".format(answer_count))
+    _debug_print(debug=debug, message=f"* DNS Answer Count: {answer_count}.")
     if answer_count < 1:
-        raise ValueError("Answer count should be > 0, is {}.".format(answer_count))
+        raise ValueError(f"Answer count should be > 0, is {answer_count}.")
 
     # Parse answers
     pointer = query_length  # Response header is the same length as the query header.
-    # pylint: disable=too-many-nested-blocks
     try:
         for answer in range(answer_count):
             # Move the pointer past the name.
@@ -167,23 +161,15 @@ def _parse_dns_response(
             # Check for a type A answer.
             if int.from_bytes(response[pointer : pointer + 2], "big") == _TYPE_A:
                 # Check for an IN class answer.
-                if (
-                    int.from_bytes(response[pointer + 2 : pointer + 4], "big")
-                    == _CLASS_IN
-                ):
+                if int.from_bytes(response[pointer + 2 : pointer + 4], "big") == _CLASS_IN:
                     _debug_print(
                         debug=debug,
-                        message="Type A, class IN found in answer {x} of {y}.".format(
-                            x=answer + 1, y=answer_count
-                        ),
+                        message=f"Type A, class IN found in answer {answer + 1} of {answer_count}.",
                     )
                     # Set pointer to start of resource record.
                     pointer += 8
                     # Confirm that the resource record is 4 bytes (an IPv4 address).
-                    if (
-                        int.from_bytes(response[pointer : pointer + 2], "big")
-                        == _DATA_LEN
-                    ):
+                    if int.from_bytes(response[pointer : pointer + 2], "big") == _DATA_LEN:
                         ipv4 = response[pointer + 2 : pointer + 6]
                         # Low probability that the response was truncated inside the 4 byte address.
                         if len(ipv4) != _DATA_LEN:
@@ -199,18 +185,14 @@ def _parse_dns_response(
             pointer += 10 + int.from_bytes(response[pointer + 8 : pointer + 10], "big")
             _debug_print(
                 debug=debug,
-                message="Answer {x} of {y} was not type A, class IN.".format(
-                    x=answer + 1, y=answer_count
-                ),
+                message=f"Answer {answer + 1} of {answer_count} was not type A, class IN.",
             )
         # No IPv4 address in any answer.
         raise ValueError()
     except (IndexError, ValueError) as error:
         # IndexError means we ran out of data in an answer, maybe truncated.
         # ValueError means we ran out of answers.
-        raise ValueError(
-            "No type A, class IN answers found in the DNS response."
-        ) from error
+        raise ValueError("No type A, class IN answers found in the DNS response.") from error
 
 
 class DNS:
@@ -230,9 +212,7 @@ class DNS:
         self._debug = debug
         self._iface = iface
         self._dns_server = (
-            self._iface.unpretty_ip(dns_address)
-            if isinstance(dns_address, str)
-            else dns_address
+            self._iface.unpretty_ip(dns_address) if isinstance(dns_address, str) else dns_address
         )
         self._query_id = 0  # Request ID.
         self._query_length = 0  # Length of last query.
@@ -252,9 +232,7 @@ class DNS:
 
         # Send DNS request packet
         dns_socket = self._iface.get_socket()
-        self._iface.socket_connect(
-            dns_socket, bytes(self._dns_server), _DNS_PORT, conn_mode=0x02
-        )
+        self._iface.socket_connect(dns_socket, bytes(self._dns_server), _DNS_PORT, conn_mode=0x02)
         _debug_print(debug=self._debug, message="* DNS: Sending request packet...")
         self._iface.socket_write(dns_socket, buffer)
 
@@ -277,7 +255,7 @@ class DNS:
             _, buffer = self._iface.read_udp(dns_socket, 512)
             _debug_print(
                 debug=self._debug,
-                message="DNS Packet Received: {}".format(buffer),
+                message=f"DNS Packet Received: {buffer}",
             )
             try:
                 ipaddress = _parse_dns_response(
@@ -291,7 +269,7 @@ class DNS:
                 _debug_print(
                     debug=self._debug,
                     message="* DNS ERROR: Failed to resolve DNS response, retrying…\n"
-                    "    ({}).".format(error.args[0]),
+                    f"    ({error.args[0]}).",
                 )
         self._iface.socket_close(dns_socket)
         return ipaddress

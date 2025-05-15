@@ -2,15 +2,15 @@
 # SPDX-License-Identifier: MIT
 
 import time
-import board
-import busio
-from digitalio import DigitalInOut
 
 import adafruit_connection_manager
-import adafruit_requests
-
-import neopixel
 import adafruit_fancyled.adafruit_fancyled as fancy
+import adafruit_requests
+import board
+import busio
+import neopixel
+from digitalio import DigitalInOut
+
 from adafruit_wiznet5k.adafruit_wiznet5k import WIZNET5K
 
 cs = DigitalInOut(board.D10)

@@ -11,6 +11,7 @@ A socket compatible interface with the Wiznet5k module.
 * Author(s): ladyada, Brent Rubell, Patrick Van Oosterwijck, Adam Cummick, Martin Stephens
 
 """
+
 from __future__ import annotations
 
 try:
@@ -25,11 +26,10 @@ import errno
 import gc
 from sys import byteorder
 
+from adafruit_ticks import ticks_diff, ticks_ms
 from micropython import const
-from adafruit_ticks import ticks_ms, ticks_diff
 
 import adafruit_wiznet5k as wiznet5k
-
 
 _SOCKET_TYPE_TO_WIZNET = b"\0\x21\2"
 _SOCKET_INVALID = const(255)
@@ -71,7 +71,7 @@ class SocketPool:
         """
         octets = ipv4_address.split(".", 3)
         if len(octets) == 4 and "".join(octets).isdigit():
-            if all((0 <= int(octet) <= 255 for octet in octets)):
+            if all(0 <= int(octet) <= 255 for octet in octets):
                 return True
         return False
 
@@ -154,7 +154,7 @@ class SocketPool:
             raise ValueError("The IPv4 address must be 4 bytes.")
         return self._interface.pretty_ip(ip_address)
 
-    def getaddrinfo(  # pylint: disable=redefined-builtin,too-many-arguments,unused-argument
+    def getaddrinfo(
         self,
         host: str,
         port: int,
@@ -201,10 +201,10 @@ class SocketPool:
         if self._is_ipv4_string(hostname):
             return hostname
         address = self._interface.get_host_by_name(hostname)
-        address = "{}.{}.{}.{}".format(address[0], address[1], address[2], address[3])
+        address = f"{address[0]}.{address[1]}.{address[2]}.{address[3]}"
         return address
 
-    def socket(  # pylint: disable=redefined-builtin
+    def socket(
         self,
         family: int = AF_INET,
         type: int = SOCK_STREAM,
@@ -221,7 +221,7 @@ class Socket:
     to a Wiznet5k module.
     """
 
-    def __init__(  # pylint: disable=redefined-builtin,too-many-arguments,unused-argument
+    def __init__(
         self,
         socket_pool: SocketPool,
         family: int = SocketPool.AF_INET,
@@ -263,15 +263,10 @@ class Socket:
                 self._socknum, 0xFF & (~wiznet5k.adafruit_wiznet5k.SNIR_DISCON)
             )  # Reset socket interrupt register.
             self._interface.socket_disconnect(self._socknum)
-            mask = (
-                wiznet5k.adafruit_wiznet5k.SNIR_TIMEOUT
-                | wiznet5k.adafruit_wiznet5k.SNIR_DISCON
-            )
+            mask = wiznet5k.adafruit_wiznet5k.SNIR_TIMEOUT | wiznet5k.adafruit_wiznet5k.SNIR_DISCON
             while not self._interface.read_snir(self._socknum) & mask:
                 pass
-        self._interface.write_snir(
-            self._socknum, 0xFF
-        )  # Reset socket interrupt register.
+        self._interface.write_snir(self._socknum, 0xFF)  # Reset socket interrupt register.
         self._interface.socket_close(self._socknum)
         while (
             self._interface.socket_status(self._socknum)
@@ -280,13 +275,13 @@ class Socket:
             pass
 
     # This works around problems with using a class method as a decorator.
-    def _check_socket_closed(func):  # pylint: disable=no-self-argument
+    def _check_socket_closed(func):
         """Decorator to check whether the socket object has been closed."""
 
         def wrapper(self, *args, **kwargs):
-            if self._socket_closed:  # pylint: disable=protected-access
+            if self._socket_closed:
                 raise RuntimeError("The socket has been closed.")
-            return func(self, *args, **kwargs)  # pylint: disable=not-callable
+            return func(self, *args, **kwargs)
 
         return wrapper
 
@@ -310,18 +305,15 @@ class Socket:
         if self._socknum >= self._interface.max_sockets:
             return False
         status = self._interface.socket_status(self._socknum)
-        if (
-            status == wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSE_WAIT
-            and self._available() == 0
-        ):
+        if status == wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSE_WAIT and self._available() == 0:
             result = False
         else:
-            result = status not in (
+            result = status not in {
                 wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSED,
                 wiznet5k.adafruit_wiznet5k.SNSR_SOCK_LISTEN,
                 wiznet5k.adafruit_wiznet5k.SNSR_SOCK_TIME_WAIT,
                 wiznet5k.adafruit_wiznet5k.SNSR_SOCK_FIN_WAIT,
-            )
+            }
         if not result and status != wiznet5k.adafruit_wiznet5k.SNSR_SOCK_LISTEN:
             self.close()
         return result
@@ -333,9 +325,7 @@ class Socket:
 
         :return Tuple[str, int]: IPv4 address and port the socket is connected to.
         """
-        return self._interface.remote_ip(self._socknum), self._interface.remote_port(
-            self._socknum
-        )
+        return self._interface.remote_ip(self._socknum), self._interface.remote_port(self._socknum)
 
     @_check_socket_closed
     def bind(self, address: Tuple[Optional[str], int]) -> None:
@@ -367,10 +357,8 @@ class Socket:
                 self._interface.ip_address
             ):
                 raise ValueError(
-                    "The IPv4 address requested must match {}, "
-                    "the one assigned to the WIZNET5K interface.".format(
-                        self._interface.pretty_ip(self._interface.ip_address)
-                    )
+                    f"The IPv4 address requested must match {self._interface.pretty_ip(self._interface.ip_address)}, "
+                    "the one assigned to the WIZNET5K interface."
                 )
         self._listen_port = address[1]
         # For UDP servers we need to open the socket here because we won't call
@@ -384,7 +372,7 @@ class Socket:
             self._buffer = b""
 
     @_check_socket_closed
-    def listen(self, backlog: int = 0) -> None:  # pylint: disable=unused-argument
+    def listen(self, backlog: int = 0) -> None:
         """
         Enable a server to accept connections.
 
@@ -408,15 +396,12 @@ class Socket:
             end of the connection.
         """
         stamp = ticks_ms()
-        while self._status not in (
+        while self._status not in {
             wiznet5k.adafruit_wiznet5k.SNSR_SOCK_SYNRECV,
             wiznet5k.adafruit_wiznet5k.SNSR_SOCK_ESTABLISHED,
             wiznet5k.adafruit_wiznet5k.SNSR_SOCK_LISTEN,
-        ):
-            if (
-                self._timeout
-                and 0 < self._timeout < ticks_diff(ticks_ms(), stamp) / 1000
-            ):
+        }:
+            if self._timeout and 0 < self._timeout < ticks_diff(ticks_ms(), stamp) / 1000:
                 raise TimeoutError("Failed to accept connection.")
             if self._status == wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSE_WAIT:
                 self._disconnect()
@@ -429,8 +414,8 @@ class Socket:
         current_socknum = self._socknum
         # Create a new socket object and swap socket nums, so we can continue listening
         client_sock = Socket(self._socket_pool)
-        self._socknum = client_sock._socknum  # pylint: disable=protected-access
-        client_sock._socknum = current_socknum  # pylint: disable=protected-access
+        self._socknum = client_sock._socknum
+        client_sock._socknum = current_socknum
         self._bind((None, self._listen_port))
         self.listen()
         if self._status != wiznet5k.adafruit_wiznet5k.SNSR_SOCK_LISTEN:
@@ -491,7 +476,7 @@ class Socket:
         """
         # May be called with (data, address) or (data, flags, address)
         other_args = list(flags_and_or_address)
-        if len(other_args) in (1, 2):
+        if len(other_args) in {1, 2}:
             address = other_args[-1]
         else:
             raise ValueError("Incorrect number of arguments, should be 2 or 3.")
@@ -499,7 +484,7 @@ class Socket:
         return self.send(data)
 
     @_check_socket_closed
-    def recv(  # pylint: disable=unused-argument
+    def recv(
         self,
         bufsize: int,
         flags: int = 0,
@@ -521,9 +506,7 @@ class Socket:
             return bytes(buf[:nread])
         return bytes(buf)
 
-    def _embed_recv(  # pylint: disable=unused-argument
-        self, bufsize: int = 0, flags: int = 0
-    ) -> bytes:
+    def _embed_recv(self, bufsize: int = 0, flags: int = 0) -> bytes:
         """
         Read from the connected remote address.
 
@@ -546,9 +529,7 @@ class Socket:
         return ret
 
     @_check_socket_closed
-    def recvfrom(  # pylint: disable=unused-argument
-        self, bufsize: int, flags: int = 0
-    ) -> Tuple[bytes, Tuple[str, int]]:
+    def recvfrom(self, bufsize: int, flags: int = 0) -> Tuple[bytes, Tuple[str, int]]:
         """
         Receive data from the socket. The return value is a pair (bytes, address) where bytes is
         a bytes object representing the data received and address is the address of the socket
@@ -569,9 +550,7 @@ class Socket:
         )
 
     @_check_socket_closed
-    def recv_into(  # pylint: disable=unused-argument
-        self, buffer: bytearray, nbytes: int = 0, flags: int = 0
-    ) -> int:
+    def recv_into(self, buffer: bytearray, nbytes: int = 0, flags: int = 0) -> int:
         """
         Receive up to nbytes bytes from the socket, storing the data into a buffer
         rather than creating a new bytestring.
@@ -593,9 +572,7 @@ class Socket:
             # _readline
             if len(self._buffer) > 0:
                 bytes_to_read = min(num_to_read, len(self._buffer))
-                buffer[num_read : num_read + bytes_to_read] = self._buffer[
-                    :bytes_to_read
-                ]
+                buffer[num_read : num_read + bytes_to_read] = self._buffer[:bytes_to_read]
                 num_read += bytes_to_read
                 num_to_read -= bytes_to_read
                 self._buffer = self._buffer[bytes_to_read:]
@@ -607,23 +584,19 @@ class Socket:
                 last_read_time = ticks_ms()
                 bytes_to_read = min(num_to_read, num_avail)
                 if self._sock_type == SocketPool.SOCK_STREAM:
-                    bytes_read = self._interface.socket_read(
-                        self._socknum, bytes_to_read
-                    )[1]
+                    bytes_read = self._interface.socket_read(self._socknum, bytes_to_read)[1]
                 else:
-                    bytes_read = self._interface.read_udp(self._socknum, bytes_to_read)[
-                        1
-                    ]
+                    bytes_read = self._interface.read_udp(self._socknum, bytes_to_read)[1]
                 buffer[num_read : num_read + len(bytes_read)] = bytes_read
                 num_read += len(bytes_read)
                 num_to_read -= len(bytes_read)
             elif num_read > 0:
                 # We got a message, but there are no more bytes to read, so we can stop.
                 break
-            elif self._status in (
+            elif self._status in {
                 wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSED,
                 wiznet5k.adafruit_wiznet5k.SNSR_SOCK_CLOSE_WAIT,
-            ):
+            }:
                 # No bytes to read and we will not get more, stop.
                 break
             # No bytes yet, or more bytes requested.
@@ -638,7 +611,7 @@ class Socket:
         return num_read
 
     @_check_socket_closed
-    def recvfrom_into(  # pylint: disable=unused-argument
+    def recvfrom_into(
         self, buffer: bytearray, nbytes: int = 0, flags: int = 0
     ) -> Tuple[int, Tuple[str, int]]:
         """
@@ -718,9 +691,7 @@ class Socket:
         )
 
     @_check_socket_closed
-    def setsockopt(  # pylint: disable=no-self-use,unused-argument
-        self, level: int, opt: int, value: any
-    ) -> None:
+    def setsockopt(self, level: int, opt: int, value: any) -> None:
         """
         Set a socket option.
 
