@@ -6,8 +6,9 @@
 import board
 import busio
 import digitalio
-from adafruit_wiznet5k.adafruit_wiznet5k import WIZNET5K
+
 import adafruit_wiznet5k.adafruit_wiznet5k_socketpool as socketpool
+from adafruit_wiznet5k.adafruit_wiznet5k import WIZNET5K
 
 print("Wiznet5k SimpleServer Test")
 

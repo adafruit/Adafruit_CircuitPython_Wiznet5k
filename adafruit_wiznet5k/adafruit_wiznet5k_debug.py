@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: MIT
 
 """Makes a debug message function available to all modules."""
+
 try:
     from typing import TYPE_CHECKING, Union
 
@@ -14,9 +15,7 @@ except ImportError:
 import gc
 
 
-def debug_msg(
-    message: Union[Exception, str, bytes, bytearray], debugging: bool
-) -> None:
+def debug_msg(message: Union[Exception, str, bytes, bytearray], debugging: bool) -> None:
     """
     Helper function to print debugging messages. If the message is a bytes type
     object, create a hexdump.
@@ -43,7 +42,7 @@ def _hexdump(src: bytes):
     result = []
     for i in range(0, len(src), 16):
         chunk = src[i : i + 16]
-        hexa = " ".join(("{:02x}".format(x) for x in chunk))
-        text = "".join((chr(x) if 0x20 <= x < 0x7F else "." for x in chunk))
-        result.append("{:04x}   {:<48}   {}".format(i, hexa, text))
+        hexa = " ".join(f"{x:02x}" for x in chunk)
+        text = "".join(chr(x) if 0x20 <= x < 0x7F else "." for x in chunk)
+        result.append(f"{i:04x}   {hexa:<48}   {text}")
     return "\n".join(result)

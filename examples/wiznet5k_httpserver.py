@@ -3,9 +3,10 @@
 
 import board
 import digitalio
-from adafruit_httpserver import Server, Request, Response
-from adafruit_wiznet5k.adafruit_wiznet5k import WIZNET5K
+from adafruit_httpserver import Request, Response, Server
+
 import adafruit_wiznet5k.adafruit_wiznet5k_socketpool as socketpool
+from adafruit_wiznet5k.adafruit_wiznet5k import WIZNET5K
 
 print("Wiznet5k HTTPServer Test")
 
