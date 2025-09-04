@@ -61,59 +61,133 @@ from adafruit_wiznet5k.adafruit_wiznet5k_debug import debug_msg
 # *** Wiznet Common Registers ***
 _REG_MR = {"w5100s": const(0x0000), "w5500": const(0x0000)}
 # Gateway IPv4 Address.
-_REG_GAR = {"w5100s": const(0x0001), "w5500": const(0x0001), "w6100": const(0x4130)}
+_REG_GAR = {
+    "w5100s": const(0x0001),
+    "w5500": const(0x0001),
+    "w6100": const(0x4130),
+    "w6300": const(0x4130),
+}
 # Subnet Mask Address
-_REG_SUBR = {"w5100s": const(0x0005), "w5500": const(0x0005), "w6100": const(0x4134)}
+_REG_SUBR = {
+    "w5100s": const(0x0005),
+    "w5500": const(0x0005),
+    "w6100": const(0x4134),
+    "w6300": const(0x4134),
+}
 # Chip version.
 _REG_VERSIONR = {
     "w5100s": const(0x0080),
     "w5500": const(0x0039),
     "w6100": const(0x0000),
+    "w6300": const(0x0000),
 }
 # Source Hardware Address
-_REG_SHAR = {"w5100s": const(0x0009), "w5500": const(0x0009), "w6100": const(0x4120)}
+_REG_SHAR = {
+    "w5100s": const(0x0009),
+    "w5500": const(0x0009),
+    "w6100": const(0x4120),
+    "w6300": const(0x4120),
+}
 # Source IP Address
-_REG_SIPR = {"w5100s": const(0x000F), "w5500": const(0x000F), "w6100": const(0x4138)}
+_REG_SIPR = {
+    "w5100s": const(0x000F),
+    "w5500": const(0x000F),
+    "w6100": const(0x4138),
+    "w6300": const(0x4138),
+}
 # Register with link status flag (PHYCFGR for 5xxxx, PHYSR for 6100).
 _REG_LINK_FLAG = {
     "w5100s": const(0x003C),
     "w5500": const(0x002E),
     "w6100": const(0x3000),
+    "w6300": const(0x3000),
 }
-_REG_RCR = {"w5100s": const(0x0019), "w5500": const(0x001B), "w6100": const(0x4204)}
-_REG_RTR = {"w5100s": const(0x0017), "w5500": const(0x0019), "w6100": const(0x4200)}
+_REG_RCR = {
+    "w5100s": const(0x0019),
+    "w5500": const(0x001B),
+    "w6100": const(0x4204),
+    "w6300": const(0x4204),
+}
+_REG_RTR = {
+    "w5100s": const(0x0017),
+    "w5500": const(0x0019),
+    "w6100": const(0x4200),
+    "w6300": const(0x4200),
+}
 
 # *** Wiznet Socket Registers ***
 # Socket n Mode.
 _REG_SNMR = const(0x0000)
 # Socket n Command.
-_REG_SNCR = {"w5100s": const(0x0001), "w5500": const(0x0001), "w6100": const(0x0010)}
+_REG_SNCR = {
+    "w5100s": const(0x0001),
+    "w5500": const(0x0001),
+    "w6100": const(0x0010),
+    "w6300": const(0x0010),
+}
 # Socket n Interrupt.
-_REG_SNIR = {"w5100s": const(0x0002), "w5500": const(0x0002), "w6100": const(0x0020)}
+_REG_SNIR = {
+    "w5100s": const(0x0002),
+    "w5500": const(0x0002),
+    "w6100": const(0x0020),
+    "w6300": const(0x0020),
+}
 # Socket n Status.
-_REG_SNSR = {"w5100s": const(0x0003), "w5500": const(0x0003), "w6100": const(0x0030)}
+_REG_SNSR = {
+    "w5100s": const(0x0003),
+    "w5500": const(0x0003),
+    "w6100": const(0x0030),
+    "w6300": const(0x0030),
+}
 # Socket n Source Port.
-_REG_SNPORT = {"w5100s": const(0x0004), "w5500": const(0x0004), "w6100": const(0x0114)}
+_REG_SNPORT = {
+    "w5100s": const(0x0004),
+    "w5500": const(0x0004),
+    "w6100": const(0x0114),
+    "w6300": const(0x0114),
+}
 # Destination IPv4 Address.
-_REG_SNDIPR = {"w5100s": const(0x000C), "w5500": const(0x000C), "w6100": const(0x0120)}
+_REG_SNDIPR = {
+    "w5100s": const(0x000C),
+    "w5500": const(0x000C),
+    "w6100": const(0x0120),
+    "w6300": const(0x0120),
+}
 # Destination Port.
-_REG_SNDPORT = {"w5100s": const(0x0010), "w5500": const(0x0010), "w6100": const(0x0140)}
+_REG_SNDPORT = {
+    "w5100s": const(0x0010),
+    "w5500": const(0x0010),
+    "w6100": const(0x0140),
+    "w6300": const(0x0140),
+}
 # RX Free Size.
 _REG_SNRX_RSR = {
     "w5100s": const(0x0026),
     "w5500": const(0x0026),
     "w6100": const(0x0224),
+    "w6300": const(0x0224),
 }
 # Read Size Pointer.
-_REG_SNRX_RD = {"w5100s": const(0x0028), "w5500": const(0x0028), "w6100": const(0x0228)}
+_REG_SNRX_RD = {
+    "w5100s": const(0x0028),
+    "w5500": const(0x0028),
+    "w6100": const(0x0228),
+    "w6300": const(0x0228),
+}
 # Socket n TX Free Size.
 _REG_SNTX_FSR = {
     "w5100s": const(0x0020),
     "w5500": const(0x0020),
     "w6100": const(0x0204),
+    "w6300": const(0x0204),
 }
 # TX Write Pointer.
-_REG_SNTX_WR = {"w5100s": const(0x0024), "w5500": const(0x0024), "w6100": const(0x020C)}
+_REG_SNTX_WR = {
+    "w5100s": const(0x0024),
+    "w5500": const(0x0024),
+    "w6100": const(0x020C),
+    "w6300": const(0x020C),
+}
 
 # SNSR Commands
 SNSR_SOCK_CLOSED = const(0x00)
@@ -169,7 +243,12 @@ _LOCAL_PORT = const(0x400)
 _DEFAULT_MAC = "DE:AD:BE:EF:FE:ED"
 
 # Maximum number of sockets to support, differs between chip versions.
-_MAX_SOCK_NUM = {"w5100s": const(0x04), "w5500": const(0x08), "w6100": const(0x08)}
+_MAX_SOCK_NUM = {
+    "w5100s": const(0x04),
+    "w5500": const(0x08),
+    "w6100": const(0x08),
+    "w6300": const(0x08),
+}
 _SOCKET_INVALID = const(0xFF)
 
 
@@ -334,7 +413,10 @@ class WIZNET5K:
 
         :return bytes: IP address as four bytes.
         """
-        return self._read(_REG_SIPR[self._chip_type], 0x00, 4)
+        if self._chip_type == "w6300":
+            return self._read(_REG_SIPR[self._chip_type], 0x80, 4)
+        else:
+            return self._read(_REG_SIPR[self._chip_type], 0x00, 4)
 
     @property
     def ipv4_address(self) -> str:
@@ -380,7 +462,10 @@ class WIZNET5K:
 
         :return bytes: Six byte MAC address.
         """
-        return self._read(_REG_SHAR[self._chip_type], 0x00, 6)
+        if self._chip_type == "w6300":
+            return self._read(_REG_SHAR[self._chip_type], 0x80, 6)
+        else:
+            return self._read(_REG_SHAR[self._chip_type], 0x00, 6)
 
     @mac_address.setter
     def mac_address(self, address: Union[MacAddressRaw, str]) -> None:
@@ -399,7 +484,10 @@ class WIZNET5K:
             if len(address) != 6:
                 raise ValueError()
             # Bytes conversion will raise ValueError if values are not 0-255
-            self._write(_REG_SHAR[self._chip_type], 0x04, bytes(address))
+            if self._chip_type == "w6300":
+                self._write(_REG_SHAR[self._chip_type], 0xA0, bytes(address))
+            else:
+                self._write(_REG_SHAR[self._chip_type], 0x04, bytes(address))
         except ValueError:
             raise ValueError("Invalid MAC address.")
 
@@ -457,7 +545,15 @@ class WIZNET5K:
 
         :return bool: True if the link is up, False if the link is down.
         """
-        return bool(int.from_bytes(self._read(_REG_LINK_FLAG[self._chip_type], 0x00), "big") & 0x01)
+        if self._chip_type == "w6300":
+            # w6300 uses PHYCFGR register for link status
+            return bool(
+                int.from_bytes(self._read(_REG_LINK_FLAG[self._chip_type], 0x80), "big") & 0x01
+            )
+        else:
+            return bool(
+                int.from_bytes(self._read(_REG_LINK_FLAG[self._chip_type], 0x00), "big") & 0x01
+            )
 
     @property
     def ifconfig(self) -> Tuple[bytes, bytes, bytes, bytes]:
@@ -467,12 +563,20 @@ class WIZNET5K:
         :return Tuple[bytes, bytes, bytes, bytes]: The IP address, subnet mask, gateway
             address and DNS server address.
         """
-        return (
-            self.ip_address,
-            self._read(_REG_SUBR[self._chip_type], 0x00, 4),
-            self._read(_REG_GAR[self._chip_type], 0x00, 4),
-            self._dns,
-        )
+        if self._chip_type == "w6300":
+            return (
+                self.ip_address,
+                self._read(_REG_SUBR[self._chip_type], 0x80, 4),
+                self._read(_REG_GAR[self._chip_type], 0x80, 4),
+                self._dns,
+            )
+        else:
+            return (
+                self.ip_address,
+                self._read(_REG_SUBR[self._chip_type], 0x00, 4),
+                self._read(_REG_GAR[self._chip_type], 0x00, 4),
+                self._dns,
+            )
 
     @ifconfig.setter
     def ifconfig(
@@ -489,9 +593,18 @@ class WIZNET5K:
                 raise ValueError("IPv4 address must be 4 bytes.")
         ip_address, subnet_mask, gateway_address, dns_server = params
 
-        self._write(_REG_SIPR[self._chip_type], 0x04, bytes(ip_address))
-        self._write(_REG_SUBR[self._chip_type], 0x04, bytes(subnet_mask))
-        self._write(_REG_GAR[self._chip_type], 0x04, bytes(gateway_address))
+        if self._chip_type == "w6300":
+            self._write(_REG_SIPR[self._chip_type], 0xA0, bytes(ip_address))
+        else:
+            self._write(_REG_SIPR[self._chip_type], 0x04, bytes(ip_address))
+        if self._chip_type == "w6300":
+            self._write(_REG_SUBR[self._chip_type], 0xA0, bytes(subnet_mask))
+        else:
+            self._write(_REG_SUBR[self._chip_type], 0x04, bytes(subnet_mask))
+        if self._chip_type == "w6300":
+            self._write(_REG_GAR[self._chip_type], 0xA0, bytes(gateway_address))
+        else:
+            self._write(_REG_GAR[self._chip_type], 0x04, bytes(gateway_address))
 
         self._dns = bytes(dns_server)
 
@@ -943,9 +1056,15 @@ class WIZNET5K:
         def _setup_sockets() -> None:
             """Initialise sockets for w5500 and w6100 chips."""
             for sock_num in range(_MAX_SOCK_NUM[self._chip_type]):
-                ctrl_byte = 0x0C + (sock_num << 5)
-                self._write(0x1E, ctrl_byte, 2)
-                self._write(0x1F, ctrl_byte, 2)
+                if self._chip_type == "w6300":
+                    ctrl_byte = 0xA1 + (sock_num << 2)
+                    self._write(0x0220, ctrl_byte, 2)
+                    self._write(0x0200, ctrl_byte, 2)
+                else:
+                    ctrl_byte = 0x0C + (sock_num << 5)
+                    self._write(0x1E, ctrl_byte, 2)
+                    self._write(0x1F, ctrl_byte, 2)
+
             self._ch_base_msb = 0x00
             WIZNET5K._sockets_reserved = [False] * (_MAX_SOCK_NUM[self._chip_type] - 1)
             self._src_ports_in_use = [0] * _MAX_SOCK_NUM[self._chip_type]
@@ -969,6 +1088,30 @@ class WIZNET5K:
                 return False
             # Initialize w6100.
             self._write(0x41F5, 0x04, 0x3A)  # Unlock network settings.
+            _setup_sockets()
+
+            return True
+
+        def _detect_and_reset_w6300() -> bool:
+            """
+            Detect and reset a W6300 chip. Called at startup to initialize the
+            interface hardware.
+
+            :return bool: True if a W6300 chip is detected, False if not.
+            """
+            self._chip_type = "w6300"
+
+            self._write(0x41F4, 0xA0, 0xCE)  # Unlock chip settings.
+            time.sleep(0.05)  # Wait for unlock.
+            self._write(0x41F5, 0xA0, 0x3A)  # Unlock network settings.
+            time.sleep(0.05)  # Wait for unlock.
+            self._write(0x41F6, 0xA0, 0x53)  # PHY Unlock.
+            time.sleep(0.05)  # Wait for unlock.
+
+            if self._read(_REG_VERSIONR[self._chip_type], 0x80)[0] != 0x61:
+                return False
+
+            # Initialize w6300.
             _setup_sockets()
             return True
 
@@ -1025,6 +1168,7 @@ class WIZNET5K:
             _detect_and_reset_w5100s,
             _detect_and_reset_w5500,
             _detect_and_reset_w6100,
+            _detect_and_reset_w6300,
         ]:
             if func():
                 return
@@ -1216,7 +1360,10 @@ class WIZNET5K:
         """Retry count register."""
         if 0 > retry_count > 255:
             raise ValueError("Retries must be from 0 to 255.")
-        self._write(_REG_RCR[self._chip_type], 0x04, retry_count)
+        if self._chip_type == "w6300":
+            self._write(_REG_RCR[self._chip_type], 0xA0, retry_count)
+        else:
+            self._write(_REG_RCR[self._chip_type], 0x04, retry_count)
 
     @property
     def rtr(self) -> int:
@@ -1228,7 +1375,10 @@ class WIZNET5K:
         """Retry time register."""
         if 0 > retry_time >= 2**16:
             raise ValueError("Retry time must be from 0 to 65535")
-        self._write(_REG_RTR[self._chip_type], 0x04, retry_time)
+        if self._chip_type == "w6300":
+            self._write(_REG_RCR[self._chip_type], 0xA0, retry_time)
+        else:
+            self._write(_REG_RTR[self._chip_type], 0x04, retry_time)
 
     # *** Chip Specific Methods ***
 
@@ -1242,6 +1392,11 @@ class WIZNET5K:
             device.write((0x0F).to_bytes(1, "big"))
             device.write((address >> 8).to_bytes(1, "big"))
             device.write((address & 0xFF).to_bytes(1, "big"))
+        elif self._chip_type == "w6300":
+            device.write(call_back.to_bytes(1, "big"))
+            device.write((address >> 8).to_bytes(1, "big"))
+            device.write((address & 0xFF).to_bytes(1, "big"))
+            device.write((0x00).to_bytes(1, "big"))
 
     def _chip_write(self, device: busio.SPI, address: int, call_back: int) -> None:
         """Chip specific calls for _write."""
@@ -1253,6 +1408,11 @@ class WIZNET5K:
             device.write((0xF0).to_bytes(1, "big"))
             device.write((address >> 8).to_bytes(1, "big"))
             device.write((address & 0xFF).to_bytes(1, "big"))
+        elif self._chip_type == "w6300":
+            device.write(call_back.to_bytes(1, "big"))
+            device.write((address >> 8).to_bytes(1, "big"))
+            device.write((address & 0xFF).to_bytes(1, "big"))
+            device.write((0x00).to_bytes(1, "big"))
 
     def _chip_socket_read(self, socket_number, pointer, bytes_to_read):
         """Chip specific calls for socket_read."""
@@ -1271,6 +1431,9 @@ class WIZNET5K:
                 bytes_read += self._read(src_addr, 0x00, split_point)
             else:
                 bytes_read = self._read(src_addr, 0x00, bytes_to_read)
+        elif self._chip_type == "w6300":
+            ctrl_byte = 0x83 + (socket_number << 2)
+            bytes_read = self._read(pointer, ctrl_byte, bytes_to_read)
         return bytes_read
 
     def _chip_socket_write(
@@ -1293,6 +1456,11 @@ class WIZNET5K:
             else:
                 self._write(dst_addr, 0x00, buffer[:bytes_to_write])
 
+        elif self._chip_type == "w6300":
+            dst_addr = offset + (socket_number * _SOCK_SIZE + 0x8000)
+            cntl_byte = 0xA2 + (socket_number << 2)
+            self._write(dst_addr, cntl_byte, buffer[:bytes_to_write])
+
     def _chip_parse_udp_header(self, socket_num) -> int:
         """
         Parse chip specific UDP header data for IPv4 packets.
@@ -1309,6 +1477,10 @@ class WIZNET5K:
             self.udp_from_ip[socket_num] = self._pbuff[3:7]
             self.udp_from_port[socket_num] = int.from_bytes(self._pbuff[6:], "big")
             return int.from_bytes(self._pbuff[:2], "big") & 0x07FF
+        if self._chip_type == "w6300":
+            self.udp_from_ip[socket_num] = self._pbuff[2:6]
+            self.udp_from_port[socket_num] = int.from_bytes(self._pbuff[6:8], "big")
+            return int.from_bytes(self._pbuff[:2], "big") & 0x07FF
         raise ValueError("Unsupported chip type.")
 
     def _write_socket_register(self, sock: int, address: int, data: int) -> None:
@@ -1319,6 +1491,9 @@ class WIZNET5K:
         elif self._chip_type == "w5100s":
             cntl_byte = 0
             self._write(self._ch_base_msb + sock * _CH_SIZE + address, cntl_byte, data)
+        elif self._chip_type == "w6300":
+            cntl_byte = (sock << 2) + 0xA1
+            self._write(address, cntl_byte, data)
 
     def _read_socket_register(self, sock: int, address: int) -> int:
         """Read a WIZnet 5k socket register."""
@@ -1328,4 +1503,7 @@ class WIZNET5K:
         elif self._chip_type == "w5100s":
             cntl_byte = 0
             register = self._read(self._ch_base_msb + sock * _CH_SIZE + address, cntl_byte)
+        elif self._chip_type == "w6300":
+            cntl_byte = (sock << 2) + 0x81
+            register = self._read(address, cntl_byte)
         return int.from_bytes(register, "big")
