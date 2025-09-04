@@ -61,133 +61,43 @@ from adafruit_wiznet5k.adafruit_wiznet5k_debug import debug_msg
 # *** Wiznet Common Registers ***
 _REG_MR = {"w5100s": const(0x0000), "w5500": const(0x0000)}
 # Gateway IPv4 Address.
-_REG_GAR = {
-    "w5100s": const(0x0001),
-    "w5500": const(0x0001),
-    "w6100": const(0x4130),
-    "w6300": const(0x4130),
-}
+_REG_GAR = {"w5100s": const(0x0001), "w5500": const(0x0001), "w6100": const(0x4130), "w6300": const(0x4130)}
 # Subnet Mask Address
-_REG_SUBR = {
-    "w5100s": const(0x0005),
-    "w5500": const(0x0005),
-    "w6100": const(0x4134),
-    "w6300": const(0x4134),
-}
+_REG_SUBR = {"w5100s": const(0x0005), "w5500": const(0x0005), "w6100": const(0x4134), "w6300": const(0x4134)}
 # Chip version.
-_REG_VERSIONR = {
-    "w5100s": const(0x0080),
-    "w5500": const(0x0039),
-    "w6100": const(0x0000),
-    "w6300": const(0x0000),
-}
+_REG_VERSIONR = {"w5100s": const(0x0080), "w5500": const(0x0039), "w6100": const(0x0000), "w6300": const(0x0000)}
 # Source Hardware Address
-_REG_SHAR = {
-    "w5100s": const(0x0009),
-    "w5500": const(0x0009),
-    "w6100": const(0x4120),
-    "w6300": const(0x4120),
-}
+_REG_SHAR = {"w5100s": const(0x0009), "w5500": const(0x0009), "w6100": const(0x4120), "w6300": const(0x4120)}
 # Source IP Address
-_REG_SIPR = {
-    "w5100s": const(0x000F),
-    "w5500": const(0x000F),
-    "w6100": const(0x4138),
-    "w6300": const(0x4138),
-}
+_REG_SIPR = {"w5100s": const(0x000F), "w5500": const(0x000F), "w6100": const(0x4138), "w6300": const(0x4138)}
 # Register with link status flag (PHYCFGR for 5xxxx, PHYSR for 6100).
-_REG_LINK_FLAG = {
-    "w5100s": const(0x003C),
-    "w5500": const(0x002E),
-    "w6100": const(0x3000),
-    "w6300": const(0x3000),
-}
-_REG_RCR = {
-    "w5100s": const(0x0019),
-    "w5500": const(0x001B),
-    "w6100": const(0x4204),
-    "w6300": const(0x4204),
-}
-_REG_RTR = {
-    "w5100s": const(0x0017),
-    "w5500": const(0x0019),
-    "w6100": const(0x4200),
-    "w6300": const(0x4200),
-}
+_REG_LINK_FLAG = {"w5100s": const(0x003C), "w5500": const(0x002E), "w6100": const(0x3000), "w6300": const(0x3000)}
+_REG_RCR = {"w5100s": const(0x0019), "w5500": const(0x001B), "w6100": const(0x4204), "w6300": const(0x4204)}
+_REG_RTR = {"w5100s": const(0x0017), "w5500": const(0x0019), "w6100": const(0x4200), "w6300": const(0x4200)}
 
 # *** Wiznet Socket Registers ***
 # Socket n Mode.
 _REG_SNMR = const(0x0000)
 # Socket n Command.
-_REG_SNCR = {
-    "w5100s": const(0x0001),
-    "w5500": const(0x0001),
-    "w6100": const(0x0010),
-    "w6300": const(0x0010),
-}
+_REG_SNCR = {"w5100s": const(0x0001), "w5500": const(0x0001), "w6100": const(0x0010), "w6300": const(0x0010)}
 # Socket n Interrupt.
-_REG_SNIR = {
-    "w5100s": const(0x0002),
-    "w5500": const(0x0002),
-    "w6100": const(0x0020),
-    "w6300": const(0x0020),
-}
+_REG_SNIR = {"w5100s": const(0x0002), "w5500": const(0x0002), "w6100": const(0x0020), "w6300": const(0x0020)}
 # Socket n Status.
-_REG_SNSR = {
-    "w5100s": const(0x0003),
-    "w5500": const(0x0003),
-    "w6100": const(0x0030),
-    "w6300": const(0x0030),
-}
+_REG_SNSR = {"w5100s": const(0x0003), "w5500": const(0x0003), "w6100": const(0x0030), "w6300": const(0x0030)}
 # Socket n Source Port.
-_REG_SNPORT = {
-    "w5100s": const(0x0004),
-    "w5500": const(0x0004),
-    "w6100": const(0x0114),
-    "w6300": const(0x0114),
-}
+_REG_SNPORT = {"w5100s": const(0x0004), "w5500": const(0x0004), "w6100": const(0x0114), "w6300": const(0x0114)}
 # Destination IPv4 Address.
-_REG_SNDIPR = {
-    "w5100s": const(0x000C),
-    "w5500": const(0x000C),
-    "w6100": const(0x0120),
-    "w6300": const(0x0120),
-}
+_REG_SNDIPR = {"w5100s": const(0x000C), "w5500": const(0x000C), "w6100": const(0x0120), "w6300": const(0x0120)}
 # Destination Port.
-_REG_SNDPORT = {
-    "w5100s": const(0x0010),
-    "w5500": const(0x0010),
-    "w6100": const(0x0140),
-    "w6300": const(0x0140),
-}
+_REG_SNDPORT = {"w5100s": const(0x0010), "w5500": const(0x0010), "w6100": const(0x0140), "w6300": const(0x0140)}
 # RX Free Size.
-_REG_SNRX_RSR = {
-    "w5100s": const(0x0026),
-    "w5500": const(0x0026),
-    "w6100": const(0x0224),
-    "w6300": const(0x0224),
-}
+_REG_SNRX_RSR = {"w5100s": const(0x0026), "w5500": const(0x0026), "w6100": const(0x0224), "w6300": const(0x0224)}
 # Read Size Pointer.
-_REG_SNRX_RD = {
-    "w5100s": const(0x0028),
-    "w5500": const(0x0028),
-    "w6100": const(0x0228),
-    "w6300": const(0x0228),
-}
+_REG_SNRX_RD = {"w5100s": const(0x0028), "w5500": const(0x0028), "w6100": const(0x0228), "w6300": const(0x0228)}
 # Socket n TX Free Size.
-_REG_SNTX_FSR = {
-    "w5100s": const(0x0020),
-    "w5500": const(0x0020),
-    "w6100": const(0x0204),
-    "w6300": const(0x0204),
-}
+_REG_SNTX_FSR = {"w5100s": const(0x0020), "w5500": const(0x0020), "w6100": const(0x0204), "w6300": const(0x0204)}
 # TX Write Pointer.
-_REG_SNTX_WR = {
-    "w5100s": const(0x0024),
-    "w5500": const(0x0024),
-    "w6100": const(0x020C),
-    "w6300": const(0x020C),
-}
+_REG_SNTX_WR = {"w5100s": const(0x0024), "w5500": const(0x0024), "w6100": const(0x020C), "w6300": const(0x020C)}
 
 # SNSR Commands
 SNSR_SOCK_CLOSED = const(0x00)
@@ -243,12 +153,7 @@ _LOCAL_PORT = const(0x400)
 _DEFAULT_MAC = "DE:AD:BE:EF:FE:ED"
 
 # Maximum number of sockets to support, differs between chip versions.
-_MAX_SOCK_NUM = {
-    "w5100s": const(0x04),
-    "w5500": const(0x08),
-    "w6100": const(0x08),
-    "w6300": const(0x08),
-}
+_MAX_SOCK_NUM = {"w5100s": const(0x04), "w5500": const(0x08), "w6100": const(0x08), "w6300": const(0x08)}
 _SOCKET_INVALID = const(0xFF)
 
 
@@ -547,13 +452,9 @@ class WIZNET5K:
         """
         if self._chip_type == "w6300":
             # w6300 uses PHYCFGR register for link status
-            return bool(
-                int.from_bytes(self._read(_REG_LINK_FLAG[self._chip_type], 0x80), "big") & 0x01
-            )
+            return bool(int.from_bytes(self._read(_REG_LINK_FLAG[self._chip_type], 0x80), "big") & 0x01)
         else:
-            return bool(
-                int.from_bytes(self._read(_REG_LINK_FLAG[self._chip_type], 0x00), "big") & 0x01
-            )
+            return bool(int.from_bytes(self._read(_REG_LINK_FLAG[self._chip_type], 0x00), "big") & 0x01)
 
     @property
     def ifconfig(self) -> Tuple[bytes, bytes, bytes, bytes]:
