@@ -7,6 +7,7 @@
 This example client runs on CPython and connects to / sends data to the
 simpleserver example.
 """
+
 import socket
 import time
 

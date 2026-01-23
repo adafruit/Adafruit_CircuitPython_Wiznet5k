@@ -1,13 +1,15 @@
 # SPDX-FileCopyrightText: 2021 ladyada for Adafruit Industries
 # SPDX-License-Identifier: MIT
 
-from os import getenv
 import time
+from os import getenv
+
+import adafruit_connection_manager
+import adafruit_requests
 import board
 import busio
 from digitalio import DigitalInOut
-import adafruit_connection_manager
-import adafruit_requests
+
 from adafruit_wiznet5k.adafruit_wiznet5k import WIZNET5K
 
 # Get Adafruit IO keys, ensure these are setup in settings.toml
