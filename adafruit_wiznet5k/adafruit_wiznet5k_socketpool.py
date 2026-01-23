@@ -422,10 +422,7 @@ class Socket:
                 if self._timeout == 0:
                     # non-blocking mode
                     raise OSError(errno.EAGAIN)
-                if (
-                    self._timeout
-                    and 0 < self._timeout < ticks_diff(ticks_ms(), stamp) / 1000
-                ):
+                if self._timeout and 0 < self._timeout < ticks_diff(ticks_ms(), stamp) / 1000:
                     # blocking mode with timeout
                     raise OSError(errno.ETIMEDOUT)
                 # blocking mode / timeout not expired
