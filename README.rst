@@ -71,7 +71,7 @@ wifitest.adafruit.com.
     print("Wiznet5k WebClient Test")
 
     TEXT_URL = "http://wifitest.adafruit.com/testwifi/index.html"
-    JSON_URL = "http://api.coindesk.com/v1/bpi/currentprice/USD.json"
+    JSON_URL = "http://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard"
 
     cs = digitalio.DigitalInOut(board.D10)
     spi_bus = busio.SPI(board.SCK, MOSI=board.MOSI, MISO=board.MISO)

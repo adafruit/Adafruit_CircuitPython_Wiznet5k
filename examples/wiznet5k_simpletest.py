@@ -12,7 +12,7 @@ from adafruit_wiznet5k.adafruit_wiznet5k import WIZNET5K
 print("Wiznet5k WebClient Test")
 
 TEXT_URL = "http://wifitest.adafruit.com/testwifi/index.html"
-JSON_URL = "http://api.coindesk.com/v1/bpi/currentprice/USD.json"
+JSON_URL = "http://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard"
 
 # For Adafruit Ethernet FeatherWing
 cs = digitalio.DigitalInOut(board.D10)
