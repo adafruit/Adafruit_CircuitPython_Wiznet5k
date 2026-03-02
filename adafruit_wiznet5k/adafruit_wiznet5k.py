@@ -773,13 +773,11 @@ class WIZNET5K:
         # Send listen command
         self._write_sncr(socket_num, _CMD_SOCK_LISTEN)
         # Wait until ready
-        status = SNSR_SOCK_CLOSED
-        while status not in {
+        while (status := self._read_snsr(socket_num)) not in {
             SNSR_SOCK_LISTEN,
             SNSR_SOCK_ESTABLISHED,
             _SNSR_SOCK_UDP,
         }:
-            status = self._read_snsr(socket_num)
             if status == SNSR_SOCK_CLOSED:
                 raise RuntimeError("Listening socket closed.")
 
