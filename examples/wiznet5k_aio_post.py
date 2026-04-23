@@ -41,7 +41,7 @@ while True:
     )
     print(response.json())
     response.close()
-    counter = counter + 1
+    counter += 1
     print("OK")
     response = None
     time.sleep(15)
